@@ -48,13 +48,14 @@ function startSequence() {
             setTimeout(() => {
                 glitchText.classList.remove('blinking');
 
-                // 4. Глитч
+                // 4. Глитч с затуханием
                 glitchText.classList.add('glitching');
 
+                // Глитч длится 2 секунды и сам угасает в тьму
                 setTimeout(() => {
                     glitchText.classList.remove('glitching');
 
-                    // 5. Убираем текст, показываем финальный чёрный
+                    // 5. Убираем текстовый экран, показываем финальный чёрный
                     textScreen.classList.add('fade-out');
 
                     setTimeout(() => {
@@ -77,9 +78,9 @@ function startSequence() {
 
                         }, 1500);
 
-                    }, 1000);
+                    }, 600);
 
-                }, 2000); // глитч
+                }, 2000); // глитч длится 2 секунды
 
             }, 1800); // мигание
 
