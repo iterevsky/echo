@@ -59,6 +59,7 @@ function startSequence() {
                 // После окончания глитча — чёрный экран
                 setTimeout(() => {
                     textScreen.classList.remove('visible');
+                    textScreen.style.opacity = ''; // сбрасываем inline-стиль
                     
                     // Показываем финальный чёрный экран
                     finalScreen.classList.add('visible');
@@ -92,6 +93,7 @@ function showContents() {
 
     setTimeout(() => {
         titleScreen.classList.remove('visible');
+        titleScreen.classList.remove('melting');
 
         // Показываем оглавление
         setTimeout(() => {
@@ -205,13 +207,14 @@ function openChapter(index) {
     prevBtn.classList.toggle('inactive', index === 0);
     nextBtn.classList.toggle('inactive', index === chapters.length - 1);
     
-    // Скрываем оглавление, показываем главу
+    // Скрываем оглавление
     contentsScreen.classList.remove('visible');
     
+    // Показываем главу
     setTimeout(() => {
         screen.classList.add('visible');
-        window.scrollTo(0, 0);
-    }, 500);
+        screen.scrollTop = 0; // скроллим сам элемент, а не window
+    }, 300);
 }
 
 // Обработчики навигации внутри главы
