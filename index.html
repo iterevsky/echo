@@ -2,7 +2,10 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="description" content="ЭХО — иммерсивная книга Итеревского-Кочетова Ивана. Психологический хоррор / мистика.">
+    <meta name="theme-color" content="#000000">
+    <meta name="apple-mobile-web-app-capable" content="yes">
     <title>ЭХО</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -10,12 +13,12 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <!-- Экран с картинкой -->
+    <!-- Экран с обложкой -->
     <div id="cover-screen">
-        <img src="zastavka.jpg" alt="ЭХО">
+        <img src="zastavka.jpg" alt="ЭХО" draggable="false">
     </div>
 
-    <!-- Экран с текстом -->
+    <!-- Экран с вопросом -->
     <div id="text-screen">
         <div id="glitch-text">Что страшнее – исчезнуть или быть забытым?</div>
     </div>
@@ -64,7 +67,7 @@
         </div>
     </div>
 
-    <!-- Контейнер для текста глав -->
+    <!-- Экран главы -->
     <div id="chapter-screen">
         <div class="chapter-number"></div>
         <div class="chapter-title"></div>
