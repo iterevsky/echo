@@ -4,12 +4,12 @@
     box-sizing: border-box;
 }
 
-body {
+html, body {
     font-family: 'PT Serif', serif;
     overflow: hidden;
     background: #000;
-    height: 100vh;
-    width: 100vw;
+    height: 100%;
+    width: 100%;
 }
 
 /* Экран с картинкой */
@@ -30,20 +30,11 @@ body {
 
 #cover-screen img {
     max-width: 90%;
-    max-height: 80vh;
+    max-height: 85vh;
     object-fit: contain;
-}
-
-#cover-screen .hint {
-    color: rgba(255,255,255,0.5);
-    margin-top: 20px;
-    font-size: 14px;
-    animation: pulse 2s infinite;
-}
-
-@keyframes pulse {
-    0%, 100% { opacity: 0.3; }
-    50% { opacity: 0.8; }
+    -webkit-user-drag: none;
+    user-select: none;
+    -webkit-user-select: none;
 }
 
 /* Экран с текстом */
@@ -60,15 +51,19 @@ body {
     z-index: 2;
     opacity: 0;
     pointer-events: none;
+    transition: opacity 0.3s ease;
 }
 
 #glitch-text {
+    font-family: 'PT Serif', serif;
     color: #fff;
-    font-size: 2.5rem;
+    font-size: 1.25rem; /* Уменьшено на 50% (было 2.5rem) */
     text-align: center;
     padding: 20px;
     max-width: 90%;
-    line-height: 1.4;
+    line-height: 1.5;
+    opacity: 0;
+    transition: opacity 0.5s ease;
 }
 
 /* Мигание текста */
@@ -78,23 +73,30 @@ body {
 }
 
 .blinking {
-    animation: blink 0.3s ease-in-out 6; /* 6 раз = ~1.8 секунды */
+    animation: blink 0.3s ease-in-out 6;
+    opacity: 1 !important;
 }
 
 /* Глитч-эффект */
 @keyframes glitch {
-    0% { transform: translate(0); filter: none; }
-    20% { transform: translate(-3px, 2px); filter: hue-rotate(90deg); }
-    40% { transform: translate(3px, -2px); filter: hue-rotate(180deg) saturate(200%); }
-    60% { transform: translate(-2px, -1px); filter: hue-rotate(270deg); }
-    80% { transform: translate(2px, 3px); filter: hue-rotate(360deg); }
-    100% { transform: translate(0); filter: none; }
+    0% { transform: translate(0); filter: none; opacity: 1; }
+    10% { transform: translate(-3px, 2px); filter: hue-rotate(90deg); }
+    20% { transform: translate(3px, -2px); filter: hue-rotate(180deg) saturate(200%); }
+    30% { transform: translate(-2px, -1px); filter: hue-rotate(270deg); }
+    40% { transform: translate(2px, 3px); filter: hue-rotate(360deg); }
+    50% { transform: translate(-3px, 1px); filter: hue-rotate(90deg) blur(1px); }
+    60% { transform: translate(2px, -3px); filter: hue-rotate(180deg); }
+    70% { transform: translate(-1px, 2px); filter: hue-rotate(270deg) saturate(150%); }
+    80% { transform: translate(3px, -1px); filter: hue-rotate(360deg); }
+    90% { transform: translate(-2px, 3px); filter: hue-rotate(180deg) blur(1px); }
+    100% { transform: translate(0); filter: none; opacity: 1; }
 }
 
 .glitching {
-    animation: glitch 0.1s ease-in-out 20; /* 20 раз = 2 секунды */
+    animation: glitch 0.1s ease-in-out 20;
     color: #ff0040;
     text-shadow: 2px 0 #00ffea, -2px 0 #ff00ff;
+    opacity: 1 !important;
 }
 
 /* Финальный экран */
@@ -105,17 +107,28 @@ body {
     width: 100%;
     height: 100%;
     background: #000;
-    z-index: 1;
+    z-index: 10;
     opacity: 0;
-    transition: opacity 1s ease;
+    pointer-events: none;
+    transition: opacity 1.5s ease;
 }
 
-.show {
+.final-show {
     opacity: 1 !important;
     pointer-events: all !important;
 }
 
-.hide {
+.text-visible {
+    opacity: 1 !important;
+}
+
+/* Убираем картинку */
+.hide-up {
     transform: translateY(-100%);
     opacity: 0;
+}
+
+.show-screen {
+    opacity: 1 !important;
+    pointer-events: all !important;
 }
