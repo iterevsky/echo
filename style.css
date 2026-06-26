@@ -11,9 +11,10 @@ html, body {
     height: 100%;
     width: 100%;
     color: #e8e6e3;
+    -webkit-tap-highlight-color: transparent;
 }
 
-/* === ЭКРАН С КАРТИНКОЙ === */
+/* === ЭКРАН С ОБЛОЖКОЙ === */
 #cover-screen {
     position: fixed;
     top: 0;
@@ -37,7 +38,7 @@ html, body {
     filter: contrast(1.05) brightness(0.95);
 }
 
-/* === ЭКРАН С ТЕКСТОМ === */
+/* === ЭКРАН С ВОПРОСОМ === */
 #text-screen {
     position: fixed;
     top: 0;
@@ -76,7 +77,6 @@ html, body {
     opacity: 1;
 }
 
-/* Мигание текста */
 @keyframes blink {
     0%, 100% { opacity: 1; }
     50% { opacity: 0; }
@@ -86,62 +86,22 @@ html, body {
     animation: blink 0.35s ease-in-out 5;
 }
 
-/* Глитч-эффект с затуханием в тьму */
 @keyframes glitch-to-dark {
-    0% { 
-        transform: translate(0); 
-        filter: none; 
-        opacity: 1; 
-    }
-    10% { 
-        transform: translate(-2px, 1px); 
-        filter: hue-rotate(90deg) saturate(150%); 
-    }
-    20% { 
-        transform: translate(2px, -1px); 
-        filter: hue-rotate(180deg) saturate(200%); 
-    }
-    30% { 
-        transform: translate(-1px, -2px); 
-        filter: hue-rotate(270deg) blur(0.5px); 
-    }
-    40% { 
-        transform: translate(2px, 2px); 
-        filter: hue-rotate(360deg); 
-    }
-    50% { 
-        transform: translate(-2px, 0); 
-        filter: hue-rotate(90deg) saturate(180%) blur(0.3px); 
-    }
-    60% { 
-        transform: translate(1px, -2px); 
-        filter: hue-rotate(180deg); 
-        opacity: 0.9; 
-    }
-    70% { 
-        transform: translate(-1px, 1px); 
-        filter: hue-rotate(270deg) saturate(150%) blur(1px); 
-        opacity: 0.6; 
-    }
-    80% { 
-        transform: translate(2px, -1px); 
-        filter: hue-rotate(360deg) blur(2px); 
-        opacity: 0.3; 
-    }
-    90% { 
-        transform: translate(-2px, 2px); 
-        filter: hue-rotate(180deg) blur(4px); 
-        opacity: 0.05; 
-    }
-    100% { 
-        transform: translate(0); 
-        filter: blur(12px); 
-        opacity: 0; 
-    }
+    0% { transform: translate(0); filter: none; opacity: 1; }
+    10% { transform: translate(-2px, 1px); filter: hue-rotate(90deg) saturate(150%); }
+    20% { transform: translate(2px, -1px); filter: hue-rotate(180deg) saturate(200%); }
+    30% { transform: translate(-1px, -2px); filter: hue-rotate(270deg) blur(0.5px); }
+    40% { transform: translate(2px, 2px); filter: hue-rotate(360deg); }
+    50% { transform: translate(-2px, 0); filter: hue-rotate(90deg) saturate(180%) blur(0.3px); }
+    60% { transform: translate(1px, -2px); filter: hue-rotate(180deg); opacity: 0.9; }
+    70% { transform: translate(-1px, 1px); filter: hue-rotate(270deg) saturate(150%) blur(1px); opacity: 0.6; }
+    80% { transform: translate(2px, -1px); filter: hue-rotate(360deg) blur(2px); opacity: 0.3; }
+    90% { transform: translate(-2px, 2px); filter: hue-rotate(180deg) blur(4px); opacity: 0.05; }
+    100% { transform: translate(0); filter: blur(12px); opacity: 0; }
 }
 
 .glitching {
-    animation: glitch-to-dark 2s ease;
+    animation: glitch-to-dark 2s ease forwards;
     color: #c41e3a;
     text-shadow: 1px 0 #00b4d8, -1px 0 #9b59b6;
 }
@@ -289,7 +249,6 @@ html, body {
     opacity: 0;
 }
 
-/* Мелт-эффект для букв */
 @keyframes melt {
     0% { opacity: 1; filter: blur(0); transform: translateY(0); }
     30% { opacity: 0.8; filter: blur(1px); transform: translateY(2px); }
@@ -358,13 +317,21 @@ html, body {
     text-indent: 0;
 }
 
-.chapter-text p:first-child::first-letter {
+.chapter-text p:first-child:not(.placeholder)::first-letter {
     font-size: 3.2rem;
     float: left;
     line-height: 0.8;
     padding-right: 12px;
     padding-top: 8px;
     color: #e8e6e3;
+}
+
+.chapter-text p.placeholder {
+    text-indent: 0;
+    text-align: center;
+    color: #5a5a5a;
+    margin-top: 35vh;
+    font-style: italic;
 }
 
 .chapter-nav {
@@ -381,6 +348,7 @@ html, body {
     font-size: 0.85rem;
     color: #6b6b6b;
     z-index: 10;
+    user-select: none;
 }
 
 .chapter-nav span {
@@ -396,4 +364,18 @@ html, body {
 .chapter-nav .nav-next.inactive {
     color: #2a2a2a;
     pointer-events: none;
+}
+
+/* === МОБИЛЬНЫЕ УЛУЧШЕНИЯ === */
+@media (max-width: 480px) {
+    #title-screen .book-title {
+        font-size: 2.8rem;
+        letter-spacing: 0.2em;
+    }
+    .chapter-title {
+        font-size: 1.2rem;
+    }
+    .chapter-text {
+        font-size: 1rem;
+    }
 }
