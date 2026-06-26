@@ -59,22 +59,35 @@ function startSequence() {
 
                 // После окончания глитча — чёрный экран
                 setTimeout(() => {
+                    // Скрываем text-screen полностью
+                    textScreen.style.pointerEvents = 'none';
+                    
+                    // Показываем финальный чёрный экран
                     finalScreen.classList.add('show');
+                    finalScreen.style.opacity = '1';
 
-                    // 5. Показываем название книги
+                    // 5. Через 1.5 секунды — затухаем чёрный экран и показываем название
                     setTimeout(() => {
+                        // Подготавливаем titleScreen (делаем видимым, но прозрачным)
+                        titleScreen.style.opacity = '0';
+                        titleScreen.style.pointerEvents = 'none';
+                        titleScreen.classList.add('show');
+                        
+                        // Затухаем финальный экран
+                        finalScreen.style.transition = 'opacity 2s ease';
                         finalScreen.style.opacity = '0';
-                        finalScreen.style.transition = 'opacity 1.5s ease';
 
+                        // Параллельно появляется название
                         setTimeout(() => {
-                            titleScreen.classList.add('show');
+                            titleScreen.style.transition = 'opacity 2s ease';
+                            titleScreen.style.opacity = '1';
                             titleScreen.style.pointerEvents = 'all';
 
                             // Ждём клик для перехода к оглавлению
                             titleScreen.addEventListener('click', showContents, { once: true });
                             titleScreen.addEventListener('touchend', showContents, { once: true });
 
-                        }, 800);
+                        }, 500);
 
                     }, 1500);
 
