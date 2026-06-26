@@ -8,10 +8,6 @@ let isStarted = false;
 // Обработка касания/клика
 function handleStart(e) {
     if (isStarted) return;
-    // Предотвращаем стандартное поведение только если это не скролл
-    if (e.type === 'touchstart') {
-        // Для тач — просто запоминаем, что коснулись
-    }
 }
 
 function handleEnd(e) {
@@ -76,9 +72,6 @@ function startSequence() {
                     setTimeout(() => {
                         // 6. Показываем финальный чёрный экран
                         finalScreen.classList.add('final-show');
-                        
-                        // Здесь можно добавить содержимое книги
-                        // setTimeout(() => { window.location.href = 'book.html'; }, 1000);
                     }, 500);
                     
                 }, 2000); // Длительность глитча
