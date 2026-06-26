@@ -3,75 +3,89 @@ const textScreen = document.getElementById('text-screen');
 const glitchText = document.getElementById('glitch-text');
 const finalScreen = document.getElementById('final-screen');
 
-let isSwiped = false;
+let isStarted = false;
 
-// Обработка свайпа (для телефона)
-let touchStartY = 0;
+// Обработка касания/клика
+function handleStart(e) {
+    if (isStarted) return;
+    // Предотвращаем стандартное поведение только если это не скролл
+    if (e.type === 'touchstart') {
+        // Для тач — просто запоминаем, что коснулись
+    }
+}
 
-document.addEventListener('touchstart', (e) => {
-    touchStartY = e.touches[0].clientY;
+function handleEnd(e) {
+    if (isStarted) return;
+    startSequence();
+}
+
+// Touch события
+document.addEventListener('touchstart', handleStart, { passive: true });
+document.addEventListener('touchend', handleEnd, { passive: true });
+
+// Клик мышью
+document.addEventListener('click', (e) => {
+    if (isStarted) return;
+    startSequence();
 });
 
+// Также свайп вверх
+let touchStartY = 0;
+document.addEventListener('touchstart', (e) => {
+    touchStartY = e.touches[0].clientY;
+}, { passive: true });
+
 document.addEventListener('touchend', (e) => {
-    if (isSwiped) return;
-    
+    if (isStarted) return;
     const touchEndY = e.changedTouches[0].clientY;
     const diff = touchStartY - touchEndY;
-    
-    // Свайп вверх (разница > 50 пикселей)
     if (diff > 50) {
         startSequence();
     }
-});
-
-// Обработка прокрутки мышью (для компьютера)
-document.addEventListener('wheel', (e) => {
-    if (isSwiped) return;
-    
-    if (e.deltaY < 0) { // Прокрутка вверх
-        startSequence();
-    }
-});
-
-// Также можно кликнуть по картинке (для удобства)
-coverScreen.addEventListener('click', () => {
-    if (!isSwiped) startSequence();
-});
+}, { passive: true });
 
 function startSequence() {
-    isSwiped = true;
+    if (isStarted) return;
+    isStarted = true;
     
     // 1. Убираем картинку вверх
-    coverScreen.classList.add('hide');
+    coverScreen.classList.add('hide-up');
     
     // 2. Показываем текстовый экран
     setTimeout(() => {
-        textScreen.classList.add('show');
+        textScreen.classList.add('show-screen');
+        glitchText.classList.add('text-visible');
         
-        // 3. Мигание текста (2 секунды)
-        glitchText.classList.add('blinking');
-        
+        // 3. Мигание текста (~2 секунды)
         setTimeout(() => {
-            glitchText.classList.remove('blinking');
-            
-            // 4. Глитч-эффект (2 секунды)
-            glitchText.classList.add('glitching');
+            glitchText.classList.add('blinking');
             
             setTimeout(() => {
-                // 5. Убираем текст, показываем финальный экран
-                textScreen.style.opacity = '0';
-                textScreen.style.transition = 'opacity 0.5s ease';
+                glitchText.classList.remove('blinking');
+                
+                // 4. Глитч-эффект (2 секунды)
+                glitchText.classList.add('glitching');
                 
                 setTimeout(() => {
-                    finalScreen.classList.add('show');
+                    glitchText.classList.remove('glitching');
+                    glitchText.classList.remove('text-visible');
                     
-                    // Здесь можно добавить переход к содержимому книги
-                    // Например: window.location.href = 'book.html';
-                }, 500);
+                    // 5. Убираем текстовый экран
+                    textScreen.style.opacity = '0';
+                    
+                    setTimeout(() => {
+                        // 6. Показываем финальный чёрный экран
+                        finalScreen.classList.add('final-show');
+                        
+                        // Здесь можно добавить содержимое книги
+                        // setTimeout(() => { window.location.href = 'book.html'; }, 1000);
+                    }, 500);
+                    
+                }, 2000); // Длительность глитча
                 
-            }, 2000); // Длительность глитча
+            }, 2000); // Длительность мигания
             
-        }, 2000); // Длительность мигания
+        }, 300); // Небольшая пауза перед миганием
         
-    }, 600); // Небольшая задержка после свайпа
+    }, 600); // Задержка после свайпа
 }
