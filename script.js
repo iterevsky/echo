@@ -4,136 +4,25 @@ const glitchText = document.getElementById('glitch-text');
 const finalScreen = document.getElementById('final-screen');
 const titleScreen = document.getElementById('title-screen');
 const contentsScreen = document.getElementById('contents-screen');
+const chapterScreen = document.getElementById('chapter-screen');
 
 let isStarted = false;
+let currentChapter = 0;
 
-// Касание / клик везде
-document.addEventListener('touchstart', () => {}, { passive: true });
-document.addEventListener('touchend', (e) => {
-    if (!isStarted) startSequence();
-}, { passive: true });
+const STORAGE_KEY = 'echo_state';
 
-document.addEventListener('click', () => {
-    if (!isStarted) startSequence();
-});
-
-// Свайп вверх
-let touchStartY = 0;
-document.addEventListener('touchstart', (e) => {
-    touchStartY = e.touches[0].clientY;
-}, { passive: true });
-
-document.addEventListener('touchend', (e) => {
-    if (isStarted) return;
-    const diff = touchStartY - e.changedTouches[0].clientY;
-    if (diff > 50) startSequence();
-}, { passive: true });
-
-function startSequence() {
-    if (isStarted) return;
-    isStarted = true;
-
-    // 1. Убираем картинку
-    coverScreen.classList.add('hide-up');
-
-    // 2. Показываем текст
-    setTimeout(() => {
-        textScreen.classList.add('visible');
-        glitchText.classList.add('visible');
-
-        // 3. Мигание
-        setTimeout(() => {
-            glitchText.classList.add('blinking');
-
-            setTimeout(() => {
-                glitchText.classList.remove('blinking');
-
-                // 4. Глитч с затуханием в тьму — 2 секунды
-                glitchText.classList.add('glitching');
-
-                // Затухаем text-screen параллельно с глитчем
-                setTimeout(() => {
-                    textScreen.style.opacity = '0';
-                }, 1200);
-
-                // После окончания глитча — чёрный экран
-                setTimeout(() => {
-                    textScreen.classList.remove('visible');
-                    textScreen.style.opacity = ''; // сбрасываем inline-стиль
-                    
-                    // Показываем финальный чёрный экран
-                    finalScreen.classList.add('visible');
-
-                    // 5. Через 1.5 секунды — показываем название
-                    setTimeout(() => {
-                        // Затухаем чёрный экран
-                        finalScreen.classList.remove('visible');
-                        
-                        // Показываем название
-                        titleScreen.classList.add('visible');
-
-                        // Ждём клик для перехода к оглавлению
-                        titleScreen.addEventListener('click', showContents, { once: true });
-                        titleScreen.addEventListener('touchend', showContents, { once: true });
-
-                    }, 1500);
-
-                }, 2000); // глитч длится 2 секунды
-
-            }, 1800); // мигание
-
-        }, 400); // пауза перед миганием
-
-    }, 700); // задержка после свайпа
+function loadState() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; }
+    catch (e) { return {}; }
 }
-
-function showContents() {
-    // Буквы растают
-    titleScreen.classList.add('melting');
-
-    setTimeout(() => {
-        titleScreen.classList.remove('visible');
-        titleScreen.classList.remove('melting');
-
-        // Показываем оглавление
-        setTimeout(() => {
-            contentsScreen.classList.add('visible');
-
-            // Поочерёдно проявляем пункты
-            const items = document.querySelectorAll('.contents-item');
-            items.forEach((item, index) => {
-                setTimeout(() => {
-                    item.classList.add('revealed');
-                }, 200 + index * 80);
-            });
-
-            // Навешиваем обработчики кликов на пункты оглавления
-            items.forEach((item, index) => {
-                item.addEventListener('click', () => {
-                    openChapter(index);
-                });
-            });
-
-        }, 300);
-
-    }, 1200);
+function saveState(state) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
+const state = loadState();
 
-const coverScreen = document.getElementById('cover-screen');
-const textScreen = document.getElementById('text-screen');
-const glitchText = document.getElementById('glitch-text');
-const finalScreen = document.getElementById('final-screen');
-const titleScreen = document.getElementById('title-screen');
-const contentsScreen = document.getElementById('contents-screen');
-
-let isStarted = false;
-
-// ДАННЫЕ ГЛАВ — определяем заранее
-const chapters = [
-    {
-        number: "01",
-        title: "В начале была метель",
-        text: `<p>В начале была метель.</p>
+// === ТЕКСТЫ ГЛАВ ===
+const chapterTexts = {
+    0: `<p>В начале была метель.</p>
 <p>Я разглядывал двор, в котором мне предстояло жить. Обычная панельная девятиэтажка, по бокам и напротив — её копии. Вместе они создавали иллюзию дома-колодца. Только панельного. Во дворе беседка, качели, турники. Дальше виднелся декор, созданный из старых покрышек: они покрашены и наполовину вкопаны в землю.</p>
 <p>— Ярослав, соберись, что ты зеваешь по сторонам, — прервал мои размышления голос отца. — Мы так и до вечера не управимся.</p>
 <p>— Да я просто логистику оцениваю, пап, — улыбнулся я, стараясь пошутить его терминами. — Смотри, вон в том месте будет удобнее разгружать вещи. Ну, где-то на 27 процентов.</p>
@@ -164,24 +53,16 @@ const chapters = [
 <p>Сначала мне показалось, что нужно сказать родителям, может, следует связаться с прошлыми жильцами или хозяевами квартиры, вдруг её забыли, но потом я подумал, что раз все крупные вещи вывезли, а эта коробка осталась, значит, её просто не захотели брать.</p>
 <p>Ну нет, оставлю себе.</p>
 <p>Я взял цаплю и поставил её на подоконник. Мне показалось, что там ей самое подходящее место. Выглянул в окно и увидел уже знакомый мне двор, идентичный панельный дом напротив. Вокруг виднелся такой же стандартный спальный район, дворы, дома, ничего необычного. Но мой взгляд привлекло то, чего раньше я видеть не мог. Между домами виднелась Волга. Несмотря на то, что до неё было не меньше километра или двух, она всё равно казалась очень большой. Я никогда раньше её не видел, но река показалась мне смутно знакомой, я ощутил необъяснимый прилив сил. Иронично: вода и прилив сил. Улыбнулся.</p>
-<p>Нужно обязательно к ней сходить.</p>`
-    },
-    {
-        number: "02",
-        title: "Разложив большую часть",
-        text: `<p>Разложив большую часть своих вещей, я решил, что сейчас самое время прогуляться до Волги. Всё равно уборка и разбор вещей продолжатся и завтра. Я вышел из своей комнаты и направился к родителям, чтобы отпроситься.</p>
+<p>Нужно обязательно к ней сходить.</p>`,
+    1: `<p>Разложив большую часть своих вещей, я решил, что сейчас самое время прогуляться до Волги. Всё равно уборка и разбор вещей продолжатся и завтра. Я вышел из своей комнаты и направился к родителям, чтобы отпроситься.</p>
 <p>— Ну как же хорошо! — услышал я голос отца из комнаты. — Неужели будет всё нормально. Больше никаких соседей сверху. Ни музыки, ни хаоса с топаньем и вечеринками. Никакого нарушения порядка.</p>
 <p>— Да, — ответила ему мама. — Риелтор так и сказала, что квартира над нами опечатана. Уже очень давно. Наследники то ли уехали, то ли ещё что-то, поэтому в ней точно никто не живёт и вряд ли будет.</p>
 <p>— Отличные новости, — сказал отец и, увидев меня, добавил. — А, Ярослав, ты разобрался в комнате?</p>
 <p>— Да, почти, пап. Можно я немного передохну и прогуляюсь по городу? Завтра ещё целый день будем приводить квартиру в порядок, — поспешил добавить я.</p>
 <p>— Саша, пусть Ярослав прогуляется, новый город всё же, интересно, — поддержала меня мама.</p>
 <p>— Ну, хорошо, только не допоздна. Мать завтра пойдёт в школу, мы с ними связывались, отнесёт документы. Ты завтра здесь за главного будешь, чтобы убраться и разобрать вещи. Я уже завтра на работу.</p>
-<p>Чтобы не упустить момент, я быстро накинул вещи и вышел в подъезд, оставив родителей наедине. Они уже продолжили обсуждать планы на новом месте.</p>`
-    },
-    {
-        number: "03",
-        title: "Воздух казался мне другим",
-        text: `<p>Воздух казался мне другим.</p>
+<p>Чтобы не упустить момент, я быстро накинул вещи и вышел в подъезд, оставив родителей наедине. Они уже продолжили обсуждать планы на новом месте.</p>`,
+    2: `<p>Воздух казался мне другим.</p>
 <p>Нет, дело вряд ли в чём-то сверхъестественном. Уверен, что всё это было из-за Волги. Большая река, которая протекала вдоль всего города, определённо влияла на влажность и на сам запах воздуха в городе.</p>
 <p>Я шёл по центру города немного грустным. Позади остался привычный мне мир, мои знакомые, моя школа, мой дом. Отец говорил, что всё это здорово, но сентиментальная чепуха не должна влиять на жизнь. Впереди меня ждёт поступление и обучение в вузе. Он очень сильно хотел, чтобы я продолжил его дело. Быть инженером — гордо и престижно. Инженеры зарабатывают. Инженеры делают. Благодаря людям дела вращается мир. Дайте мне точку опоры и… И множество-множество подобных карикатурных и плоских мантр.</p>
 <p>— Завод ждёт тебя, инженер, — с досадой сказал я и ударил по пустой банке из-под газировки, что валялась под ногами. Она со звоном полетела вниз по гранитным ступенькам, и я понял, что уже стою на центральной набережной. Поднял глаза и увидел Волгу перед собой.</p>
@@ -189,169 +70,197 @@ const chapters = [
 <p>Этот вид поглотил всё: ветер, звуки города, машины, людей. Всё словно слилось воедино. Я почувствовал необъяснимое желание идти к ней. Но не чтобы утонуть, нет. Словно мне хотелось установить с ней связь. Или раствориться в этой титанической силе, стать частью чего-то вечного.</p>
 <p>Я чувствовал, как колотится моё сердце, но это был не страх, а всепоглощающее любопытство. Словно я слышал зов. Меня звали.</p>
 <p>И я хотел туда прийти.</p>`
+};
+
+// === ПОСТРОЕНИЕ МАССИВА ГЛАВ ИЗ HTML ===
+const items = document.querySelectorAll('.contents-item');
+const chapters = Array.from(items).map((item, index) => {
+    const num = String(index + 1).padStart(2, '0');
+    // Заголовок — текст после номера и точки
+    const raw = item.textContent.trim();
+    const title = raw.replace(/^\d+\s*[•\s]*/, '').trim();
+    const text = chapterTexts[index] || `<p class="placeholder">Глава в процессе написания…</p>`;
+    return { number: num, title, text };
+});
+
+// === ИНИЦИАЛИЗАЦИЯ ===
+function init() {
+    if (state.hasSeenIntro) {
+        skipToContents();
+    } else {
+        setupIntroListeners();
     }
-];
 
-let currentChapter = 0;
+    // Навигация по главе (один раз)
+    document.querySelector('.nav-prev').addEventListener('click', () => {
+        if (currentChapter > 0) openChapter(currentChapter - 1);
+    });
+    document.querySelector('.nav-next').addEventListener('click', () => {
+        if (currentChapter < chapters.length - 1) openChapter(currentChapter + 1);
+    });
+    document.querySelector('.nav-contents').addEventListener('click', returnToContents);
 
-// ФУНКЦИЯ ОТКРЫТИЯ ГЛАВЫ — определяем заранее
-function openChapter(index) {
-    if (index < 0 || index >= chapters.length) return;
-    
-    currentChapter = index;
-    const chapter = chapters[index];
-    
-    const screen = document.getElementById('chapter-screen');
-    const numberEl = screen.querySelector('.chapter-number');
-    const titleEl = screen.querySelector('.chapter-title');
-    const textEl = screen.querySelector('.chapter-text');
-    const prevBtn = screen.querySelector('.nav-prev');
-    const nextBtn = screen.querySelector('.nav-next');
-    
-    numberEl.textContent = 'Глава ' + chapter.number;
-    titleEl.textContent = chapter.title;
-    textEl.innerHTML = chapter.text;
-    
-    // Обновляем навигацию
-    prevBtn.classList.toggle('inactive', index === 0);
-    nextBtn.classList.toggle('inactive', index === chapters.length - 1);
-    
-    // Скрываем оглавление
-    contentsScreen.classList.remove('visible');
-    
-    // Показываем главу
-    setTimeout(() => {
-        screen.classList.add('visible');
-        screen.scrollTop = 0;
-    }, 300);
+    // Делегирование на оглавление
+    contentsScreen.addEventListener('click', (e) => {
+        const item = e.target.closest('.contents-item');
+        if (!item) return;
+        const idx = parseInt(item.dataset.chapter, 10);
+        if (!isNaN(idx)) openChapter(idx);
+    });
+
+    // Клавиатура
+    document.addEventListener('keydown', (e) => {
+        if (!chapterScreen.classList.contains('visible')) return;
+        if (e.key === 'ArrowLeft' && currentChapter > 0) {
+            e.preventDefault();
+            openChapter(currentChapter - 1);
+        }
+        if (e.key === 'ArrowRight' && currentChapter < chapters.length - 1) {
+            e.preventDefault();
+            openChapter(currentChapter + 1);
+        }
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            returnToContents();
+        }
+    });
 }
 
-// ОБРАБОТЧИКИ НАВИГАЦИИ ВНУТРИ ГЛАВЫ
-document.querySelector('.nav-prev').addEventListener('click', () => {
-    if (currentChapter > 0) openChapter(currentChapter - 1);
-});
+function setupIntroListeners() {
+    let touchStartY = 0;
 
-document.querySelector('.nav-next').addEventListener('click', () => {
-    if (currentChapter < chapters.length - 1) openChapter(currentChapter + 1);
-});
+    document.addEventListener('touchstart', (e) => {
+        touchStartY = e.touches[0].clientY;
+    }, { passive: true });
 
-document.querySelector('.nav-contents').addEventListener('click', () => {
-    const screen = document.getElementById('chapter-screen');
-    screen.classList.remove('visible');
-    
-    setTimeout(() => {
-        contentsScreen.classList.add('visible');
-    }, 500);
-});
+    document.addEventListener('touchend', (e) => {
+        if (isStarted) return;
+        const diff = touchStartY - e.changedTouches[0].clientY;
+        if (diff > 50) startSequence();
+    }, { passive: true });
 
-// КАСАНИЕ / КЛИК ВЕЗДЕ
-document.addEventListener('touchstart', () => {}, { passive: true });
-document.addEventListener('touchend', (e) => {
-    if (!isStarted) startSequence();
-}, { passive: true });
-
-document.addEventListener('click', () => {
-    if (!isStarted) startSequence();
-});
-
-// СВАЙП ВВЕРХ
-let touchStartY = 0;
-document.addEventListener('touchstart', (e) => {
-    touchStartY = e.touches[0].clientY;
-}, { passive: true });
-
-document.addEventListener('touchend', (e) => {
-    if (isStarted) return;
-    const diff = touchStartY - e.changedTouches[0].clientY;
-    if (diff > 50) startSequence();
-}, { passive: true });
+    document.addEventListener('click', () => {
+        if (!isStarted) startSequence();
+    });
+}
 
 function startSequence() {
     if (isStarted) return;
     isStarted = true;
+    state.hasSeenIntro = true;
+    saveState(state);
 
-    // 1. Убираем картинку
     coverScreen.classList.add('hide-up');
 
-    // 2. Показываем текст
     setTimeout(() => {
         textScreen.classList.add('visible');
         glitchText.classList.add('visible');
 
-        // 3. Мигание
         setTimeout(() => {
             glitchText.classList.add('blinking');
 
             setTimeout(() => {
                 glitchText.classList.remove('blinking');
-
-                // 4. Глитч с затуханием в тьму — 2 секунды
                 glitchText.classList.add('glitching');
 
-                // Затухаем text-screen параллельно с глитчем
                 setTimeout(() => {
                     textScreen.style.opacity = '0';
                 }, 1200);
 
-                // После окончания глитча — чёрный экран
                 setTimeout(() => {
                     textScreen.classList.remove('visible');
                     textScreen.style.opacity = '';
-                    
-                    // Показываем финальный чёрный экран
                     finalScreen.classList.add('visible');
 
-                    // 5. Через 1.5 секунды — показываем название
                     setTimeout(() => {
-                        // Затухаем чёрный экран
                         finalScreen.classList.remove('visible');
-                        
-                        // Показываем название
                         titleScreen.classList.add('visible');
-
-                        // Ждём клик для перехода к оглавлению
                         titleScreen.addEventListener('click', showContents, { once: true });
-                        titleScreen.addEventListener('touchend', showContents, { once: true });
-
                     }, 1500);
 
-                }, 2000); // глитч длится 2 секунды
+                }, 2000);
 
-            }, 1800); // мигание
+            }, 1800);
 
-        }, 400); // пауза перед миганием
+        }, 400);
 
-    }, 700); // задержка после свайпа
+    }, 700);
 }
 
 function showContents() {
-    // Буквы растают
     titleScreen.classList.add('melting');
 
     setTimeout(() => {
         titleScreen.classList.remove('visible');
         titleScreen.classList.remove('melting');
 
-        // Показываем оглавление
         setTimeout(() => {
             contentsScreen.classList.add('visible');
-
-            // Поочерёдно проявляем пункты
-            const items = document.querySelectorAll('.contents-item');
-            items.forEach((item, index) => {
-                setTimeout(() => {
-                    item.classList.add('revealed');
-                }, 200 + index * 80);
-            });
-
-            // Навешиваем обработчики кликов на пункты оглавления
-            items.forEach((item, index) => {
-                item.addEventListener('click', () => {
-                    openChapter(index);
-                });
-            });
-
+            revealContentsItems();
         }, 300);
 
     }, 1200);
 }
+
+function skipToContents() {
+    coverScreen.classList.add('hide-up');
+    textScreen.style.opacity = '0';
+    finalScreen.classList.remove('visible');
+    titleScreen.classList.remove('visible');
+    contentsScreen.classList.add('visible');
+    revealContentsItems();
+
+    // Если есть сохранённая глава — открываем её (опционально)
+    if (typeof state.lastChapter === 'number' && state.lastChapter >= 0) {
+        // Не открываем автоматически, пусть читатель сам выберет
+    }
+}
+
+function revealContentsItems() {
+    const items = document.querySelectorAll('.contents-item');
+    items.forEach((item, index) => {
+        setTimeout(() => {
+            item.classList.add('revealed');
+        }, 200 + index * 80);
+    });
+}
+
+function openChapter(index) {
+    if (index < 0 || index >= chapters.length) return;
+
+    currentChapter = index;
+    const chapter = chapters[index];
+
+    const numberEl = chapterScreen.querySelector('.chapter-number');
+    const titleEl = chapterScreen.querySelector('.chapter-title');
+    const textEl = chapterScreen.querySelector('.chapter-text');
+    const prevBtn = chapterScreen.querySelector('.nav-prev');
+    const nextBtn = chapterScreen.querySelector('.nav-next');
+
+    numberEl.textContent = 'Глава ' + chapter.number;
+    titleEl.textContent = chapter.title;
+    textEl.innerHTML = chapter.text;
+
+    prevBtn.classList.toggle('inactive', index === 0);
+    nextBtn.classList.toggle('inactive', index === chapters.length - 1);
+
+    contentsScreen.classList.remove('visible');
+
+    setTimeout(() => {
+        chapterScreen.classList.add('visible');
+        chapterScreen.scrollTop = 0;
+    }, 300);
+
+    state.lastChapter = index;
+    saveState(state);
+}
+
+function returnToContents() {
+    chapterScreen.classList.remove('visible');
+    setTimeout(() => {
+        contentsScreen.classList.add('visible');
+    }, 500);
+}
+
+// === СТАРТ ===
+init();
