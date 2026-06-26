@@ -57,7 +57,7 @@ html, body {
 #glitch-text {
     font-family: 'PT Serif', serif;
     color: #fff;
-    font-size: 1.25rem; /* Уменьшено на 50% (было 2.5rem) */
+    font-size: 1.25rem;
     text-align: center;
     padding: 20px;
     max-width: 90%;
