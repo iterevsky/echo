@@ -313,19 +313,6 @@ html, body {
     text-indent: 1.5em;
 }
 
-.chapter-text p:first-child {
-    text-indent: 0;
-}
-
-.chapter-text p:first-child:not(.placeholder)::first-letter {
-    font-size: 3.2rem;
-    float: left;
-    line-height: 0.8;
-    padding-right: 12px;
-    padding-top: 8px;
-    color: #e8e6e3;
-}
-
 .chapter-text p.placeholder {
     text-indent: 0;
     text-align: center;
