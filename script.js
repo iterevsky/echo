@@ -48,39 +48,37 @@ function startSequence() {
             setTimeout(() => {
                 glitchText.classList.remove('blinking');
 
-                // 4. Глитч с затуханием
+                // 4. Глитч с затуханием в тьму — 2 секунды
                 glitchText.classList.add('glitching');
 
-                // Глитч длится 2 секунды и сам угасает в тьму
+                // Одновременно начинаем затухать сам text-screen
                 setTimeout(() => {
-                    glitchText.classList.remove('glitching');
+                    textScreen.style.transition = 'opacity 1.5s ease';
+                    textScreen.style.opacity = '0';
+                }, 1200);
 
-                    // 5. Убираем текстовый экран, показываем финальный чёрный
-                    textScreen.classList.add('fade-out');
+                // После окончания глитча — чёрный экран
+                setTimeout(() => {
+                    finalScreen.classList.add('show');
 
+                    // 5. Показываем название книги
                     setTimeout(() => {
-                        finalScreen.classList.add('show');
+                        finalScreen.style.opacity = '0';
+                        finalScreen.style.transition = 'opacity 1.5s ease';
 
-                        // 6. Показываем название книги
                         setTimeout(() => {
-                            finalScreen.style.opacity = '0';
-                            finalScreen.style.transition = 'opacity 1.5s ease';
+                            titleScreen.classList.add('show');
+                            titleScreen.style.pointerEvents = 'all';
 
-                            setTimeout(() => {
-                                titleScreen.classList.add('show');
-                                titleScreen.style.pointerEvents = 'all';
+                            // Ждём клик для перехода к оглавлению
+                            titleScreen.addEventListener('click', showContents, { once: true });
+                            titleScreen.addEventListener('touchend', showContents, { once: true });
 
-                                // Ждём клик для перехода к оглавлению
-                                titleScreen.addEventListener('click', showContents, { once: true });
-                                titleScreen.addEventListener('touchend', showContents, { once: true });
+                        }, 800);
 
-                            }, 800);
+                    }, 1500);
 
-                        }, 1500);
-
-                    }, 600);
-
-                }, 2000); // глитч длится 2 секунды
+                }, 2000); // глитч длится 2 секунды и полностью угасает
 
             }, 1800); // мигание
 
