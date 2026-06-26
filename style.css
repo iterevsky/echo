@@ -1,255 +1,114 @@
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
+const coverScreen = document.getElementById('cover-screen');
+const textScreen = document.getElementById('text-screen');
+const glitchText = document.getElementById('glitch-text');
+const finalScreen = document.getElementById('final-screen');
+const titleScreen = document.getElementById('title-screen');
+const contentsScreen = document.getElementById('contents-screen');
+
+let isStarted = false;
+
+// Касание / клик везде
+document.addEventListener('touchstart', () => {}, { passive: true });
+document.addEventListener('touchend', (e) => {
+    if (!isStarted) startSequence();
+}, { passive: true });
+
+document.addEventListener('click', () => {
+    if (!isStarted) startSequence();
+});
+
+// Свайп вверх
+let touchStartY = 0;
+document.addEventListener('touchstart', (e) => {
+    touchStartY = e.touches[0].clientY;
+}, { passive: true });
+
+document.addEventListener('touchend', (e) => {
+    if (isStarted) return;
+    const diff = touchStartY - e.changedTouches[0].clientY;
+    if (diff > 50) startSequence();
+}, { passive: true });
+
+function startSequence() {
+    if (isStarted) return;
+    isStarted = true;
+
+    // 1. Убираем картинку
+    coverScreen.classList.add('hide-up');
+
+    // 2. Показываем текст
+    setTimeout(() => {
+        textScreen.classList.add('show');
+        glitchText.classList.add('show');
+
+        // 3. Мигание
+        setTimeout(() => {
+            glitchText.classList.add('blinking');
+
+            setTimeout(() => {
+                glitchText.classList.remove('blinking');
+
+                // 4. Глитч
+                glitchText.classList.add('glitching');
+
+                setTimeout(() => {
+                    glitchText.classList.remove('glitching');
+
+                    // 5. Убираем текст, показываем финальный чёрный
+                    textScreen.classList.add('fade-out');
+
+                    setTimeout(() => {
+                        finalScreen.classList.add('show');
+
+                        // 6. Показываем название книги
+                        setTimeout(() => {
+                            finalScreen.style.opacity = '0';
+                            finalScreen.style.transition = 'opacity 1.5s ease';
+
+                            setTimeout(() => {
+                                titleScreen.classList.add('show');
+                                titleScreen.style.pointerEvents = 'all';
+
+                                // Ждём клик для перехода к оглавлению
+                                titleScreen.addEventListener('click', showContents, { once: true });
+                                titleScreen.addEventListener('touchend', showContents, { once: true });
+
+                            }, 800);
+
+                        }, 1500);
+
+                    }, 1000);
+
+                }, 2000); // глитч
+
+            }, 1800); // мигание
+
+        }, 400); // пауза перед миганием
+
+    }, 700); // задержка после свайпа
 }
 
-html, body {
-    font-family: 'PT Serif', serif;
-    overflow: hidden;
-    background: #000;
-    height: 100%;
-    width: 100%;
-    color: #e8e6e3;
-}
+function showContents() {
+    // Буквы растают
+    titleScreen.classList.add('melting');
 
-/* === ЭКРАН С КАРТИНКОЙ === */
-#cover-screen {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    background: #000;
-    z-index: 5;
-    transition: transform 1s cubic-bezier(0.7, 0, 0.3, 1), opacity 1s ease;
-}
+    setTimeout(() => {
+        titleScreen.style.opacity = '0';
+        titleScreen.style.pointerEvents = 'none';
 
-#cover-screen img {
-    max-width: 92%;
-    max-height: 88vh;
-    object-fit: contain;
-    -webkit-user-drag: none;
-    user-select: none;
-    filter: contrast(1.05) brightness(0.95);
-}
+        // Показываем оглавление
+        setTimeout(() => {
+            contentsScreen.classList.add('show');
 
-/* === ЭКРАН С ТЕКСТОМ === */
-#text-screen {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    background: #060608;
-    z-index: 4;
-    opacity: 0;
-    pointer-events: none;
-}
+            // Поочерёдно проявляем пункты
+            const items = document.querySelectorAll('.contents-item');
+            items.forEach((item, index) => {
+                setTimeout(() => {
+                    item.classList.add('revealed');
+                }, 200 + index * 80);
+            });
 
-#glitch-text {
-    font-family: 'PT Serif', serif;
-    color: #e8e6e3;
-    font-size: 1.15rem;
-    text-align: center;
-    padding: 24px;
-    max-width: 85%;
-    line-height: 1.6;
-    letter-spacing: 0.02em;
-    opacity: 0;
-}
+        }, 300);
 
-/* Мигание текста */
-@keyframes blink {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0; }
-}
-
-.blinking {
-    animation: blink 0.35s ease-in-out 5;
-    opacity: 1 !important;
-}
-
-/* Глитч-эффект */
-@keyframes glitch {
-    0% { transform: translate(0); filter: none; opacity: 1; }
-    10% { transform: translate(-2px, 1px); filter: hue-rotate(90deg) saturate(150%); }
-    20% { transform: translate(2px, -1px); filter: hue-rotate(180deg) saturate(200%); }
-    30% { transform: translate(-1px, -2px); filter: hue-rotate(270deg) blur(0.5px); }
-    40% { transform: translate(2px, 2px); filter: hue-rotate(360deg); }
-    50% { transform: translate(-2px, 0); filter: hue-rotate(90deg) saturate(180%) blur(0.3px); }
-    60% { transform: translate(1px, -2px); filter: hue-rotate(180deg); }
-    70% { transform: translate(-1px, 1px); filter: hue-rotate(270deg) saturate(150%); }
-    80% { transform: translate(2px, -1px); filter: hue-rotate(360deg) blur(0.5px); }
-    90% { transform: translate(-2px, 2px); filter: hue-rotate(180deg); }
-    100% { transform: translate(0); filter: none; opacity: 1; }
-}
-
-.glitching {
-    animation: glitch 0.1s ease-in-out 20;
-    color: #c41e3a;
-    text-shadow: 1px 0 #00b4d8, -1px 0 #9b59b6;
-    opacity: 1 !important;
-}
-
-/* === ФИНАЛЬНЫЙ ТЁМНЫЙ ЭКРАН === */
-#final-screen {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: #000;
-    z-index: 3;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 2s ease;
-}
-
-/* === ЭКРАН С НАЗВАНИЕМ === */
-#title-screen {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    background: #000;
-    z-index: 2;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 1.5s ease;
-}
-
-#title-screen .author {
-    font-family: 'PT Serif', serif;
-    font-size: 0.85rem;
-    color: #6b6b6b;
-    letter-spacing: 0.15em;
-    text-transform: uppercase;
-    margin-bottom: 16px;
-    opacity: 0;
-    transform: translateY(10px);
-    transition: opacity 1s ease 0.5s, transform 1s ease 0.5s;
-}
-
-#title-screen .book-title {
-    font-family: 'PT Serif', serif;
-    font-size: 4rem;
-    font-weight: 400;
-    color: #e8e6e3;
-    letter-spacing: 0.3em;
-    opacity: 0;
-    transform: scale(0.9);
-    transition: opacity 1.5s ease 0.8s, transform 1.5s ease 0.8s;
-}
-
-#title-screen.show .author,
-#title-screen.show .book-title {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-}
-
-/* === ЭКРАН С ОГЛАВЛЕНИЕМ === */
-#contents-screen {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    display: flex;
-    justify-content: center;
-    align-items: flex-start;
-    background: #000;
-    z-index: 1;
-    opacity: 0;
-    pointer-events: none;
-    overflow-y: auto;
-    padding: 60px 20px 80px;
-}
-
-#contents-screen.show {
-    opacity: 1;
-    pointer-events: all;
-}
-
-.contents-list {
-    max-width: 520px;
-    width: 100%;
-}
-
-.contents-item {
-    font-family: 'PT Serif', serif;
-    font-size: 0.95rem;
-    color: #8a8a8a;
-    padding: 14px 0;
-    border-bottom: 1px solid #1a1a1a;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    opacity: 0;
-    transform: translateY(8px);
-    transition: color 0.4s ease, border-color 0.4s ease, opacity 0.6s ease, transform 0.6s ease;
-}
-
-.contents-item .dot {
-    width: 4px;
-    height: 4px;
-    background: #3a3a3a;
-    border-radius: 50%;
-    flex-shrink: 0;
-    transition: background 0.4s ease;
-}
-
-.contents-item:hover {
-    color: #e8e6e3;
-    border-color: #3a3a3a;
-}
-
-.contents-item:hover .dot {
-    background: #c41e3a;
-}
-
-.contents-item.revealed {
-    opacity: 1;
-    transform: translateY(0);
-}
-
-/* === УТИЛИТЫ === */
-.hide-up {
-    transform: translateY(-100%);
-    opacity: 0;
-}
-
-.show {
-    opacity: 1 !important;
-    pointer-events: all !important;
-}
-
-.fade-out {
-    opacity: 0 !important;
-    transition: opacity 1s ease !important;
-}
-
-/* Мелт-эффект для букв */
-@keyframes melt {
-    0% { opacity: 1; filter: blur(0); transform: translateY(0); }
-    30% { opacity: 0.8; filter: blur(1px); transform: translateY(2px); }
-    60% { opacity: 0.4; filter: blur(3px); transform: translateY(6px); }
-    100% { opacity: 0; filter: blur(8px); transform: translateY(15px); }
-}
-
-.melting .author,
-.melting .book-title {
-    animation: melt 1.2s ease forwards;
+    }, 1200);
 }
