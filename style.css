@@ -235,7 +235,7 @@ html, body {
 }
 
 .contents-item:hover .dot {
-    background: #c41e3a;
+    background: #4a9eff;
 }
 
 .contents-item.revealed {
@@ -285,7 +285,7 @@ html, body {
 .chapter-number {
     font-family: 'PT Serif', serif;
     font-size: 0.75rem;
-    color: #c41e3a;
+    color: #4a9eff;
     letter-spacing: 0.2em;
     text-transform: uppercase;
     margin-bottom: 8px;
