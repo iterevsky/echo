@@ -373,7 +373,7 @@ html, body {
 /* Пульт управления: меняйте цифры здесь, не лезя в основной код */
 :root {
   --echo-vignette-opacity: 0.8;   /* Темнота краёв: 0.3 = лёгкая, 0.8 = кинотеатр */
-  --echo-noise-opacity: 0.08;      /* Зернистость: 0.02 = едва видно, 0.08 = старая кассета */
+  --echo-noise-opacity: 0.15;      /* Зернистость: 0.02 = едва видно, 0.08 = старая кассета */
   --echo-breathe-speed: 12s;       /* Период пульсации фона: 6s = нервно, 16s = едва заметно */
   --echo-grain-speed: 0.8s;        /* Скорость «шевеления» зерна: 0.3s = агрессивно, 1s = медленно */
 }
@@ -404,7 +404,7 @@ body {
   top: 0; right: 0; bottom: 0; left: 0;
   z-index: 1;
   background: radial-gradient(
-    ellipse 10% 10% at 10% 10%,
+    ellipse 90% 90% at 50% 50%,
     rgba(0, 0, 0, 0) 0%,
     rgba(0, 0, 0, 0) 90%,
     rgba(0, 2, 6, var(--echo-vignette-opacity)) 90%
