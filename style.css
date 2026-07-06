@@ -404,9 +404,9 @@ body {
   top: 0; right: 0; bottom: 0; left: 0;
   z-index: 1;
   background: radial-gradient(
-    ellipse 80% 80% at 80% 80%,
+    ellipse 10% 10% at 10% 10%,
     rgba(0, 0, 0, 0) 0%,
-    rgba(0, 0, 0, 0) 45%,
+    rgba(0, 0, 0, 0) 90%,
     rgba(0, 2, 6, var(--echo-vignette-opacity)) 90%
   );
 }
