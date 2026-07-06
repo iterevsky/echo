@@ -201,3 +201,45 @@ function openChapter(index) {
 
     saveState({ lastChapter: index });
 }
+/* === ЭЛЕКТРИЧЕСКИЙ ДРЕБЕЗГ В ОГЛАВЛЕНИИ === */
+(function() {
+    const GROUP_SIZE = 15;          // Каждые 15 глав = одна группа
+    const INTERVAL_MS = 15000;      // Раз в 15 секунд
+    const GLITCH_DURATION = 1200;   // Длительность дребезга одной главы
+
+    const contentsScreen = document.getElementById('contents-screen');
+    if (!contentsScreen) return;
+
+    function triggerGlitch() {
+        // Работает только когда оглавление открыто
+        if (!contentsScreen.classList.contains('visible')) return;
+
+        const items = Array.from(document.querySelectorAll('.contents-item'));
+        if (items.length === 0) return;
+
+        const totalGroups = Math.ceil(items.length / GROUP_SIZE);
+
+        for (let g = 0; g < totalGroups; g++) {
+            const start = g * GROUP_SIZE;
+            const end = Math.min(start + GROUP_SIZE, items.length);
+            const group = items.slice(start, end);
+
+            // Случайная глава из группы
+            const randomIndex = Math.floor(Math.random() * group.length);
+            const item = group[randomIndex];
+
+            // Если уже дребезжит — пропускаем, чтобы не наложилось
+            if (item.classList.contains('electric-glitch')) continue;
+
+            item.classList.add('electric-glitch');
+
+            // Убираем эффект после окончания анимации
+            setTimeout(() => {
+                item.classList.remove('electric-glitch');
+            }, GLITCH_DURATION);
+        }
+    }
+
+    // Запускаем цикл
+    setInterval(triggerGlitch, INTERVAL_MS);
+})();
