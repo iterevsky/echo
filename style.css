@@ -366,3 +366,30 @@ html, body {
         font-size: 1rem;
     }
 }
+/* === ЭЛЕКТРИЧЕСКИЙ ДРЕБЕЗГ В ОГЛАВЛЕНИИ === */
+@keyframes electric-glitch {
+    0%   { transform: translate(0, 0); opacity: 1; text-shadow: none; }
+    8%   { transform: translate(-2px, 1px); opacity: 0.85; text-shadow: 1px 0 #00A8E8, -1px 0 #c41e3a; }
+    16%  { transform: translate(2px, -1px); opacity: 1; text-shadow: -1px 0 #00A8E8, 1px 0 #c41e3a; }
+    24%  { transform: translate(-1px, 2px); opacity: 0.7; text-shadow: 2px 0 #00A8E8; }
+    32%  { transform: translate(1px, -2px); opacity: 1; text-shadow: none; }
+    40%  { transform: translate(-2px, 0); opacity: 0.9; text-shadow: -2px 0 #c41e3a; }
+    48%  { transform: translate(2px, 1px); opacity: 0.8; text-shadow: 1px 0 #00A8E8; }
+    56%  { transform: translate(0, -1px); opacity: 1; text-shadow: none; }
+    64%  { transform: translate(-1px, 2px); opacity: 0.85; text-shadow: 2px 0 #c41e3a; }
+    72%  { transform: translate(1px, -1px); opacity: 1; text-shadow: none; }
+    80%  { transform: translate(-2px, 1px); opacity: 0.9; text-shadow: -1px 0 #00A8E8; }
+    88%  { transform: translate(1px, 0); opacity: 1; text-shadow: none; }
+    100% { transform: translate(0, 0); opacity: 1; text-shadow: none; }
+}
+
+.contents-item.electric-glitch {
+    animation: electric-glitch 1.2s steps(1) forwards;
+    color: #e8e6e3 !important;
+}
+
+.contents-item.electric-glitch .dot {
+    background: #00A8E8 !important;
+    box-shadow: 0 0 6px #00A8E8;
+}
+
