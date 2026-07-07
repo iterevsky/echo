@@ -680,8 +680,11 @@ function showShareTooltip() {
     
     requestAnimationFrame(() => {
         const ttRect = shareTooltip.getBoundingClientRect();
-        let top = rect.top - ttRect.height - 14;
-        if (top < 10) top = rect.bottom + 14;
+        let top = rect.bottom + 14;
+        if (top + ttRect.height > window.innerHeight - 10) {
+            top = rect.top - ttRect.height - 14;
+        }
+
         
         let left = rect.left + (rect.width - ttRect.width) / 2;
         if (left < 10) left = 10;
