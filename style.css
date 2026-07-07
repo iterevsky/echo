@@ -445,13 +445,15 @@ html, body {
   font-family: 'PT Serif', serif;
   font-size: 1.15rem;
   color: #e8e6e3;
-  text-align: center;
-  margin-bottom: 36px;
+  text-align: left;
+  margin-bottom: 32px;
+  padding-left: 4px;
   letter-spacing: 0.18em;
   opacity: 0;
   transform: translateY(12px);
   transition: opacity 0.8s ease, transform 0.8s ease;
 }
+
 
 #contents-screen.visible .contents-header {
   opacity: 1;
@@ -674,5 +676,86 @@ html, body {
   color: #5a5a5a;
   font-style: italic;
   cursor: default;
+}
+
+/* === КОНТАКТЫ === */
+.menu-contacts {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.contacts-label {
+  font-size: 1rem;
+  color: #b8b5b0;
+}
+
+.contacts-link {
+  font-family: 'PT Serif', serif;
+  font-size: 0.95rem;
+  color: #e8e6e3;
+  text-decoration: none;
+  transition: color 0.3s ease, text-shadow 0.3s ease;
+}
+
+.contacts-link:hover {
+  color: #00A8E8;
+  text-shadow: 0 0 10px rgba(0, 168, 232, 0.3);
+}
+
+/* === ДОНАТ === */
+.menu-donate {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.donate-label {
+  font-size: 1rem;
+  color: #b8b5b0;
+}
+
+.donate-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.donate-card {
+  font-family: 'PT Serif', serif;
+  font-size: 0.92rem;
+  color: #e8e6e3;
+  letter-spacing: 0.06em;
+}
+
+.donate-bank {
+  font-family: 'PT Serif', serif;
+  font-size: 0.78rem;
+  color: #6b6b6b;
+  font-style: italic;
+}
+
+/* === О ПРОЕКТЕ === */
+.menu-about {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  border-bottom: none;
+}
+
+.about-label {
+  font-size: 1rem;
+  color: #b8b5b0;
+}
+
+.about-note {
+  font-family: 'PT Serif', serif;
+  font-size: 0.85rem;
+  color: #5a5a5a;
+  font-style: italic;
 }
 
