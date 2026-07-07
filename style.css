@@ -396,8 +396,8 @@ html, body {
 .voice-glitch {
     display: inline;
     position: relative;
-    color: #e8e6e3;
 }
+
 
 /* Подсветка точки рядом, если voice-glitch внутри contents-item */
 .contents-item .voice-glitch {
