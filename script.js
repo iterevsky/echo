@@ -650,7 +650,7 @@ const shareTooltip = document.getElementById('share-tooltip');
 
 function showShareTooltip() {
     const selection = window.getSelection();
-    if (!selection || selection.rangeCount === 0) {
+    if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
         hideShareTooltip();
         return;
     }
@@ -745,14 +745,17 @@ shareTooltip.addEventListener('click', (e) => {
     copySelection();
 });
 
-document.addEventListener('mouseup', () => {
-    setTimeout(showShareTooltip, 10);
+// selectionchange — надёжнее, чем mouseup/touchend
+document.addEventListener('selectionchange', () => {
+    setTimeout(showShareTooltip, 60);
 });
 
+// Дополнительно для мобильных
 document.addEventListener('touchend', () => {
-    setTimeout(showShareTooltip, 100);
+    setTimeout(showShareTooltip, 200);
 });
 
+// Скрытие при клике/таче вне тултипа
 document.addEventListener('mousedown', (e) => {
     if (!shareTooltip.contains(e.target)) {
         hideShareTooltip();
@@ -767,4 +770,5 @@ document.addEventListener('touchstart', (e) => {
 
 chapterScreen.addEventListener('scroll', hideShareTooltip);
 window.addEventListener('resize', hideShareTooltip);
+
 
