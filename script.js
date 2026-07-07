@@ -88,11 +88,8 @@ if (e.key === 'Escape') {
     cleanupVoiceObserver();
     chapterScreen.classList.remove('visible');
     if (menuTrigger) menuTrigger.classList.add('visible');
-    setTimeout(() => contentsScreen.classList.add('visible'), 500);
-}
-
-}
-
+        setTimeout(() => contentsScreen.classList.add('visible'), 500);
+    }
 });
 
 // === ИНТРО: КАСАНИЕ / КЛИК / СВАЙП ===
