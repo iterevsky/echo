@@ -52,10 +52,12 @@ document.querySelector('.nav-next').addEventListener('click', () => {
 document.querySelector('.nav-contents').addEventListener('click', () => {
     cleanupVoiceObserver();
     chapterScreen.classList.remove('visible');
+    if (menuTrigger) menuTrigger.classList.add('visible');
     setTimeout(() => {
         contentsScreen.classList.add('visible');
     }, 500);
 });
+
 
 
 // === ДЕЛЕГИРОВАНИЕ НА ОГЛАВЛЕНИЕ ===
@@ -77,7 +79,7 @@ document.addEventListener('keydown', (e) => {
         e.preventDefault();
         openChapter(currentChapter + 1);
     }
-   if (e.key === 'Escape') {
+if (e.key === 'Escape') {
     e.preventDefault();
     if (isMenuOpen) {
         closeMenu();
@@ -85,7 +87,10 @@ document.addEventListener('keydown', (e) => {
     }
     cleanupVoiceObserver();
     chapterScreen.classList.remove('visible');
+    if (menuTrigger) menuTrigger.classList.add('visible');
     setTimeout(() => contentsScreen.classList.add('visible'), 500);
+}
+
 }
 
 });
@@ -102,15 +107,19 @@ document.addEventListener('touchend', (e) => {
     const diffY = touchStartY - e.changedTouches[0].clientY;
     const diffX = touchStartX - e.changedTouches[0].clientX;
     
-    if (!isStarted && diffY > 50) {
+    if (!isStarted && diffY > 50 && Math.abs(diffX) < 40) {
         startSequence();
     }
     
     // Свайп справа налево в главе — открыть меню
-    if (chapterScreen.classList.contains('visible') && diffX > 60 && touchStartX > window.innerWidth * 0.7) {
+    if (chapterScreen.classList.contains('visible') 
+        && Math.abs(diffX) > Math.abs(diffY) * 1.8 
+        && diffX > 70 
+        && touchStartX > window.innerWidth * 0.82) {
         openMenu();
     }
 }, { passive: true });
+
 
 
 document.addEventListener('click', () => {
@@ -606,24 +615,39 @@ function fallbackCopy(text) {
     document.body.removeChild(ta);
 }
 
-function copyCard() {
-    if (!donateCard) return;
-    const text = donateCard.textContent.trim();
+function copyCard(targetId, btn) {
+    const cardEl = document.getElementById(targetId);
+    if (!cardEl) return;
+    const text = cardEl.textContent.trim();
+    
+    const onSuccess = () => {
+        const originalText = btn.textContent;
+        btn.textContent = 'Скопировано';
+        btn.classList.add('copied');
+        setTimeout(() => {
+            btn.textContent = originalText;
+            btn.classList.remove('copied');
+        }, 2000);
+    };
+    
     if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(text).then(() => {
-            if (donateCopyBtn) {
-                donateCopyBtn.textContent = 'Скопировано';
-                donateCopyBtn.classList.add('copied');
-                setTimeout(() => {
-                    donateCopyBtn.textContent = 'Копировать';
-                    donateCopyBtn.classList.remove('copied');
-                }, 2000);
-            }
-        }).catch(() => fallbackCopy(text));
+        navigator.clipboard.writeText(text).then(onSuccess).catch(() => {
+            fallbackCopy(text);
+            onSuccess();
+        });
     } else {
         fallbackCopy(text);
+        onSuccess();
     }
 }
+
+document.querySelectorAll('.donate-copy').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const target = btn.dataset.target;
+        if (target) copyCard(target, btn);
+    });
+});
+
 
 if (donateCopyBtn) donateCopyBtn.addEventListener('click', copyCard);
 
