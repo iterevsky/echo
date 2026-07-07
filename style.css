@@ -398,6 +398,29 @@ html, body {
     position: relative;
 }
 
+/* === УДАРНАЯ ВОЛНА: соседние абзацы отлетают === */
+@keyframes voice-shock-prev {
+    0%   { transform: translateX(0); opacity: 1; }
+    15%  { transform: translateX(-14px); opacity: 0.45; filter: blur(2px); }
+    40%  { transform: translateX(-5px); opacity: 0.75; filter: blur(0.5px); }
+    100% { transform: translateX(0); opacity: 1; filter: blur(0); }
+}
+
+@keyframes voice-shock-next {
+    0%   { transform: translateX(0); opacity: 1; }
+    15%  { transform: translateX(14px); opacity: 0.45; filter: blur(2px); }
+    40%  { transform: translateX(5px); opacity: 0.75; filter: blur(0.5px); }
+    100% { transform: translateX(0); opacity: 1; filter: blur(0); }
+}
+
+.voice-shock-prev {
+    animation: voice-shock-prev 0.7s ease-out forwards !important;
+}
+
+.voice-shock-next {
+    animation: voice-shock-next 0.7s ease-out forwards !important;
+}
+
 
 /* Подсветка точки рядом, если voice-glitch внутри contents-item */
 .contents-item .voice-glitch {
