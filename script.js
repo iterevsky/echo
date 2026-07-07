@@ -256,34 +256,44 @@ let voiceObserver = null;
 function generateGlitchAnimation(el) {
     const animId = 'voice-glitch-' + Math.random().toString(36).substr(2, 9);
     
+    // === Рандомные параметры ===
     const palettes = [
         ['#ff0040', '#00A8E8'],
         ['#c41e3a', '#00A8E8'],
         ['#ff6b00', '#0040ff'],
         ['#9b59b6', '#2ecc71'],
-        ['#e74c3c', '#3498db']
+        ['#e74c3c', '#3498db'],
+        ['#ff0000', '#00ffff'],
+        ['#ff3366', '#33ccff']
     ];
     const [c1, c2] = palettes[Math.floor(Math.random() * palettes.length)];
-    const shift = 1 + Math.floor(Math.random() * 3);
-    const skew = 1 + Math.floor(Math.random() * 4);
-    const duration = (1.2 + Math.random() * 1.3).toFixed(2);
+    const maxShift = 2 + Math.floor(Math.random() * 3);   // 2–4px
+    const maxSkew = 2 + Math.floor(Math.random() * 4);    // 2–5deg
+    const duration = (2.4 + Math.random() * 2.6).toFixed(2); // 2.4–5.0s (в 2 раза дольше)
     
-    const keyframes = `
-        @keyframes ${animId} {
-            0%   { transform: translate(0,0) skewX(0deg); opacity: 1; text-shadow: none; }
-            10%  { transform: translate(-${shift}px, ${Math.ceil(shift/2)}px) skewX(-${skew}deg); opacity: 0.85; text-shadow: ${shift}px 0 ${c1}, -${shift}px 0 ${c2}; }
-            20%  { transform: translate(${shift}px, -${Math.ceil(shift/2)}px) skewX(${skew}deg); opacity: 1; text-shadow: -${shift}px 0 ${c1}, ${shift}px 0 ${c2}; }
-            30%  { transform: translate(-${Math.ceil(shift/2)}px, ${shift}px) skewX(0deg); opacity: 0.7; text-shadow: ${shift*2}px 0 ${c1}; }
-            40%  { transform: translate(${Math.ceil(shift/2)}px, -${shift}px) skewX(-${skew}deg); opacity: 1; text-shadow: none; }
-            50%  { transform: translate(-${shift}px, 0) skewX(${skew}deg); opacity: 0.9; text-shadow: -${shift}px 0 ${c2}; }
-            60%  { transform: translate(${shift}px, ${Math.ceil(shift/2)}px) skewX(0deg); opacity: 0.8; text-shadow: ${shift}px 0 ${c1}; }
-            70%  { transform: translate(0, -${Math.ceil(shift/2)}px) skewX(-${skew}deg); opacity: 1; text-shadow: none; }
-            80%  { transform: translate(-${Math.ceil(shift/2)}px, ${shift}px) skewX(${skew}deg); opacity: 0.85; text-shadow: ${shift}px 0 ${c2}; }
-            90%  { transform: translate(${Math.ceil(shift/2)}px, -${Math.ceil(shift/2)}px) skewX(0deg); opacity: 1; text-shadow: none; }
-            100% { transform: translate(0,0) skewX(0deg); opacity: 1; text-shadow: none; }
-        }
-    `;
+    // === Генерация 20 случайных ключевых кадров ===
+    const steps = 20;
+    let frames = '';
+    for (let i = 0; i <= steps; i++) {
+        const pct = Math.round((i / steps) * 100);
+        const tx = (Math.random() > 0.5 ? 1 : -1) * Math.floor(Math.random() * maxShift + 1);
+        const ty = (Math.random() > 0.5 ? 1 : -1) * Math.floor(Math.random() * 3);
+        const sk = (Math.random() > 0.5 ? 1 : -1) * Math.floor(Math.random() * maxSkew + 1);
+        const op = (0.5 + Math.random() * 0.5).toFixed(2);
+        const sc = (0.95 + Math.random() * 0.10).toFixed(2);
+        const br = (0.6 + Math.random() * 0.8).toFixed(2);
+        const bl = Math.random() > 0.5 ? (Math.random() * 2).toFixed(1) : 0;
+        const hasShadow = Math.random() > 0.25;
+        const ts = hasShadow 
+            ? `${Math.floor(Math.random()*4+1)}px 0 ${c1}, -${Math.floor(Math.random()*4+1)}px 0 ${c2}`
+            : 'none';
+        
+        frames += `            ${pct}% { transform: translate(${tx}px, ${ty}px) skewX(${sk}deg) scale(${sc}); opacity: ${op}; text-shadow: ${ts}; filter: brightness(${br}) blur(${bl}px); }\n`;
+    }
     
+    const keyframes = `@keyframes ${animId} {\n${frames}        }`;
+    
+    // === Вставляем стиль анимации ===
     const style = document.createElement('style');
     style.textContent = keyframes;
     style.dataset.voiceGlitch = animId;
@@ -291,6 +301,22 @@ function generateGlitchAnimation(el) {
     
     el.style.animation = `${animId} ${duration}s steps(1) forwards`;
     
+    // === Ударная волна: соседние абзацы отлетают ===
+    const parentP = el.closest('p');
+    if (parentP) {
+        const prev = parentP.previousElementSibling;
+        const next = parentP.nextElementSibling;
+        if (prev && prev.tagName === 'P') {
+            prev.classList.add('voice-shock-prev');
+            setTimeout(() => prev.classList.remove('voice-shock-prev'), 700);
+        }
+        if (next && next.tagName === 'P') {
+            next.classList.add('voice-shock-next');
+            setTimeout(() => next.classList.remove('voice-shock-next'), 700);
+        }
+    }
+    
+    // === Очистка после завершения ===
     setTimeout(() => {
         el.style.animation = '';
         if (style.parentNode) style.remove();
