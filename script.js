@@ -40,11 +40,13 @@ document.querySelector('.nav-next').addEventListener('click', () => {
     if (currentChapter < chapters.length - 1) openChapter(currentChapter + 1);
 });
 document.querySelector('.nav-contents').addEventListener('click', () => {
+    cleanupVoiceObserver();
     chapterScreen.classList.remove('visible');
     setTimeout(() => {
         contentsScreen.classList.add('visible');
     }, 500);
 });
+
 
 // === ДЕЛЕГИРОВАНИЕ НА ОГЛАВЛЕНИЕ ===
 contentsScreen.addEventListener('click', (e) => {
@@ -67,10 +69,11 @@ document.addEventListener('keydown', (e) => {
     }
     if (e.key === 'Escape') {
         e.preventDefault();
+        cleanupVoiceObserver();
         chapterScreen.classList.remove('visible');
         setTimeout(() => contentsScreen.classList.add('visible'), 500);
     }
-});
+
 
 // === ИНТРО: КАСАНИЕ / КЛИК / СВАЙП ===
 let touchStartY = 0;
@@ -187,7 +190,8 @@ function openChapter(index) {
 
     numberEl.textContent = 'Глава ' + chapter.number;
     titleEl.textContent = chapter.title;
-    textEl.innerHTML = chapter.text;
+    textEl.innerHTML = chapter.text.replace(/{{VOICE}}(.*?){{\/VOICE}}/g, '<span class="voice-glitch">$1</span>');
+
 
     prevBtn.classList.toggle('inactive', index === 0);
     nextBtn.classList.toggle('inactive', index === chapters.length - 1);
@@ -197,6 +201,7 @@ function openChapter(index) {
     setTimeout(() => {
         chapterScreen.classList.add('visible');
         chapterScreen.scrollTop = 0;
+        initVoiceObserver();
     }, 300);
 
     saveState({ lastChapter: index });
@@ -243,3 +248,93 @@ function openChapter(index) {
     // Запускаем цикл
     setInterval(triggerGlitch, INTERVAL_MS);
 })();
+
+                          
+/* === МЕХАНИЧЕСКИЙ ГОЛОС: РАНДОМНАЯ АНИМАЦИЯ И ОТСЛЕЖИВАНИЕ === */
+let voiceObserver = null;
+
+function generateGlitchAnimation(el) {
+    const animId = 'voice-glitch-' + Math.random().toString(36).substr(2, 9);
+    
+    const palettes = [
+        ['#ff0040', '#00A8E8'],
+        ['#c41e3a', '#00A8E8'],
+        ['#ff6b00', '#0040ff'],
+        ['#9b59b6', '#2ecc71'],
+        ['#e74c3c', '#3498db']
+    ];
+    const [c1, c2] = palettes[Math.floor(Math.random() * palettes.length)];
+    const shift = 1 + Math.floor(Math.random() * 3);
+    const skew = 1 + Math.floor(Math.random() * 4);
+    const duration = (1.2 + Math.random() * 1.3).toFixed(2);
+    
+    const keyframes = `
+        @keyframes ${animId} {
+            0%   { transform: translate(0,0) skewX(0deg); opacity: 1; text-shadow: none; }
+            10%  { transform: translate(-${shift}px, ${Math.ceil(shift/2)}px) skewX(-${skew}deg); opacity: 0.85; text-shadow: ${shift}px 0 ${c1}, -${shift}px 0 ${c2}; }
+            20%  { transform: translate(${shift}px, -${Math.ceil(shift/2)}px) skewX(${skew}deg); opacity: 1; text-shadow: -${shift}px 0 ${c1}, ${shift}px 0 ${c2}; }
+            30%  { transform: translate(-${Math.ceil(shift/2)}px, ${shift}px) skewX(0deg); opacity: 0.7; text-shadow: ${shift*2}px 0 ${c1}; }
+            40%  { transform: translate(${Math.ceil(shift/2)}px, -${shift}px) skewX(-${skew}deg); opacity: 1; text-shadow: none; }
+            50%  { transform: translate(-${shift}px, 0) skewX(${skew}deg); opacity: 0.9; text-shadow: -${shift}px 0 ${c2}; }
+            60%  { transform: translate(${shift}px, ${Math.ceil(shift/2)}px) skewX(0deg); opacity: 0.8; text-shadow: ${shift}px 0 ${c1}; }
+            70%  { transform: translate(0, -${Math.ceil(shift/2)}px) skewX(-${skew}deg); opacity: 1; text-shadow: none; }
+            80%  { transform: translate(-${Math.ceil(shift/2)}px, ${shift}px) skewX(${skew}deg); opacity: 0.85; text-shadow: ${shift}px 0 ${c2}; }
+            90%  { transform: translate(${Math.ceil(shift/2)}px, -${Math.ceil(shift/2)}px) skewX(0deg); opacity: 1; text-shadow: none; }
+            100% { transform: translate(0,0) skewX(0deg); opacity: 1; text-shadow: none; }
+        }
+    `;
+    
+    const style = document.createElement('style');
+    style.textContent = keyframes;
+    style.dataset.voiceGlitch = animId;
+    document.head.appendChild(style);
+    
+    el.style.animation = `${animId} ${duration}s steps(1) forwards`;
+    
+    setTimeout(() => {
+        el.style.animation = '';
+        if (style.parentNode) style.remove();
+    }, parseFloat(duration) * 1000);
+}
+
+function initVoiceObserver() {
+    if (voiceObserver) voiceObserver.disconnect();
+    
+    const chapterScreen = document.getElementById('chapter-screen');
+    if (!chapterScreen) return;
+    
+    const options = {
+        root: chapterScreen,
+        rootMargin: '-45% 0px -45% 0px',
+        threshold: 0.5
+    };
+    
+    voiceObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting && !entry.target.dataset.voiceTriggered) {
+                entry.target.dataset.voiceTriggered = 'true';
+                generateGlitchAnimation(entry.target);
+                
+                if (navigator.vibrate) {
+                    navigator.vibrate([30, 60, 30]);
+                }
+            }
+        });
+    }, options);
+    
+    chapterScreen.querySelectorAll('.voice-glitch').forEach(el => {
+        voiceObserver.observe(el);
+    });
+}
+
+function cleanupVoiceObserver() {
+    if (voiceObserver) {
+        voiceObserver.disconnect();
+        voiceObserver = null;
+    }
+    document.querySelectorAll('style[data-voice-glitch]').forEach(s => s.remove());
+    document.querySelectorAll('.voice-glitch').forEach(el => {
+        el.style.animation = '';
+        delete el.dataset.voiceTriggered;
+    });
+}
