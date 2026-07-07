@@ -35,6 +35,7 @@
 
     <!-- Экран с оглавлением -->
     <div id="contents-screen">
+        <div class="contents-header">Оглавление</div>
         <div class="contents-list">
             <div class="contents-item" data-chapter="0">01 <span class="dot"></span> В начале была метель</div>
             <div class="contents-item" data-chapter="1">02 <span class="dot"></span> Разложив большую часть</div>
@@ -72,6 +73,22 @@
             <div class="contents-item" data-chapter="33">34 <span class="dot"></span> Я направился к подъезду Максима</div>
         </div>
     </div>
+    <button class="menu-trigger" id="menu-trigger" aria-label="Меню">
+  <svg class="heron-svg" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="100" cy="100" r="94" fill="none" stroke="currentColor" stroke-width="3.5"/>
+    <path d="M85 42 L48 34 L56 48 Z" fill="currentColor"/>
+    <ellipse cx="82" cy="46" rx="10" ry="12" fill="currentColor"/>
+    <path d="M82 58 Q72 88 76 108 Q78 124 86 134" fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round"/>
+    <ellipse cx="102" cy="138" rx="40" ry="30" fill="currentColor"/>
+    <path d="M102 122 Q132 116 148 134 Q138 140 128 138" fill="currentColor"/>
+    <path d="M104 132 Q134 132 152 152 Q142 148 132 144" fill="currentColor"/>
+    <line x1="90" y1="164" x2="80" y2="198" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+    <line x1="102" y1="164" x2="112" y2="198" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+    <path d="M80 198 L70 203 M80 198 L75 206 M80 198 L85 206" stroke="currentColor" stroke-width="2" fill="none"/>
+    <path d="M112 198 L122 203 M112 198 L117 206 M112 198 L107 206" stroke="currentColor" stroke-width="2" fill="none"/>
+  </svg>
+</button>
+
 
     <!-- Экран главы -->
     <div id="chapter-screen">
@@ -85,6 +102,42 @@
         </div>
     </div>
 
+<div id="menu-overlay" class="menu-overlay">
+  <button class="menu-close" id="menu-close" aria-label="Закрыть меню">
+    <svg class="heron-svg" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="100" cy="100" r="94" fill="none" stroke="currentColor" stroke-width="3.5"/>
+      <path d="M85 42 L48 34 L56 48 Z" fill="currentColor"/>
+      <ellipse cx="82" cy="46" rx="10" ry="12" fill="currentColor"/>
+      <path d="M82 58 Q72 88 76 108 Q78 124 86 134" fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round"/>
+      <ellipse cx="102" cy="138" rx="40" ry="30" fill="currentColor"/>
+      <path d="M102 122 Q132 116 148 134 Q138 140 128 138" fill="currentColor"/>
+      <path d="M104 132 Q134 132 152 152 Q142 148 132 144" fill="currentColor"/>
+      <line x1="90" y1="164" x2="80" y2="198" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+      <line x1="102" y1="164" x2="112" y2="198" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+      <path d="M80 198 L70 203 M80 198 L75 206 M80 198 L85 206" stroke="currentColor" stroke-width="2" fill="none"/>
+      <path d="M112 198 L122 203 M112 198 L117 206 M112 198 L107 206" stroke="currentColor" stroke-width="2" fill="none"/>
+    </svg>
+    <span class="menu-close-label">к чтению</span>
+  </button>
+  
+  <div class="menu-content">
+    <a href="https://t.me/iterevsky" target="_blank" rel="noopener" class="menu-item">Контакты</a>
+    
+    <div class="menu-item menu-donate">
+      <span class="donate-label">Поблагодарить автора</span>
+      <div class="donate-row">
+        <span class="donate-card" id="donate-card">8888 8888 8888 8888</span>
+        <button class="donate-copy" id="donate-copy">Копировать</button>
+      </div>
+    </div>
+    
+    <div class="menu-separator"></div>
+    
+    <div class="menu-item menu-about">О проекте — в процессе заполнения</div>
+  </div>
+</div>
+
+    
     <script src="chapters.js"></script>
 <script src="script.js"></script>
 
