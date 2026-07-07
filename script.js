@@ -645,6 +645,3 @@ document.querySelectorAll('.donate-copy').forEach(btn => {
     });
 });
 
-
-if (donateCopyBtn) donateCopyBtn.addEventListener('click', copyCard);
-
