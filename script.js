@@ -73,7 +73,7 @@ document.addEventListener('keydown', (e) => {
         chapterScreen.classList.remove('visible');
         setTimeout(() => contentsScreen.classList.add('visible'), 500);
     }
-
+});
 
 // === ИНТРО: КАСАНИЕ / КЛИК / СВАЙП ===
 let touchStartY = 0;
