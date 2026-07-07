@@ -392,4 +392,15 @@ html, body {
     background: #00A8E8 !important;
     box-shadow: 0 0 6px #00A8E8;
 }
+/* === МЕХАНИЧЕСКИЙ ГОЛОС (VOICE GLITCH) === */
+.voice-glitch {
+    display: inline;
+    position: relative;
+    color: #e8e6e3;
+}
+
+/* Подсветка точки рядом, если voice-glitch внутри contents-item */
+.contents-item .voice-glitch {
+    color: #c41e3a;
+}
 
