@@ -190,7 +190,14 @@ function openChapter(index) {
 
     numberEl.textContent = 'Глава ' + chapter.number;
     titleEl.textContent = chapter.title;
-    textEl.innerHTML = chapter.text.replace(/{{VOICE}}(.*?){{\/VOICE}}/g, '<span class="voice-glitch">$1</span>');
+    textEl.innerHTML = chapter.text.replace(
+    /{{VOICE(?::(\w+))?}}(.*?){{\/VOICE}}/g,
+    (match, mode, text) => {
+        const voiceMode = mode || 'aggressive';
+        return `<span class="voice-glitch" data-voice-mode="${voiceMode}">${text}</span>`;
+    }
+);
+
 
 
     prevBtn.classList.toggle('inactive', index === 0);
@@ -253,8 +260,206 @@ function openChapter(index) {
 /* === МЕХАНИЧЕСКИЙ ГОЛОС: РАНДОМНАЯ АНИМАЦИЯ И ОТСЛЕЖИВАНИЕ === */
 let voiceObserver = null;
 
-function generateGlitchAnimation(el) {
+function generateAggressiveGlitch(el) {
     const animId = 'voice-glitch-' + Math.random().toString(36).substr(2, 9);
+    
+    const palettes = [
+        ['#ff0040', '#00A8E8'],
+        ['#c41e3a', '#00A8E8'],
+        ['#ff6b00', '#0040ff'],
+        ['#9b59b6', '#2ecc71'],
+        ['#e74c3c', '#3498db'],
+        ['#ff0000', '#00ffff'],
+        ['#ff3366', '#33ccff']
+    ];
+    const [c1, c2] = palettes[Math.floor(Math.random() * palettes.length)];
+    const maxShift = 2 + Math.floor(Math.random() * 3);
+    const maxSkew = 2 + Math.floor(Math.random() * 4);
+    const duration = (2.4 + Math.random() * 2.6).toFixed(2);
+    
+    const steps = 20;
+    let frames = '';
+    for (let i = 0; i <= steps; i++) {
+        const pct = Math.round((i / steps) * 100);
+        const tx = (Math.random() > 0.5 ? 1 : -1) * Math.floor(Math.random() * maxShift + 1);
+        const ty = (Math.random() > 0.5 ? 1 : -1) * Math.floor(Math.random() * 3);
+        const sk = (Math.random() > 0.5 ? 1 : -1) * Math.floor(Math.random() * maxSkew + 1);
+        const op = (0.5 + Math.random() * 0.5).toFixed(2);
+        const sc = (0.95 + Math.random() * 0.10).toFixed(2);
+        const br = (0.6 + Math.random() * 0.8).toFixed(2);
+        const bl = Math.random() > 0.5 ? (Math.random() * 2).toFixed(1) : 0;
+        const hasShadow = Math.random() > 0.25;
+        const ts = hasShadow 
+            ? `${Math.floor(Math.random()*4+1)}px 0 ${c1}, -${Math.floor(Math.random()*4+1)}px 0 ${c2}`
+            : 'none';
+        
+        frames += `            ${pct}% { transform: translate(${tx}px, ${ty}px) skewX(${sk}deg) scale(${sc}); opacity: ${op}; text-shadow: ${ts}; filter: brightness(${br}) blur(${bl}px); }\n`;
+    }
+    
+    const keyframes = `@keyframes ${animId} {\n${frames}        }`;
+    
+    const style = document.createElement('style');
+    style.textContent = keyframes;
+    style.dataset.voiceGlitch = animId;
+    document.head.appendChild(style);
+    
+    el.style.animation = `${animId} ${duration}s steps(1) forwards`;
+    
+    // Ударная волна
+    const parentP = el.closest('p');
+    if (parentP) {
+        const prev = parentP.previousElementSibling;
+        const next = parentP.nextElementSibling;
+        if (prev && prev.tagName === 'P') {
+            prev.classList.add('voice-shock-prev');
+            setTimeout(() => prev.classList.remove('voice-shock-prev'), 700);
+        }
+        if (next && next.tagName === 'P') {
+            next.classList.add('voice-shock-next');
+            setTimeout(() => next.classList.remove('voice-shock-next'), 700);
+        }
+    }
+    
+    // Вибрация
+    if (navigator.vibrate) {
+        navigator.vibrate([30, 60, 30]);
+    }
+    
+    setTimeout(() => {
+        el.style.animation = '';
+        if (style.parentNode) style.remove();
+    }, parseFloat(duration) * 1000);
+}
+
+function generateStandardGlitch(el) {
+    const animId = 'voice-standard-' + Math.random().toString(36).substr(2, 9);
+    
+    // Палитра: монохром + лёгкий акцент (как будто голос из тени)
+    const baseColor = '#b8b5b0';      // обычный текст
+    const dimColor = '#7a7874';      // тусклый
+    const accentColor = '#8a9aab';   // холодный серо-голубой (не крик)
+    
+    const duration = (4.0 + Math.random() * 2.0).toFixed(2); // 4.0–6.0 с
+    
+    // 15 мягких ключевых кадров (меньше резкости)
+    const steps = 15;
+    let frames = '';
+    
+    for (let i = 0; i <= steps; i++) {
+        const pct = Math.round((i / steps) * 100);
+        
+        // Мягкое мерцание: opacity колеблется 0.4–1.0
+        const op = (0.4 + Math.random() * 0.6).toFixed(2);
+        
+        // Микро-сдвиги: max 1px (едва заметно)
+        const tx = (Math.random() > 0.5 ? 1 : -1) * (Math.random() * 0.8).toFixed(2);
+        const ty = (Math.random() > 0.5 ? 1 : -1) * (Math.random() * 0.5).toFixed(2);
+        
+        // Лёгкий blur: 0–1.5px
+        const bl = (Math.random() * 1.5).toFixed(2);
+        
+        // Яркость: 0.7–1.1
+        const br = (0.7 + Math.random() * 0.4).toFixed(2);
+        
+        // Цвет: плавное перетекание между состояниями
+        const colorRoll = Math.random();
+        let color;
+        if (colorRoll < 0.6) color = baseColor;
+        else if (colorRoll < 0.85) color = dimColor;
+        else color = accentColor;
+        
+        // text-shadow: едва заметное свечение, без RGB-разброса
+        const hasGlow = Math.random() > 0.6;
+        const ts = hasGlow 
+            ? `0 0 ${(Math.random() * 3 + 1).toFixed(1)}px ${accentColor}`
+            : 'none';
+        
+        frames += `            ${pct}% { transform: translate(${tx}px, ${ty}px); opacity: ${op}; color: ${color}; text-shadow: ${ts}; filter: brightness(${br}) blur(${bl}px); }\n`;
+    }
+    
+    const keyframes = `@keyframes ${animId} {\n${frames}        }`;
+    
+    const style = document.createElement('style');
+    style.textContent = keyframes;
+    style.dataset.voiceGlitch = animId;
+    document.head.appendChild(style);
+    
+    el.style.animation = `${animId} ${duration}s ease-in-out forwards`;
+    
+    // БЕЗ ударной волны
+    // БЕЗ вибрации
+    
+    setTimeout(() => {
+        el.style.animation = '';
+        if (style.parentNode) style.remove();
+    }, parseFloat(duration) * 1000);
+}
+
+function generateWhisperGlitch(el) {
+    const animId = 'voice-whisper-' + Math.random().toString(36).substr(2, 9);
+    
+    const duration = (3.0 + Math.random() * 2.0).toFixed(2); // 3.0–5.0 с
+    
+    // 12 очень мягких кадров
+    const steps = 12;
+    let frames = '';
+    
+    for (let i = 0; i <= steps; i++) {
+        const pct = Math.round((i / steps) * 100);
+        
+        // Пульсация opacity: 0.15–0.65 (полупрозрачный, как шёпот)
+        const op = (0.15 + Math.random() * 0.5).toFixed(2);
+        
+        // Микро-дрожание: max 0.5px
+        const tx = (Math.random() > 0.5 ? 1 : -1) * (Math.random() * 0.5).toFixed(2);
+        
+        // letter-spacing: иногда расширяется, как будто слова разваливаются
+        const ls = Math.random() > 0.7 ? (Math.random() * 0.03).toFixed(3) : 0;
+        
+        // blur: 0–2px (размытость шёпота)
+        const bl = (Math.random() * 2.0).toFixed(2);
+        
+        // Цвет: почти исчезающий
+        const colors = ['#8a8680', '#6b6760', '#9a9690', '#b8b5b0'];
+        const color = colors[Math.floor(Math.random() * colors.length)];
+        
+        frames += `            ${pct}% { transform: translateX(${tx}px); opacity: ${op}; color: ${color}; letter-spacing: ${ls}em; filter: blur(${bl}px); }\n`;
+    }
+    
+    const keyframes = `@keyframes ${animId} {\n${frames}        }`;
+    
+    const style = document.createElement('style');
+    style.textContent = keyframes;
+    style.dataset.voiceGlitch = animId;
+    document.head.appendChild(style);
+    
+    el.style.animation = `${animId} ${duration}s ease-in-out forwards`;
+    
+    // БЕЗ ударной волны
+    // БЕЗ вибрации
+    
+    setTimeout(() => {
+        el.style.animation = '';
+        if (style.parentNode) style.remove();
+    }, parseFloat(duration) * 1000);
+}
+
+
+function generateGlitchAnimation(el) {
+    const mode = el.dataset.voiceMode || 'aggressive';
+    
+    switch (mode) {
+        case 'standard':
+            generateStandardGlitch(el);
+            break;
+        case 'whisper':
+            generateWhisperGlitch(el);
+            break;
+        default:
+            generateAggressiveGlitch(el);
+    }
+}
+
     
     // === Рандомные параметры ===
     const palettes = [
@@ -341,9 +546,13 @@ function initVoiceObserver() {
                 entry.target.dataset.voiceTriggered = 'true';
                 generateGlitchAnimation(entry.target);
                 
-                if (navigator.vibrate) {
-                    navigator.vibrate([30, 60, 30]);
-                }
+// Вибрация только для агрессивного режима
+if (entry.target.dataset.voiceMode !== 'standard' && 
+    entry.target.dataset.voiceMode !== 'whisper' &&
+    navigator.vibrate) {
+    navigator.vibrate([30, 60, 30]);
+}
+
             }
         });
     }, options);
