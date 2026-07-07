@@ -334,7 +334,7 @@ function generateAggressiveGlitch(el) {
 function generateStandardGlitch(el) {
     const animId = 'voice-standard-' + Math.random().toString(36).substr(2, 9);
     
-    // Мягкие палитры: два близких тона для мерцания
+    // Те же RGB-палитры, что у aggressive
     const palettes = [
         ['#ff0040', '#00A8E8'],
         ['#c41e3a', '#00A8E8'],
@@ -344,44 +344,51 @@ function generateStandardGlitch(el) {
         ['#ff0000', '#00ffff'],
         ['#ff3366', '#33ccff']
     ];
-
     const [c1, c2] = palettes[Math.floor(Math.random() * palettes.length)];
     
-    // ТА ЖЕ длительность, что и aggressive
-    const duration = (2.4 + Math.random() * 2.6).toFixed(2);
+    // Ослабленные параметры
+    const maxShift = 1 + Math.floor(Math.random() * 2);   // 1–2px (было 2–4)
+    const maxSkew = 1 + Math.floor(Math.random() * 2);    // 1–2deg (было 2–5)
+    const duration = (2.4 + Math.random() * 2.6).toFixed(2); // та же длительность
     
-    // ТО ЖЕ количество шагов — для эффекта мигания
     const steps = 20;
     let frames = '';
     
     for (let i = 0; i <= steps; i++) {
         const pct = Math.round((i / steps) * 100);
         
-        // Микро-сдвиги (мягче aggressive, но заметно)
-        const tx = (Math.random() > 0.5 ? 1 : -1) * Math.floor(Math.random() * 2 + 1);
+        // Микро-сдвиги
+        const tx = (Math.random() > 0.5 ? 1 : -1) * Math.floor(Math.random() * maxShift + 1);
         const ty = (Math.random() > 0.5 ? 1 : -1) * Math.floor(Math.random() * 2);
-        const sk = (Math.random() > 0.5 ? 1 : -1) * Math.floor(Math.random() * 2 + 1);
+        const sk = (Math.random() > 0.5 ? 1 : -1) * Math.floor(Math.random() * maxSkew + 1);
         
-        // Мерцание opacity
-        const op = (0.4 + Math.random() * 0.6).toFixed(2);
+        // Opacity: в основном высокая, иногда провал
+        const op = (0.6 + Math.random() * 0.4).toFixed(2);
         
-        // Микро-масштаб
-        const sc = (0.97 + Math.random() * 0.06).toFixed(2);
+        // Scale почти 1.0
+        const sc = (0.98 + Math.random() * 0.04).toFixed(2);
         
         // Яркость
-        const br = (0.7 + Math.random() * 0.5).toFixed(2);
+        const br = (0.8 + Math.random() * 0.4).toFixed(2);
         
-        // Blur: 0–1.5px (мягкий)
-        const bl = Math.random() > 0.4 ? (Math.random() * 1.5).toFixed(1) : 0;
+        // Blur лёгкий
+        const bl = Math.random() > 0.6 ? (Math.random() * 1.5).toFixed(1) : 0;
         
-        // Цвет: мягкое переключение между двумя тонами
-        const color = Math.random() > 0.5 ? c1 : c2;
+        // === КЛЮЧЕВОЕ: цвет ===
+        // В 60% кадров — белый текст (как обычный)
+        // В 40% — цветная вспышка (как aggressive)
+        const colorRoll = Math.random();
+        let color, ts;
         
-        // text-shadow: едва заметное двухцветное свечение
-        const hasGlow = Math.random() > 0.5;
-        const ts = hasGlow 
-            ? `${Math.floor(Math.random()*2+1)}px 0 ${c2}, -${Math.floor(Math.random()*2+1)}px 0 ${c1}`
-            : 'none';
+        if (colorRoll < 0.6) {
+            // Белый/светлый — базовый текст
+            color = '#e8e6e3';
+            ts = 'none';
+        } else {
+            // Цветная вспышка — глитч
+            color = Math.random() > 0.5 ? c1 : c2;
+            ts = `${Math.floor(Math.random()*3+1)}px 0 ${c2}, -${Math.floor(Math.random()*3+1)}px 0 ${c1}`;
+        }
         
         frames += `            ${pct}% { transform: translate(${tx}px, ${ty}px) skewX(${sk}deg) scale(${sc}); opacity: ${op}; color: ${color}; text-shadow: ${ts}; filter: brightness(${br}) blur(${bl}px); }\n`;
     }
@@ -393,7 +400,7 @@ function generateStandardGlitch(el) {
     style.dataset.voiceGlitch = animId;
     document.head.appendChild(style);
     
-    // steps(1) — эффект мигания/дробления, как у aggressive
+    // steps(1) — мигание, как у aggressive
     el.style.animation = `${animId} ${duration}s steps(1) forwards`;
     
     // БЕЗ ударной волны
@@ -404,7 +411,6 @@ function generateStandardGlitch(el) {
         if (style.parentNode) style.remove();
     }, parseFloat(duration) * 1000);
 }
-
 
 function generateWhisperGlitch(el) {
     const animId = 'voice-whisper-' + Math.random().toString(36).substr(2, 9);
