@@ -678,23 +678,20 @@ function showShareTooltip() {
     
     shareTooltip.classList.add('visible');
     
-    requestAnimationFrame(() => {
-        const ttRect = shareTooltip.getBoundingClientRect();
-        let top = rect.bottom + 14;
-        if (top + ttRect.height > window.innerHeight - 10) {
-            top = rect.top - ttRect.height - 14;
-        }
-
-        
-        let left = rect.left + (rect.width - ttRect.width) / 2;
-        if (left < 10) left = 10;
-        if (left + ttRect.width > window.innerWidth - 10) {
-            left = window.innerWidth - ttRect.width - 10;
-        }
-        
-        shareTooltip.style.top = top + 'px';
-        shareTooltip.style.left = left + 'px';
-    });
+    const ttRect = shareTooltip.getBoundingClientRect();
+    let top = rect.bottom + 14;
+    if (top + ttRect.height > window.innerHeight - 10) {
+        top = rect.top - ttRect.height - 14;
+    }
+    
+    let left = rect.left + (rect.width - ttRect.width) / 2;
+    if (left < 10) left = 10;
+    if (left + ttRect.width > window.innerWidth - 10) {
+        left = window.innerWidth - ttRect.width - 10;
+    }
+    
+    shareTooltip.style.top = top + 'px';
+    shareTooltip.style.left = left + 'px';
 }
 
 function hideShareTooltip() {
@@ -748,14 +745,13 @@ shareTooltip.addEventListener('click', (e) => {
     copySelection();
 });
 
-// selectionchange — надёжнее, чем mouseup/touchend
-document.addEventListener('selectionchange', () => {
-    setTimeout(showShareTooltip, 60);
+// Показываем только после отпускания мыши/пальца
+document.addEventListener('mouseup', () => {
+    setTimeout(showShareTooltip, 50);
 });
 
-// Дополнительно для мобильных
 document.addEventListener('touchend', () => {
-    setTimeout(showShareTooltip, 200);
+    setTimeout(showShareTooltip, 150);
 });
 
 // Скрытие при клике/таче вне тултипа
@@ -773,5 +769,6 @@ document.addEventListener('touchstart', (e) => {
 
 chapterScreen.addEventListener('scroll', hideShareTooltip);
 window.addEventListener('resize', hideShareTooltip);
+
 
 
