@@ -645,3 +645,126 @@ document.querySelectorAll('.donate-copy').forEach(btn => {
     });
 });
 
+/* === ПОДЕЛИТЬСЯ: ВЫДЕЛЕНИЕ === */
+const shareTooltip = document.getElementById('share-tooltip');
+
+function showShareTooltip() {
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) {
+        hideShareTooltip();
+        return;
+    }
+    
+    const range = selection.getRangeAt(0);
+    const text = selection.toString().trim();
+    
+    if (text.length < 3) {
+        hideShareTooltip();
+        return;
+    }
+    
+    const container = range.commonAncestorContainer;
+    const el = container.nodeType === 3 ? container.parentElement : container;
+    if (!el.closest('.chapter-text')) {
+        hideShareTooltip();
+        return;
+    }
+    
+    const rect = range.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) {
+        hideShareTooltip();
+        return;
+    }
+    
+    shareTooltip.classList.add('visible');
+    
+    requestAnimationFrame(() => {
+        const ttRect = shareTooltip.getBoundingClientRect();
+        let top = rect.top - ttRect.height - 14;
+        if (top < 10) top = rect.bottom + 14;
+        
+        let left = rect.left + (rect.width - ttRect.width) / 2;
+        if (left < 10) left = 10;
+        if (left + ttRect.width > window.innerWidth - 10) {
+            left = window.innerWidth - ttRect.width - 10;
+        }
+        
+        shareTooltip.style.top = top + 'px';
+        shareTooltip.style.left = left + 'px';
+    });
+}
+
+function hideShareTooltip() {
+    shareTooltip.classList.remove('visible');
+    shareTooltip.style.top = '';
+    shareTooltip.style.left = '';
+}
+
+function copySelection() {
+    const selection = window.getSelection();
+    const text = selection.toString().trim();
+    if (!text) return;
+    
+    const fullText = text + '\n\n— из «ЭХО». Читать: iterevsky.github.io/echo';
+    
+    const onSuccess = () => {
+        const label = shareTooltip.querySelector('.share-label');
+        const original = label.textContent;
+        label.textContent = 'Скопировано';
+        setTimeout(() => {
+            label.textContent = original;
+            hideShareTooltip();
+        }, 1500);
+    };
+    
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(fullText).then(onSuccess).catch(() => {
+            fallbackCopyShare(fullText, onSuccess);
+        });
+    } else {
+        fallbackCopyShare(fullText, onSuccess);
+    }
+}
+
+function fallbackCopyShare(text, callback) {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try {
+        document.execCommand('copy');
+        if (callback) callback();
+    } catch (err) {}
+    document.body.removeChild(ta);
+}
+
+shareTooltip.addEventListener('click', (e) => {
+    e.stopPropagation();
+    copySelection();
+});
+
+document.addEventListener('mouseup', () => {
+    setTimeout(showShareTooltip, 10);
+});
+
+document.addEventListener('touchend', () => {
+    setTimeout(showShareTooltip, 100);
+});
+
+document.addEventListener('mousedown', (e) => {
+    if (!shareTooltip.contains(e.target)) {
+        hideShareTooltip();
+    }
+});
+
+document.addEventListener('touchstart', (e) => {
+    if (!shareTooltip.contains(e.target)) {
+        hideShareTooltip();
+    }
+}, { passive: true });
+
+chapterScreen.addEventListener('scroll', hideShareTooltip);
+window.addEventListener('resize', hideShareTooltip);
+
