@@ -7,6 +7,16 @@ const contentsScreen = document.getElementById('contents-screen');
 const chapterScreen = document.getElementById('chapter-screen');
 
 let isStarted = false;
+let touchStartX = 0;
+
+const menuTrigger = document.getElementById('menu-trigger');
+const menuOverlay = document.getElementById('menu-overlay');
+const menuClose = document.getElementById('menu-close');
+const donateCopyBtn = document.getElementById('donate-copy');
+const donateCard = document.getElementById('donate-card');
+
+let isMenuOpen = false;
+
 let currentChapter = 0;
 
 const STORAGE_KEY = 'echo_state';
@@ -67,12 +77,17 @@ document.addEventListener('keydown', (e) => {
         e.preventDefault();
         openChapter(currentChapter + 1);
     }
-    if (e.key === 'Escape') {
-        e.preventDefault();
-        cleanupVoiceObserver();
-        chapterScreen.classList.remove('visible');
-        setTimeout(() => contentsScreen.classList.add('visible'), 500);
+   if (e.key === 'Escape') {
+    e.preventDefault();
+    if (isMenuOpen) {
+        closeMenu();
+        return;
     }
+    cleanupVoiceObserver();
+    chapterScreen.classList.remove('visible');
+    setTimeout(() => contentsScreen.classList.add('visible'), 500);
+}
+
 });
 
 // === ИНТРО: КАСАНИЕ / КЛИК / СВАЙП ===
@@ -80,13 +95,23 @@ let touchStartY = 0;
 
 document.addEventListener('touchstart', (e) => {
     touchStartY = e.touches[0].clientY;
+    touchStartX = e.touches[0].clientX;
 }, { passive: true });
 
 document.addEventListener('touchend', (e) => {
-    if (isStarted) return;
-    const diff = touchStartY - e.changedTouches[0].clientY;
-    if (diff > 50) startSequence();
+    const diffY = touchStartY - e.changedTouches[0].clientY;
+    const diffX = touchStartX - e.changedTouches[0].clientX;
+    
+    if (!isStarted && diffY > 50) {
+        startSequence();
+    }
+    
+    // Свайп справа налево в главе — открыть меню
+    if (chapterScreen.classList.contains('visible') && diffX > 60 && touchStartX > window.innerWidth * 0.7) {
+        openMenu();
+    }
 }, { passive: true });
+
 
 document.addEventListener('click', () => {
     if (!isStarted) startSequence();
@@ -162,6 +187,8 @@ function showContents() {
         // Показываем оглавление
         setTimeout(() => {
             contentsScreen.classList.add('visible');
+            if (menuTrigger) menuTrigger.classList.add('visible');
+
 
             // Поочерёдно проявляем пункты
             const items = document.querySelectorAll('.contents-item');
@@ -204,6 +231,8 @@ function openChapter(index) {
     nextBtn.classList.toggle('inactive', index === chapters.length - 1);
 
     contentsScreen.classList.remove('visible');
+    if (menuTrigger) menuTrigger.classList.remove('visible');
+
 
     setTimeout(() => {
         chapterScreen.classList.add('visible');
@@ -522,3 +551,79 @@ function cleanupVoiceObserver() {
         delete el.dataset.voiceTriggered;
     });
 }
+
+/* === МЕНЮ: ОТКРЫТИЕ / ЗАКРЫТИЕ === */
+function openMenu() {
+    if (isMenuOpen) return;
+    isMenuOpen = true;
+    menuOverlay.classList.add('open');
+    if (contentsScreen.classList.contains('visible')) {
+        contentsScreen.classList.add('menu-dimmed');
+    }
+    if (chapterScreen.classList.contains('visible')) {
+        chapterScreen.classList.add('menu-dimmed');
+    }
+    if (menuTrigger) menuTrigger.classList.remove('visible');
+}
+
+function closeMenu() {
+    if (!isMenuOpen) return;
+    isMenuOpen = false;
+    menuOverlay.classList.remove('open');
+    contentsScreen.classList.remove('menu-dimmed');
+    chapterScreen.classList.remove('menu-dimmed');
+    if (contentsScreen.classList.contains('visible') && menuTrigger) {
+        menuTrigger.classList.add('visible');
+    }
+}
+
+function toggleMenu() {
+    isMenuOpen ? closeMenu() : openMenu();
+}
+
+if (menuTrigger) menuTrigger.addEventListener('click', toggleMenu);
+if (menuClose) menuClose.addEventListener('click', closeMenu);
+
+/* === КОПИРОВАНИЕ НОМЕРА КАРТЫ === */
+function fallbackCopy(text) {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try {
+        document.execCommand('copy');
+        if (donateCopyBtn) {
+            donateCopyBtn.textContent = 'Скопировано';
+            donateCopyBtn.classList.add('copied');
+            setTimeout(() => {
+                donateCopyBtn.textContent = 'Копировать';
+                donateCopyBtn.classList.remove('copied');
+            }, 2000);
+        }
+    } catch (err) {}
+    document.body.removeChild(ta);
+}
+
+function copyCard() {
+    if (!donateCard) return;
+    const text = donateCard.textContent.trim();
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => {
+            if (donateCopyBtn) {
+                donateCopyBtn.textContent = 'Скопировано';
+                donateCopyBtn.classList.add('copied');
+                setTimeout(() => {
+                    donateCopyBtn.textContent = 'Копировать';
+                    donateCopyBtn.classList.remove('copied');
+                }, 2000);
+            }
+        }).catch(() => fallbackCopy(text));
+    } else {
+        fallbackCopy(text);
+    }
+}
+
+if (donateCopyBtn) donateCopyBtn.addEventListener('click', copyCard);
+
