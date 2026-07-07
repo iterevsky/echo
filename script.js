@@ -336,11 +336,15 @@ function generateStandardGlitch(el) {
     
     // Мягкие палитры: два близких тона для мерцания
     const palettes = [
-        ['#b8b5b0', '#7a7874'],
-        ['#9a9690', '#6b6760'],
-        ['#b8b5b0', '#8a9aab'],
-        ['#a0a098', '#7a7874']
+        ['#ff0040', '#00A8E8'],
+        ['#c41e3a', '#00A8E8'],
+        ['#ff6b00', '#0040ff'],
+        ['#9b59b6', '#2ecc71'],
+        ['#e74c3c', '#3498db'],
+        ['#ff0000', '#00ffff'],
+        ['#ff3366', '#33ccff']
     ];
+
     const [c1, c2] = palettes[Math.floor(Math.random() * palettes.length)];
     
     // ТА ЖЕ длительность, что и aggressive
