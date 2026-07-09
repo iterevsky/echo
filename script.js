@@ -81,6 +81,10 @@ document.addEventListener('keydown', (e) => {
     }
 if (e.key === 'Escape') {
     e.preventDefault();
+    if (photoOverlay && photoOverlay.classList.contains('active')) {
+        closePhoto();
+        return;
+    }
     if (isMenuOpen) {
         closeMenu();
         return;
@@ -90,6 +94,7 @@ if (e.key === 'Escape') {
     if (menuTrigger) menuTrigger.classList.add('visible');
         setTimeout(() => contentsScreen.classList.add('visible'), 500);
     }
+
 });
 
 // === ИНТРО: КАСАНИЕ / КЛИК / СВАЙП ===
@@ -223,15 +228,21 @@ function openChapter(index) {
 
     numberEl.textContent = 'Глава ' + chapter.number;
     titleEl.textContent = chapter.title;
-    textEl.innerHTML = chapter.text.replace(
-    /{{VOICE(?::(\w+))?}}(.*?){{\/VOICE}}/g,
-    (match, mode, text) => {
-        const voiceMode = mode || 'aggressive';
-        return `<span class="voice-glitch" data-voice-mode="${voiceMode}">${text}</span>`;
-    }
-);
+        // Парсим {{PHOTO:слово:файл}} и {{VOICE}}
+    let processedText = chapter.text
+      .replace(
+        /\{\{PHOTO:([^:]+):([^}]+)\}\}/g,
+        '<span class="photo-link" data-photo="$2">$1</span>'
+      )
+      .replace(
+        /{{VOICE(?::(\w+))?}}(.*?){{\/VOICE}}/g,
+        (match, mode, text) => {
+          const voiceMode = mode || 'aggressive';
+          return `<span class="voice-glitch" data-voice-mode="${voiceMode}">${text}</span>`;
+        }
+      );
 
-
+    textEl.innerHTML = processedText;
 
     prevBtn.classList.toggle('inactive', index === 0);
     nextBtn.classList.toggle('inactive', index === chapters.length - 1);
@@ -248,6 +259,58 @@ function openChapter(index) {
 
     saveState({ lastChapter: index });
 }
+
+/* === ФОТО: ОВЕРЛЕЙ === */
+
+const photoOverlay = document.getElementById('photo-overlay');
+const photoBackdrop = document.getElementById('photo-backdrop');
+const photoImage = document.getElementById('photo-image');
+const photoClose = document.getElementById('photo-close');
+
+let photoTouchStartY = 0;
+let photoTouchStartX = 0;
+let photoTouchMoved = false;
+let photoTouchTimer = null;
+
+function openPhoto(src) {
+  photoImage.src = 'images/' + src;
+  photoOverlay.classList.add('active');
+  document.body.style.overflow = 'hidden';
+}
+
+function closePhoto() {
+  photoOverlay.classList.remove('active');
+  document.body.style.overflow = '';
+  photoImage.src = '';
+}
+
+if (photoBackdrop) photoBackdrop.addEventListener('click', closePhoto);
+if (photoClose) photoClose.addEventListener('click', closePhoto);
+
+if (photoOverlay) {
+  photoOverlay.addEventListener('touchstart', function(e) {
+    photoTouchStartY = e.touches[0].clientY;
+    photoTouchStartX = e.touches[0].clientX;
+    photoTouchMoved = false;
+  }, { passive: true });
+
+  photoOverlay.addEventListener('touchmove', function(e) {
+    const dy = e.touches[0].clientY - photoTouchStartY;
+    const dx = e.touches[0].clientX - photoTouchStartX;
+    if (Math.abs(dy) > 10 || Math.abs(dx) > 10) {
+      photoTouchMoved = true;
+    }
+  }, { passive: true });
+
+  photoOverlay.addEventListener('touchend', function(e) {
+    if (!photoTouchMoved) return;
+    const dy = e.changedTouches[0].clientY - photoTouchStartY;
+    if (dy > 50) {
+      closePhoto();
+    }
+  }, { passive: true });
+}
+
 /* === ЭЛЕКТРИЧЕСКИЙ ДРЕБЕЗГ В ОГЛАВЛЕНИИ === */
 (function() {
     const GROUP_SIZE = 15;          // Каждые 15 глав = одна группа
@@ -770,5 +833,51 @@ document.addEventListener('touchstart', (e) => {
 chapterScreen.addEventListener('scroll', hideShareTooltip);
 window.addEventListener('resize', hideShareTooltip);
 
+
+/* === ФОТО: ОБРАБОТЧИКИ === */
+
+document.addEventListener('click', function(e) {
+  const link = e.target.closest('.photo-link');
+  if (!link) return;
+  
+  e.preventDefault();
+  e.stopPropagation();
+  
+  const filename = link.getAttribute('data-photo');
+  if (filename) {
+    openPhoto(filename);
+  }
+});
+
+document.addEventListener('touchstart', function(e) {
+  const link = e.target.closest('.photo-link');
+  if (!link) return;
+  
+  photoTouchMoved = false;
+  photoTouchTimer = setTimeout(function() {
+    if (!photoTouchMoved) {
+      const filename = link.getAttribute('data-photo');
+      if (filename) {
+        e.preventDefault();
+        openPhoto(filename);
+      }
+    }
+  }, 150);
+}, { passive: false });
+
+document.addEventListener('touchmove', function(e) {
+  if (photoTouchTimer) {
+    clearTimeout(photoTouchTimer);
+    photoTouchTimer = null;
+  }
+  photoTouchMoved = true;
+}, { passive: true });
+
+document.addEventListener('touchend', function(e) {
+  if (photoTouchTimer) {
+    clearTimeout(photoTouchTimer);
+    photoTouchTimer = null;
+  }
+}, { passive: true });
 
 
