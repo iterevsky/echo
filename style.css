@@ -832,3 +832,91 @@ html, body {
   color: #e8e6e3;
 }
 
+/* Photo overlay */
+#photo-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.08s ease;
+}
+
+#photo-overlay.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+#photo-backdrop {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.92);
+  cursor: pointer;
+}
+
+#photo-container {
+  position: relative;
+  z-index: 1;
+  max-width: 90vw;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+#photo-image {
+  max-width: 90vw;
+  max-height: 80vh;
+  object-fit: contain;
+  display: block;
+}
+
+#photo-close {
+  position: absolute;
+  top: -40px;
+  right: 0;
+  background: none;
+  border: none;
+  color: #e8e6e3;
+  font-size: 32px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 8px;
+  font-family: inherit;
+  opacity: 0.7;
+  transition: opacity 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#photo-close:hover,
+#photo-close:active {
+  opacity: 1;
+}
+
+/* Photo link in chapter text */
+.photo-link {
+  color: #e8e6e3;
+  text-decoration: none;
+  border-bottom: 1px solid #00A8E8;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.photo-link:hover,
+.photo-link:active {
+  border-bottom-color: #00A8E8;
+  box-shadow: 0 2px 10px rgba(0, 168, 232, 0.35);
+  text-shadow: 0 0 10px rgba(0, 168, 232, 0.25);
+}
+
+
