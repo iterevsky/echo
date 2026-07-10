@@ -51,12 +51,14 @@ document.querySelector('.nav-next').addEventListener('click', () => {
 });
 document.querySelector('.nav-contents').addEventListener('click', () => {
     cleanupVoiceObserver();
+    cleanupSnowObserver();
     chapterScreen.classList.remove('visible');
     if (menuTrigger) menuTrigger.classList.add('visible');
     setTimeout(() => {
         contentsScreen.classList.add('visible');
     }, 500);
 });
+
 
 
 
