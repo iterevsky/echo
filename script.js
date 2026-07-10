@@ -51,14 +51,12 @@ document.querySelector('.nav-next').addEventListener('click', () => {
 });
 document.querySelector('.nav-contents').addEventListener('click', () => {
     cleanupVoiceObserver();
-    cleanupSnowObserver();
     chapterScreen.classList.remove('visible');
     if (menuTrigger) menuTrigger.classList.add('visible');
     setTimeout(() => {
         contentsScreen.classList.add('visible');
     }, 500);
 });
-
 
 
 
@@ -92,12 +90,10 @@ if (e.key === 'Escape') {
         return;
     }
     cleanupVoiceObserver();
-    cleanupSnowObserver();
     chapterScreen.classList.remove('visible');
     if (menuTrigger) menuTrigger.classList.add('visible');
-    setTimeout(() => contentsScreen.classList.add('visible'), 500);
-}
-
+        setTimeout(() => contentsScreen.classList.add('visible'), 500);
+    }
 
 });
 
@@ -259,9 +255,7 @@ function openChapter(index) {
         chapterScreen.classList.add('visible');
         chapterScreen.scrollTop = 0;
         initVoiceObserver();
-        initSnowForChapter4();
     }, 300);
-
 
     saveState({ lastChapter: index });
 }
@@ -625,9 +619,7 @@ function cleanupVoiceObserver() {
         el.style.animation = '';
         delete el.dataset.voiceTriggered;
     });
-    cleanupSnowObserver();
 }
-
 
 /* === МЕНЮ: ОТКРЫТИЕ / ЗАКРЫТИЕ === */
 function openMenu() {
@@ -781,212 +773,3 @@ document.addEventListener('touchend', function(e) {
     photoTouchTimer = null;
   }
 }, { passive: true });
-
-/* ============================================================
-   === СИСТЕМА МЕТЕЛИ (Глава 04) + WHITE-OUT ЭФФЕКТ ===
-   ============================================================ */
-
-let snowCanvas = null;
-let snowCtx = null;
-let snowAnimationId = null;
-let snowParticles = [];
-let snowIntensity = 0;
-let snowTargetIntensity = 0;
-let snowActive = false;
-let whiteOutObserver = null
-let isChapter4 = false;
-
-function initSnowSystem() {
-    snowCanvas = document.getElementById('snow-canvas');
-    if (!snowCanvas) return;
-    snowCtx = snowCanvas.getContext('2d');
-    resizeSnowCanvas();
-    window.addEventListener('resize', resizeSnowCanvas);
-}
-
-function resizeSnowCanvas() {
-    if (!snowCanvas) return;
-    snowCanvas.width = window.innerWidth;
-    snowCanvas.height = window.innerHeight;
-}
-
-class SnowParticle {
-    constructor() {
-        this.reset();
-    }
-    
-    reset() {
-        this.x = Math.random() * snowCanvas.width;
-        this.y = -10;
-        this.size = Math.random() * 4 + 2;
-        this.speedY = Math.random() * 2 + 1;
-        this.speedX = (Math.random() - 0.5) * 1.5;
-        this.opacity = Math.random() * 0.3 + 0.7;
-        this.sway = Math.random() * 0.02;
-        this.swayOffset = Math.random() * Math.PI * 2;
-    }
-    
-    update(intensity) {
-        const speedMult = 1 + intensity * 3;
-        this.y += this.speedY * speedMult;
-        this.x += this.speedX * speedMult + Math.sin(this.y * this.sway + this.swayOffset) * 0.5;
-        
-        if (this.y > snowCanvas.height + 10) {
-            this.reset();
-        }
-        if (this.x < -10 || this.x > snowCanvas.width + 10) {
-            this.reset();
-        }
-    }
-    
-    draw() {
-        snowCtx.beginPath();
-        snowCtx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-        snowCtx.fillStyle = `rgba(232, 230, 227, ${this.opacity})`;
-        snowCtx.fill();
-    }
-}
-
-function startSnow() {
-    if (!snowCanvas) initSnowSystem();
-    if (!snowCanvas) return;
-    
-    snowParticles = [];
-    const baseCount = 50;
-    for (let i = 0; i < baseCount; i++) {
-        const p = new SnowParticle();
-        p.y = Math.random() * snowCanvas.height;
-        snowParticles.push(p);
-    }
-    
-    snowActive = true;
-    snowCanvas.classList.add('active');
-    animateSnow();
-}
-
-function stopSnow() {
-    snowActive = false;
-    if (snowCanvas) snowCanvas.classList.remove('active');
-    if (snowAnimationId) cancelAnimationFrame(snowAnimationId);
-    snowAnimationId = null;
-    snowParticles = [];
-    if (snowCtx && snowCanvas) {
-        snowCtx.clearRect(0, 0, snowCanvas.width, snowCanvas.height);
-    }
-    snowIntensity = 0;
-    snowTargetIntensity = 0;
-}
-
-function setSnowIntensity(intensity) {
-    snowTargetIntensity = Math.max(0, Math.min(1, intensity));
-}
-
-function animateSnow() {
-    if (!snowActive || !snowCtx) return;
-    
-    snowIntensity += (snowTargetIntensity - snowIntensity) * 0.03;
-    
-    const targetCount = Math.floor(50 + snowIntensity * 350);
-    
-    while (snowParticles.length < targetCount) {
-        snowParticles.push(new SnowParticle());
-    }
-    while (snowParticles.length > targetCount) {
-        snowParticles.pop();
-    }
-    
-    snowCtx.clearRect(0, 0, snowCanvas.width, snowCanvas.height);
-    
-    for (const p of snowParticles) {
-        p.update(snowIntensity);
-        p.draw();
-    }
-    
-    snowAnimationId = requestAnimationFrame(animateSnow);
-}
-
-function triggerWhiteOut() {
-    const whiteOut = document.getElementById('white-out');
-    if (!whiteOut) return;
-    
-    whiteOut.classList.add('active');
-    
-    setTimeout(() => {
-        whiteOut.classList.remove('active');
-    }, 2000);
-}
-
-function initSnowForChapter4() {
-    if (currentChapter !== 3) {
-        stopSnow();
-        isChapter4 = false;
-        return;
-    }
-    
-    isChapter4 = true;
-    startSnow();
-    
-    const textEl = chapterScreen.querySelector('.chapter-text');
-    if (!textEl) return;
-    
-    const paragraphs = textEl.querySelectorAll('p');
-    paragraphs.forEach((p, idx) => {
-        let zone = 'calm';
-        if (idx >= 5 && idx <= 8) zone = 'rising';
-        if (idx >= 9 && idx <= 14) zone = 'peak';
-        if (idx >= 15 && idx <= 17) zone = 'falling';
-        if (idx >= 18) zone = 'aftermath';
-        p.dataset.snowZone = zone;
-    });
-    
-    if (snowObserver) snowObserver.disconnect();
-    
-    snowObserver = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-            if (entry.isIntersecting) {
-                const zone = entry.target.dataset.snowZone;
-                switch(zone) {
-                    case 'calm': setSnowIntensity(0.1); break;
-                    case 'rising': setSnowIntensity(0.35); break;
-                    case 'peak': setSnowIntensity(0.75); break;
-                    case 'falling': setSnowIntensity(0.9); break;
-                    case 'aftermath': setSnowIntensity(0.15); break;
-                }
-            }
-        });
-    }, {
-        root: chapterScreen,
-        rootMargin: '-30% 0px -30% 0px',
-        threshold: 0.3
-    });
-    
-    paragraphs.forEach(p => snowObserver.observe(p));
-    
-    paragraphs.forEach(p => {
-        if (p.textContent.includes('И упал.')) {
-            if (whiteOutObserver) whiteOutObserver.disconnect();
-whiteOutObserver = new IntersectionObserver((entries) => {
-                    if (entry.isIntersecting && !p.dataset.whiteOutTriggered) {
-                        p.dataset.whiteOutTriggered = 'true';
-                        triggerWhiteOut();
-                    }
-                });
-            }, {
-                root: chapterScreen,
-                rootMargin: '-40% 0px -40% 0px',
-                threshold: 0.5
-            });
-            whiteOutObserver.observe(p);
-        }
-    });
-}
-
-function cleanupSnowObserver() {
-    if (snowObserver) {
-        snowObserver.disconnect();
-        snowObserver = null;
-    }
-    stopSnow();
-    isChapter4 = false;
-}
-
