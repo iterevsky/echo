@@ -793,7 +793,7 @@ let snowParticles = [];
 let snowIntensity = 0;
 let snowTargetIntensity = 0;
 let snowActive = false;
-let snowObserver = null;
+let whiteOutObserver = null
 let isChapter4 = false;
 
 function initSnowSystem() {
@@ -818,10 +818,10 @@ class SnowParticle {
     reset() {
         this.x = Math.random() * snowCanvas.width;
         this.y = -10;
-        this.size = Math.random() * 2.5 + 0.5;
+        this.size = Math.random() * 4 + 2;
         this.speedY = Math.random() * 2 + 1;
         this.speedX = (Math.random() - 0.5) * 1.5;
-        this.opacity = Math.random() * 0.5 + 0.15;
+        this.opacity = Math.random() * 0.3 + 0.7;
         this.sway = Math.random() * 0.02;
         this.swayOffset = Math.random() * Math.PI * 2;
     }
@@ -964,8 +964,8 @@ function initSnowForChapter4() {
     
     paragraphs.forEach(p => {
         if (p.textContent.includes('И упал.')) {
-            const whiteOutObserver = new IntersectionObserver((entries) => {
-                entries.forEach(entry => {
+            if (whiteOutObserver) whiteOutObserver.disconnect();
+whiteOutObserver = new IntersectionObserver((entries) => {
                     if (entry.isIntersecting && !p.dataset.whiteOutTriggered) {
                         p.dataset.whiteOutTriggered = 'true';
                         triggerWhiteOut();
