@@ -476,7 +476,7 @@ html, body {
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.6s ease;
-  color: ##e8e6e3;
+  color: #e8e6e3;
 }
 
 .menu-trigger.visible {
@@ -867,3 +867,60 @@ html, body {
   box-shadow: 0 2px 10px rgba(0, 168, 232, 0.35);
   text-shadow: 0 0 10px rgba(0, 168, 232, 0.25);
 }
+
+/* === СНЕГ В ГЛАВЕ 04 === */
+#snow-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 8;
+  opacity: 0;
+  transition: opacity 1s ease;
+}
+
+#snow-overlay.snow-light { opacity: 0.15; }
+#snow-overlay.snow-medium { opacity: 0.3; }
+#snow-overlay.snow-heavy { opacity: 0.4; }
+#snow-overlay.snow-blizzard { opacity: 0.35; }
+
+.snowflake {
+  position: absolute;
+  top: -10px;
+  background: #e8e6e3;
+  border-radius: 50%;
+  opacity: 0.8;
+  animation: snow-fall linear infinite;
+}
+
+@keyframes snow-fall {
+  0% { transform: translateY(-10px) translateX(0); opacity: 0.8; }
+  100% { transform: translateY(105vh) translateX(20px); opacity: 0.2; }
+}
+
+.chapter-text.snow-active p {
+  text-shadow: 0 0 8px #000, 0 0 16px #000;
+  position: relative;
+  z-index: 7;
+}
+
+/* === БЕЛАЯ ВСПЫШКА === */
+#white-flash {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: #fff;
+  z-index: 9;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.5s ease;
+}
+
+#white-flash.active {
+  opacity: 1;
+}
+
