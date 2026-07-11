@@ -255,7 +255,9 @@ function openChapter(index) {
         chapterScreen.classList.add('visible');
         chapterScreen.scrollTop = 0;
         initVoiceObserver();
+        initChapter04Effects();
     }, 300);
+
 
     saveState({ lastChapter: index });
 }
@@ -310,6 +312,123 @@ if (photoOverlay) {
     }
   }, { passive: true });
 }
+
+/* === СНЕГ В ГЛАВЕ 04 === */
+let snowflakes = [];
+
+function createSnowflake(intensity) {
+  const flake = document.createElement('div');
+  flake.className = 'snowflake';
+  
+  const sizeBase = intensity === 'snow-light' ? 2 : intensity === 'snow-medium' ? 3 : 4;
+  const size = sizeBase + Math.random() * 2;
+  flake.style.width = size + 'px';
+  flake.style.height = size + 'px';
+  
+  flake.style.left = Math.random() * 100 + '%';
+  
+  const durationBase = intensity === 'snow-light' ? 8 : intensity === 'snow-medium' ? 5 : 3;
+  const duration = durationBase + Math.random() * 3;
+  flake.style.animationDuration = duration + 's';
+  flake.style.animationDelay = -(Math.random() * duration) + 's';
+  
+  return flake;
+}
+
+function startSnow(level) {
+  const overlay = document.getElementById('snow-overlay');
+  if (!overlay) return;
+  
+  stopSnow();
+  overlay.className = level;
+  
+  const count = level === 'snow-light' ? 30 : level === 'snow-medium' ? 60 : level === 'snow-heavy' ? 100 : 150;
+  
+  for (let i = 0; i < count; i++) {
+    const flake = createSnowflake(level);
+    overlay.appendChild(flake);
+    snowflakes.push(flake);
+  }
+  
+  if (level === 'snow-blizzard') {
+    const textEl = document.querySelector('.chapter-text');
+    if (textEl) textEl.classList.add('snow-active');
+  }
+}
+
+function stopSnow() {
+  const overlay = document.getElementById('snow-overlay');
+  if (!overlay) return;
+  
+  snowflakes.forEach(f => f.remove());
+  snowflakes = [];
+  overlay.className = '';
+  
+  const textEl = document.querySelector('.chapter-text');
+  if (textEl) textEl.classList.remove('snow-active');
+}
+
+function whiteFlash(visibleDuration, callback) {
+  const flash = document.getElementById('white-flash');
+  if (!flash) return;
+  
+  flash.classList.add('active');
+  
+  setTimeout(() => {
+    flash.classList.remove('active');
+    setTimeout(() => {
+      if (callback) callback();
+    }, 500);
+  }, visibleDuration || 2000);
+}
+
+function initChapter04Effects() {
+  if (currentChapter !== 3) return;
+  
+  const chapterScreen = document.getElementById('chapter-screen');
+  if (!chapterScreen) return;
+  
+  const paragraphs = chapterScreen.querySelectorAll('.chapter-text p');
+  
+  const snowObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const p = entry.target;
+        const text = p.textContent;
+        
+        if (text.includes('небольшие снежинки')) {
+          startSnow('snow-light');
+        } else if (text.includes('Снег усилился')) {
+          startSnow('snow-medium');
+        } else if (text.includes('Фонари стали мерцать') || text.includes('пульсировать')) {
+          startSnow('snow-heavy');
+        } else if (text.includes('Я ускорился') || text.includes('Я бежал')) {
+          startSnow('snow-blizzard');
+        } else if (text.includes('И упал')) {
+          setTimeout(() => {
+            const textEl = document.querySelector('.chapter-text');
+            if (textEl) textEl.style.opacity = '0';
+            
+            whiteFlash(2000, () => {
+              if (textEl) textEl.style.opacity = '1';
+              stopSnow();
+            });
+          }, 500);
+        } else if (text.includes('Но ничего не происходило')) {
+          stopSnow();
+        }
+      }
+    });
+  }, {
+    root: chapterScreen,
+    rootMargin: '-30% 0px -30% 0px',
+    threshold: 0.3
+  });
+  
+  paragraphs.forEach(p => snowObserver.observe(p));
+  window._snowObserver = snowObserver;
+}
+
 
 /* === ЭЛЕКТРИЧЕСКИЙ ДРЕБЕЗГ В ОГЛАВЛЕНИИ === */
 (function() {
@@ -619,6 +738,11 @@ function cleanupVoiceObserver() {
         el.style.animation = '';
         delete el.dataset.voiceTriggered;
     });
+    if (window._snowObserver) {
+    window._snowObserver.disconnect();
+    window._snowObserver = null;
+    }
+    stopSnow();
 }
 
 /* === МЕНЮ: ОТКРЫТИЕ / ЗАКРЫТИЕ === */
