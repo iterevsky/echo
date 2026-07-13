@@ -981,7 +981,8 @@ function initSnowObserver() {
 
     let whiteoutTriggered = false;
 
-    // Общий observer для снега: центральная зона (снег усиливается, когда абзац в центре)
+    // === ОБЩИЙ OBSERVER: снег усиливается, когда абзац в центральной зоне ===
+    // rootMargin: -30% сверху и снизу = центральная 40% экрана
     snowObserver = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
             if (entry.isIntersecting) visibleSnowParagraphs.add(entry.target);
@@ -994,14 +995,22 @@ function initSnowObserver() {
             if (val > maxLevel) maxLevel = val;
         });
 
-        snowEngine.setLevel(getLevelName(maxLevel));
+        // Если ничего не видно — НЕ сбрасываем снег сразу.
+        // Снег плавно уйдёт через lerp, но не исчезнет мгновенно.
+        // Это решает проблему "мелькнул и пропал".
+        if (visibleSnowParagraphs.size > 0) {
+            snowEngine.setLevel(getLevelName(maxLevel));
+        }
+        // Если size === 0 — ничего не делаем, lerp сам доведёт count до 0
     }, {
         root: chapterScreen,
-        rootMargin: '-40% 0px -40% 0px',
+        rootMargin: '-30% 0px -30% 0px',
         threshold: 0
     });
 
-    // Отдельный observer для whiteout: срабатывает позже, когда абзац в верхней части экрана
+    // === WHITEOUT OBSERVER: срабатывает ТОЛЬКО когда абзац в верхней трети ===
+    // rootMargin: -70% сверху = только верхние 30% экрана
+    // Это значит: читатель уже дочитал абзац почти до конца
     const whiteoutP = chapterText.querySelector('p.snow-whiteout');
     if (whiteoutP) {
         whiteoutObserver = new IntersectionObserver((entries) => {
@@ -1013,18 +1022,20 @@ function initSnowObserver() {
             });
         }, {
             root: chapterScreen,
-            rootMargin: '-55% 0px -15% 0px',
+            rootMargin: '-70% 0px 0px 0px',  // только верхние 30% экрана
             threshold: 0
         });
         whiteoutObserver.observe(whiteoutP);
     }
 
+    // Наблюдаем ВСЕ snow-абзацы, КРОМЕ whiteout (у него свой observer)
     snowParagraphs.forEach(p => {
         if (!p.classList.contains('snow-whiteout')) {
             snowObserver.observe(p);
         }
     });
 }
+
 
 function cleanupSnowObserver() {
     if (snowObserver) {
@@ -1079,20 +1090,20 @@ function triggerWhiteoutSequence() {
     };
     document.addEventListener('keydown', blockKey, true);
 
-    // Фаза 1: абзац падает
+    // Фаза 1: абзац падает (0–700 мс)
     whiteoutP.style.transition = 'transform 0.7s ease-in, filter 0.7s ease-in, opacity 0.7s ease-in';
     whiteoutP.style.transform = 'translateY(40px) scale(0.98)';
     whiteoutP.style.filter = 'blur(6px)';
     whiteoutP.style.opacity = '0';
 
-    // Фаза 2: белый экран
+    // Фаза 2: белый экран накладывается (700 мс)
     setTimeout(() => {
         overlay.style.transition = 'opacity 0.4s ease';
         overlay.style.opacity = '1';
         if (snowEngine) snowEngine.setLevel('none');
     }, 700);
 
-    // Фаза 3: старый текст исчезает (пока экран белый)
+    // Фаза 3: весь предыдущий текст исчезает (пока экран белый)
     setTimeout(() => {
         for (let i = 0; i < idx; i++) {
             const p = paragraphs[i];
@@ -1107,7 +1118,7 @@ function triggerWhiteoutSequence() {
         }
     }, 3200);
 
-    // Фаза 4: белый уходит
+    // Фаза 4: белый экран уходит
     setTimeout(() => {
         overlay.style.transition = 'opacity 1.0s ease';
         overlay.style.opacity = '0';
@@ -1138,6 +1149,7 @@ function triggerWhiteoutSequence() {
         window.__whiteoutActive = false;
     }, 4600);
 }
+
 
 /* --- ProgressOverlay: экран возврата --- */
 function getOrCreateProgressOverlay() {
