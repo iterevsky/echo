@@ -892,7 +892,7 @@ class SnowEngine {
         }
     }
 
-    draw() {
+        draw() {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
         if (this.particles.length === 0) return;
 
@@ -908,10 +908,11 @@ class SnowEngine {
             const opacity = this.currentConfig.opacityMin + p.opacityRatio * (this.currentConfig.opacityMax - this.currentConfig.opacityMin);
 
             let drawOpacity = opacity;
-            const inGapX = Math.abs(p.x - this.centerX) < this.gapW / 2;
-            const inGapY = Math.abs(p.y - this.centerY) < this.gapH / 2;
-            if (inGapX && inGapY) drawOpacity *= 0.1;
 
+            // === УБРАНО: дырка в центре ===
+            // Снег равномерно везде
+
+            // Просвет пальцем (эллипс)
             if (touchActive && drawOpacity > 0) {
                 const dx = p.x - tx;
                 const dy = p.y - ty;
@@ -932,6 +933,7 @@ class SnowEngine {
             this.ctx.fill();
         }
     }
+
 
     animate() {
         if (this.isReducedMotion) return;
@@ -982,7 +984,8 @@ function initSnowObserver() {
     let whiteoutTriggered = false;
 
     // === ОБЩИЙ OBSERVER: снег усиливается, когда абзац в центральной зоне ===
-    // rootMargin: -30% сверху и снизу = центральная 40% экрана
+    // rootMargin: -20% сверху и снизу = центральная 60% экрана
+    // Широкая зона, чтобы снег не пропадал при скролле
     snowObserver = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
             if (entry.isIntersecting) visibleSnowParagraphs.add(entry.target);
@@ -995,22 +998,18 @@ function initSnowObserver() {
             if (val > maxLevel) maxLevel = val;
         });
 
-        // Если ничего не видно — НЕ сбрасываем снег сразу.
-        // Снег плавно уйдёт через lerp, но не исчезнет мгновенно.
-        // Это решает проблему "мелькнул и пропал".
         if (visibleSnowParagraphs.size > 0) {
             snowEngine.setLevel(getLevelName(maxLevel));
         }
-        // Если size === 0 — ничего не делаем, lerp сам доведёт count до 0
     }, {
         root: chapterScreen,
-        rootMargin: '-30% 0px -30% 0px',
+        rootMargin: '-20% 0px -20% 0px',
         threshold: 0
     });
 
-    // === WHITEOUT OBSERVER: срабатывает ТОЛЬКО когда абзац в верхней трети ===
-    // rootMargin: -70% сверху = только верхние 30% экрана
-    // Это значит: читатель уже дочитал абзац почти до конца
+    // === WHITEOUT OBSERVER: срабатывает ТОЛЬКО когда абзац в НИЖНЕЙ части экрана ===
+    // rootMargin: '-80% 0px 0px 0px' = только нижние 20% экрана
+    // Читатель должен полностью дочитать абзац, прежде чем он дойдёт до низа
     const whiteoutP = chapterText.querySelector('p.snow-whiteout');
     if (whiteoutP) {
         whiteoutObserver = new IntersectionObserver((entries) => {
@@ -1022,19 +1021,20 @@ function initSnowObserver() {
             });
         }, {
             root: chapterScreen,
-            rootMargin: '-70% 0px 0px 0px',  // только верхние 30% экрана
+            rootMargin: '-80% 0px 0px 0px',  // только нижние 20% экрана
             threshold: 0
         });
         whiteoutObserver.observe(whiteoutP);
     }
 
-    // Наблюдаем ВСЕ snow-абзацы, КРОМЕ whiteout (у него свой observer)
+    // Наблюдаем ВСЕ snow-абзацы, КРОМЕ whiteout
     snowParagraphs.forEach(p => {
         if (!p.classList.contains('snow-whiteout')) {
             snowObserver.observe(p);
         }
     });
 }
+
 
 
 function cleanupSnowObserver() {
