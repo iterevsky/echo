@@ -1021,7 +1021,7 @@ function initSnowObserver() {
             if (rect.height === 0) return; // элемент ещё скрыт, пропускаем
             // Триггер: верх абзаца вошёл в верхние 35% экрана
 
-            const triggerZone = window.innerHeight * 0.35;
+            const triggerZone = window.innerHeight * 0.45;
             if (rect.top < triggerZone && rect.bottom > 0) {
                 window.__whiteoutActive = true;
                 chapterScreen.removeEventListener('scroll', onScroll);
