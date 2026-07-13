@@ -244,8 +244,7 @@ function openChapter(index) {
         }
       );
 
-    textEl.innerHTML = processedText;
-    initSnowObserver();
+        textEl.innerHTML = processedText;
 
     prevBtn.classList.toggle('inactive', index === 0);
     nextBtn.classList.toggle('inactive', index === chapters.length - 1);
@@ -258,7 +257,9 @@ function openChapter(index) {
         chapterScreen.classList.add('visible');
         chapterScreen.scrollTop = 0;
         initVoiceObserver();
+        initSnowObserver();
     }, 300);
+
 
     saveState({ lastChapter: index });
 }
@@ -1014,10 +1015,12 @@ function initSnowObserver() {
     // === WHITEOUT: scroll listener (IntersectionObserver не умеет отслеживать позицию внутри viewport) ===
     const whiteoutP = chapterText.querySelector('p.snow-whiteout');
     if (whiteoutP) {
-        const onScroll = () => {
+                const onScroll = () => {
             if (window.__whiteoutActive) return;
             const rect = whiteoutP.getBoundingClientRect();
+            if (rect.height === 0) return; // элемент ещё скрыт, пропускаем
             // Триггер: верх абзаца вошёл в верхние 35% экрана
+
             const triggerZone = window.innerHeight * 0.35;
             if (rect.top < triggerZone && rect.bottom > 0) {
                 window.__whiteoutActive = true;
