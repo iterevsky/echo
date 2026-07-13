@@ -1007,9 +1007,9 @@ function initSnowObserver() {
         threshold: 0
     });
 
-    // === WHITEOUT OBSERVER: срабатывает ТОЛЬКО когда абзац в НИЖНЕЙ части экрана ===
-    // rootMargin: '-80% 0px 0px 0px' = только нижние 20% экрана
-    // Читатель должен полностью дочитать абзац, прежде чем он дойдёт до низа
+        // === WHITEOUT OBSERVER: срабатывает когда абзац в ВЕРХНЕЙ части экрана ===
+    // rootMargin: '0px 0px -70% 0px' = только верхние 30% экрана
+    // Абзац должен дойти до верха, прежде чем сработает
     const whiteoutP = chapterText.querySelector('p.snow-whiteout');
     if (whiteoutP) {
         whiteoutObserver = new IntersectionObserver((entries) => {
@@ -1021,11 +1021,12 @@ function initSnowObserver() {
             });
         }, {
             root: chapterScreen,
-            rootMargin: '-80% 0px 0px 0px',  // только нижние 20% экрана
+            rootMargin: '0px 0px -70% 0px',  // только верхние 30% экрана
             threshold: 0
         });
         whiteoutObserver.observe(whiteoutP);
     }
+
 
     // Наблюдаем ВСЕ snow-абзацы, КРОМЕ whiteout
     snowParagraphs.forEach(p => {
