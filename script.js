@@ -843,11 +843,21 @@ class SnowEngine {
         return map[level] || map.none;
     }
 
-    setLevel(level) {
+        setLevel(level) {
         this.currentLevel = level;
         this.targetConfig = this.getConfig(level);
         if (!this.targetConfig) this.targetConfig = this.getConfig('none');
+        
+        // Мгновенно применяем размер/скорость/прозрачность, иначе частицы sub-pixel
+        this.currentConfig.sizeMin    = this.targetConfig.sizeMin;
+        this.currentConfig.sizeMax    = this.targetConfig.sizeMax;
+        this.currentConfig.speedMin   = this.targetConfig.speedMin;
+        this.currentConfig.speedMax   = this.targetConfig.speedMax;
+        this.currentConfig.opacityMin = this.targetConfig.opacityMin;
+        this.currentConfig.opacityMax = this.targetConfig.opacityMax;
+        // count плавно нарастет в updateParticles
     }
+
 
     setTouch(x, y, active) {
         this.touch.x = x;
@@ -860,15 +870,12 @@ class SnowEngine {
 
     updateParticles() {
         const k = 0.05;
-        this.currentConfig.count      = this.lerp(this.currentConfig.count,      this.targetConfig.count,      k);
-        this.currentConfig.sizeMin    = this.lerp(this.currentConfig.sizeMin,    this.targetConfig.sizeMin,    k);
-        this.currentConfig.sizeMax    = this.lerp(this.currentConfig.sizeMax,    this.targetConfig.sizeMax,    k);
-        this.currentConfig.speedMin   = this.lerp(this.currentConfig.speedMin,   this.targetConfig.speedMin,   k);
-        this.currentConfig.speedMax   = this.lerp(this.currentConfig.speedMax,   this.targetConfig.speedMax,   k);
-        this.currentConfig.opacityMin = this.lerp(this.currentConfig.opacityMin, this.targetConfig.opacityMin, k);
-        this.currentConfig.opacityMax = this.lerp(this.currentConfig.opacityMax, this.targetConfig.opacityMax, k);
-
+        // Плавный переход ТОЛЬКО для количества
+        this.currentConfig.count = this.lerp(this.currentConfig.count, this.targetConfig.count, k);
+        
         const targetCount = Math.round(this.currentConfig.count);
+
+    
         while (this.particles.length < targetCount) {
             this.particles.push({
                 x: Math.random() * this.canvas.width,
@@ -956,7 +963,6 @@ const visibleSnowParagraphs = new Set();
 
 function initSnowObserver() {
     if (!snowEngine) snowEngine = new SnowEngine();
-
     cleanupSnowObserver();
 
     const chapterText = document.querySelector('.chapter-text');
@@ -981,11 +987,7 @@ function initSnowObserver() {
         return names[val] || 'none';
     };
 
-    let whiteoutTriggered = false;
-
-    // === ОБЩИЙ OBSERVER: снег усиливается, когда абзац в центральной зоне ===
-    // rootMargin: -20% сверху и снизу = центральная 60% экрана
-    // Широкая зона, чтобы снег не пропадал при скролле
+    // === Snow observer ===
     snowObserver = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
             if (entry.isIntersecting) visibleSnowParagraphs.add(entry.target);
@@ -1000,6 +1002,8 @@ function initSnowObserver() {
 
         if (visibleSnowParagraphs.size > 0) {
             snowEngine.setLevel(getLevelName(maxLevel));
+        } else {
+            snowEngine.setLevel('none');
         }
     }, {
         root: chapterScreen,
@@ -1007,35 +1011,27 @@ function initSnowObserver() {
         threshold: 0
     });
 
-        // === WHITEOUT OBSERVER: срабатывает когда абзац в ВЕРХНЕЙ части экрана ===
-    // rootMargin: '0px 0px -70% 0px' = только верхние 30% экрана
-    // Абзац должен дойти до верха, прежде чем сработает
-        const whiteoutP = chapterText.querySelector('p.snow-whiteout');
+    // === WHITEOUT: scroll listener (IntersectionObserver не умеет отслеживать позицию внутри viewport) ===
+    const whiteoutP = chapterText.querySelector('p.snow-whiteout');
     if (whiteoutP) {
-        whiteoutObserver = new IntersectionObserver((entries) => {
-            entries.forEach(entry => {
-                if (!entry.isIntersecting || whiteoutTriggered) return;
-                
-                // Проверяем: абзац в верхней половине экрана?
-                // boundingClientRect.top — позиция относительно viewport
-                // Если top < половины высоты экрана = абзац в верхней половине
-                const viewportCenter = window.innerHeight / 2;
-                if (entry.boundingClientRect.top < viewportCenter) {
-                    whiteoutTriggered = true;
-                    triggerWhiteoutSequence();
-                }
-            });
-        }, {
-            root: chapterScreen,
-            rootMargin: '0px 0px 0px 0px',  // весь экран
-            threshold: 0
-        });
-        whiteoutObserver.observe(whiteoutP);
+        const onScroll = () => {
+            if (window.__whiteoutActive) return;
+            const rect = whiteoutP.getBoundingClientRect();
+            // Триггер: верх абзаца вошёл в верхние 35% экрана
+            const triggerZone = window.innerHeight * 0.35;
+            if (rect.top < triggerZone && rect.bottom > 0) {
+                window.__whiteoutActive = true;
+                chapterScreen.removeEventListener('scroll', onScroll);
+                triggerWhiteoutSequence();
+            }
+        };
+        whiteoutP._whiteoutScrollHandler = onScroll;
+        chapterScreen.addEventListener('scroll', onScroll, { passive: true });
+        // Если абзац уже в зоне при открытии главы — сработает сразу
+        requestAnimationFrame(onScroll);
     }
 
-
-
-    // Наблюдаем ВСЕ snow-абзацы, КРОМЕ whiteout
+    // Наблюдаем все snow-абзацы, кроме whiteout
     snowParagraphs.forEach(p => {
         if (!p.classList.contains('snow-whiteout')) {
             snowObserver.observe(p);
@@ -1043,20 +1039,28 @@ function initSnowObserver() {
     });
 }
 
-
-
 function cleanupSnowObserver() {
     if (snowObserver) {
         snowObserver.disconnect();
         snowObserver = null;
     }
-    if (whiteoutObserver) {
-        whiteoutObserver.disconnect();
-        whiteoutObserver = null;
-    }
     visibleSnowParagraphs.clear();
+
+    // Удаляем whiteout scroll listener
+    const chapterText = document.querySelector('.chapter-text');
+    if (chapterText) {
+        const whiteoutP = chapterText.querySelector('p.snow-whiteout');
+        if (whiteoutP && whiteoutP._whiteoutScrollHandler) {
+            chapterScreen.removeEventListener('scroll', whiteoutP._whiteoutScrollHandler);
+            delete whiteoutP._whiteoutScrollHandler;
+        }
+    }
+
+    window.__whiteoutActive = false;
     if (snowEngine) snowEngine.setLevel('none');
 }
+
+
 
 /* --- WhiteoutSequence: финал метели (Вариант Б) --- */
 function getOrCreateWhiteoutOverlay() {
@@ -1085,9 +1089,10 @@ function triggerWhiteoutSequence() {
     if (idx === -1) { window.__whiteoutActive = false; return; }
 
     // Блокировка
-    const blockScroll = (e) => e.preventDefault();
+    const blockScroll = (e) => { e.preventDefault(); e.stopPropagation(); };
     chapterScreen.addEventListener('wheel', blockScroll, { passive: false });
     chapterScreen.addEventListener('touchmove', blockScroll, { passive: false });
+    chapterScreen.addEventListener('scroll', blockScroll, { passive: false });
     chapterScreen.style.overflow = 'hidden';
 
     const blockKey = (e) => {
@@ -1098,20 +1103,20 @@ function triggerWhiteoutSequence() {
     };
     document.addEventListener('keydown', blockKey, true);
 
-    // Фаза 1: абзац падает (0–700 мс)
+    // Фаза 1: абзац падает
     whiteoutP.style.transition = 'transform 0.7s ease-in, filter 0.7s ease-in, opacity 0.7s ease-in';
     whiteoutP.style.transform = 'translateY(40px) scale(0.98)';
     whiteoutP.style.filter = 'blur(6px)';
     whiteoutP.style.opacity = '0';
 
-    // Фаза 2: белый экран накладывается (700 мс)
+    // Фаза 2: белый экран
     setTimeout(() => {
         overlay.style.transition = 'opacity 0.4s ease';
         overlay.style.opacity = '1';
         if (snowEngine) snowEngine.setLevel('none');
     }, 700);
 
-    // Фаза 3: весь предыдущий текст исчезает (пока экран белый)
+    // Фаза 3: предыдущий текст исчезает
     setTimeout(() => {
         for (let i = 0; i < idx; i++) {
             const p = paragraphs[i];
@@ -1141,7 +1146,7 @@ function triggerWhiteoutSequence() {
             nextP.style.opacity = '0';
             nextP.style.transform = 'translateY(20px)';
             nextP.style.filter = 'blur(2px)';
-            nextP.offsetHeight;
+            nextP.offsetHeight; // reflow
             nextP.style.transition = 'opacity 0.8s ease, transform 0.8s ease, filter 0.8s ease';
             nextP.style.opacity = '1';
             nextP.style.transform = 'translateY(0)';
@@ -1150,13 +1155,16 @@ function triggerWhiteoutSequence() {
             setTimeout(() => nextP.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
         }
 
+        // Разблокировка
         chapterScreen.removeEventListener('wheel', blockScroll);
         chapterScreen.removeEventListener('touchmove', blockScroll);
+        chapterScreen.removeEventListener('scroll', blockScroll);
         chapterScreen.style.overflow = 'auto';
         document.removeEventListener('keydown', blockKey, true);
         window.__whiteoutActive = false;
     }, 4600);
 }
+
 
 
 /* --- ProgressOverlay: экран возврата --- */
