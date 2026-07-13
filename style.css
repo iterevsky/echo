@@ -991,3 +991,10 @@ html, body {
     }
 }
 
+#whiteout-overlay {
+    z-index: 3000 !important;
+}
+.chapter-text {
+    position: relative;
+    z-index: 2;
+}
