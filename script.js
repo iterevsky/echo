@@ -1010,22 +1010,29 @@ function initSnowObserver() {
         // === WHITEOUT OBSERVER: срабатывает когда абзац в ВЕРХНЕЙ части экрана ===
     // rootMargin: '0px 0px -70% 0px' = только верхние 30% экрана
     // Абзац должен дойти до верха, прежде чем сработает
-    const whiteoutP = chapterText.querySelector('p.snow-whiteout');
+        const whiteoutP = chapterText.querySelector('p.snow-whiteout');
     if (whiteoutP) {
         whiteoutObserver = new IntersectionObserver((entries) => {
             entries.forEach(entry => {
-                if (entry.isIntersecting && !whiteoutTriggered) {
+                if (!entry.isIntersecting || whiteoutTriggered) return;
+                
+                // Проверяем: абзац в верхней половине экрана?
+                // boundingClientRect.top — позиция относительно viewport
+                // Если top < половины высоты экрана = абзац в верхней половине
+                const viewportCenter = window.innerHeight / 2;
+                if (entry.boundingClientRect.top < viewportCenter) {
                     whiteoutTriggered = true;
                     triggerWhiteoutSequence();
                 }
             });
         }, {
             root: chapterScreen,
-            rootMargin: '0px 0px -70% 0px',  // только верхние 30% экрана
+            rootMargin: '0px 0px 0px 0px',  // весь экран
             threshold: 0
         });
         whiteoutObserver.observe(whiteoutP);
     }
+
 
 
     // Наблюдаем ВСЕ snow-абзацы, КРОМЕ whiteout
