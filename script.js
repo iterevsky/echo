@@ -787,7 +787,7 @@ class SnowEngine {
         this.canvas = document.createElement('canvas');
         this.canvas.id = 'snow-canvas';
         this.ctx = this.canvas.getContext('2d');
-        this.canvas.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:1;';
+        this.canvas.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:7;';
         document.body.appendChild(this.canvas);
 
         this.resize();
@@ -821,12 +821,14 @@ class SnowEngine {
     }
 
     resize() {
-        this.canvas.width = window.innerWidth;
-        this.canvas.height = window.innerHeight;
-        this.centerX = this.canvas.width / 2;
-        this.centerY = this.canvas.height / 2;
-        this.gapW = this.canvas.width * 0.6;
-        this.gapH = this.canvas.height * 0.7;
+        const w = window.innerWidth || document.documentElement.clientWidth || 320;
+        const h = window.innerHeight || document.documentElement.clientHeight || 480;
+        this.canvas.width = w;
+        this.canvas.height = h;
+        this.centerX = w / 2;
+        this.centerY = h / 2;
+        this.gapW = w * 0.6;
+        this.gapH = h * 0.7;
     }
 
     getConfig(level) {
@@ -897,21 +899,19 @@ class SnowEngine {
         const now = Date.now();
         const touchActive = this.touch.active || now < this.touch.fadeEnd;
         const tx = this.touch.x;
-        const ty = this.touch.y - 50; // сдвиг вверх на строку
-        const rx = 70;  // полуось эллипса X
-        const ry = 45;  // полуось эллипса Y
+        const ty = this.touch.y - 50;
+        const rx = 70;
+        const ry = 45;
 
         for (let p of this.particles) {
             const size = this.currentConfig.sizeMin + p.sizeRatio * (this.currentConfig.sizeMax - this.currentConfig.sizeMin);
             const opacity = this.currentConfig.opacityMin + p.opacityRatio * (this.currentConfig.opacityMax - this.currentConfig.opacityMin);
 
-            // «Дырка» в центре для читаемости
             let drawOpacity = opacity;
             const inGapX = Math.abs(p.x - this.centerX) < this.gapW / 2;
             const inGapY = Math.abs(p.y - this.centerY) < this.gapH / 2;
             if (inGapX && inGapY) drawOpacity *= 0.1;
 
-            // Просвет пальцем (эллипс)
             if (touchActive && drawOpacity > 0) {
                 const dx = p.x - tx;
                 const dy = p.y - ty;
@@ -948,17 +948,14 @@ class SnowEngine {
 
 /* --- SnowObserver: следит за абзацами со снегом --- */
 let snowObserver = null;
+let whiteoutObserver = null;
 let snowEngine = null;
 const visibleSnowParagraphs = new Set();
 
 function initSnowObserver() {
     if (!snowEngine) snowEngine = new SnowEngine();
 
-    if (snowObserver) {
-        snowObserver.disconnect();
-        snowObserver = null;
-    }
-    visibleSnowParagraphs.clear();
+    cleanupSnowObserver();
 
     const chapterText = document.querySelector('.chapter-text');
     if (!chapterText) return;
@@ -984,6 +981,7 @@ function initSnowObserver() {
 
     let whiteoutTriggered = false;
 
+    // Общий observer для снега: центральная зона (снег усиливается, когда абзац в центре)
     snowObserver = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
             if (entry.isIntersecting) visibleSnowParagraphs.add(entry.target);
@@ -991,33 +989,51 @@ function initSnowObserver() {
         });
 
         let maxLevel = 0;
-        let whiteoutVisible = false;
-
         visibleSnowParagraphs.forEach(el => {
             const val = getLevelValue(el);
             if (val > maxLevel) maxLevel = val;
-            if (el.classList.contains('snow-whiteout')) whiteoutVisible = true;
         });
 
         snowEngine.setLevel(getLevelName(maxLevel));
-
-        if (whiteoutVisible && !whiteoutTriggered) {
-            whiteoutTriggered = true;
-            triggerWhiteoutSequence();
-        }
     }, {
         root: chapterScreen,
-        rootMargin: '-45% 0px -45% 0px',
+        rootMargin: '-40% 0px -40% 0px',
         threshold: 0
     });
 
-    snowParagraphs.forEach(p => snowObserver.observe(p));
+    // Отдельный observer для whiteout: срабатывает позже, когда абзац в верхней части экрана
+    const whiteoutP = chapterText.querySelector('p.snow-whiteout');
+    if (whiteoutP) {
+        whiteoutObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting && !whiteoutTriggered) {
+                    whiteoutTriggered = true;
+                    triggerWhiteoutSequence();
+                }
+            });
+        }, {
+            root: chapterScreen,
+            rootMargin: '-55% 0px -15% 0px',
+            threshold: 0
+        });
+        whiteoutObserver.observe(whiteoutP);
+    }
+
+    snowParagraphs.forEach(p => {
+        if (!p.classList.contains('snow-whiteout')) {
+            snowObserver.observe(p);
+        }
+    });
 }
 
 function cleanupSnowObserver() {
     if (snowObserver) {
         snowObserver.disconnect();
         snowObserver = null;
+    }
+    if (whiteoutObserver) {
+        whiteoutObserver.disconnect();
+        whiteoutObserver = null;
     }
     visibleSnowParagraphs.clear();
     if (snowEngine) snowEngine.setLevel('none');
@@ -1049,7 +1065,7 @@ function triggerWhiteoutSequence() {
 
     if (idx === -1) { window.__whiteoutActive = false; return; }
 
-    // Блокировка скролла, тача, клавиатуры
+    // Блокировка
     const blockScroll = (e) => e.preventDefault();
     chapterScreen.addEventListener('wheel', blockScroll, { passive: false });
     chapterScreen.addEventListener('touchmove', blockScroll, { passive: false });
@@ -1063,20 +1079,20 @@ function triggerWhiteoutSequence() {
     };
     document.addEventListener('keydown', blockKey, true);
 
-    // Фаза 1: абзац «падает» (0–700 мс)
+    // Фаза 1: абзац падает
     whiteoutP.style.transition = 'transform 0.7s ease-in, filter 0.7s ease-in, opacity 0.7s ease-in';
     whiteoutP.style.transform = 'translateY(40px) scale(0.98)';
     whiteoutP.style.filter = 'blur(6px)';
     whiteoutP.style.opacity = '0';
 
-    // Фаза 2: белый экран накладывается (700 мс)
+    // Фаза 2: белый экран
     setTimeout(() => {
         overlay.style.transition = 'opacity 0.4s ease';
         overlay.style.opacity = '1';
         if (snowEngine) snowEngine.setLevel('none');
     }, 700);
 
-    // Фаза 3: весь предыдущий текст исчезает (3200 мс — во время белого экрана)
+    // Фаза 3: старый текст исчезает (пока экран белый)
     setTimeout(() => {
         for (let i = 0; i < idx; i++) {
             const p = paragraphs[i];
@@ -1091,13 +1107,13 @@ function triggerWhiteoutSequence() {
         }
     }, 3200);
 
-    // Фаза 4: белый экран уходит (3600 мс)
+    // Фаза 4: белый уходит
     setTimeout(() => {
         overlay.style.transition = 'opacity 1.0s ease';
         overlay.style.opacity = '0';
     }, 3600);
 
-    // Фаза 5: пробуждение — новый абзац появляется, разблокировка (4600 мс)
+    // Фаза 5: пробуждение
     setTimeout(() => {
         whiteoutP.style.display = 'none';
 
@@ -1106,7 +1122,7 @@ function triggerWhiteoutSequence() {
             nextP.style.opacity = '0';
             nextP.style.transform = 'translateY(20px)';
             nextP.style.filter = 'blur(2px)';
-            nextP.offsetHeight; // reflow
+            nextP.offsetHeight;
             nextP.style.transition = 'opacity 0.8s ease, transform 0.8s ease, filter 0.8s ease';
             nextP.style.opacity = '1';
             nextP.style.transform = 'translateY(0)';
@@ -1142,7 +1158,6 @@ function initProgress() {
     const chapter = chapters[saved.lastChapter];
     if (!chapter) return;
 
-    // Пропускаем интро полностью
     isStarted = true;
     coverScreen.style.opacity = '0';
     coverScreen.style.pointerEvents = 'none';
@@ -1153,7 +1168,6 @@ function initProgress() {
     titleScreen.style.opacity = '0';
     titleScreen.style.pointerEvents = 'none';
 
-    // Показываем оглавление
     contentsScreen.classList.add('visible');
     if (menuTrigger) menuTrigger.classList.add('visible');
 
@@ -1162,10 +1176,8 @@ function initProgress() {
         setTimeout(() => item.classList.add('revealed'), 200 + index * 80);
     });
 
-    // Затемняем оглавление
     contentsScreen.classList.add('progress-dimmed');
 
-    // Оверлей
     const overlay = getOrCreateProgressOverlay();
     overlay.innerHTML = `
         <div class="progress-content">
@@ -1231,6 +1243,4 @@ document.addEventListener('mouseup', () => {
     if (snowEngine) snowEngine.setTouch(-1000, -1000, false);
 });
 
-// Запуск проверки прогресса
 initProgress();
-
