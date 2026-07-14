@@ -31,7 +31,6 @@ function saveState(patch) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
 }
 const state = loadState();
-initProgress();
 
 // === ПОСТРОЕНИЕ МАССИВА ГЛАВ ИЗ HTML ===
 const items = document.querySelectorAll('.contents-item');
@@ -42,6 +41,7 @@ const chapters = Array.from(items).map((item, index) => {
     const text = chapterTexts[index] || `<p class="placeholder">Глава в процессе написания…</p>`;
     return { number: num, title, text };
 });
+initProgress();
 
 // === ОБРАБОТЧИКИ НАВИГАЦИИ ВНУТРИ ГЛАВЫ ===
 document.querySelector('.nav-prev').addEventListener('click', () => {
