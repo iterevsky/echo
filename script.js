@@ -262,6 +262,7 @@ function openChapter(index) {
 
 
     setTimeout(() => {
+        chapterScreen.classList.remove('whiteout-phase');
         chapterScreen.classList.add('visible');
         chapterScreen.scrollTop = 0;
         initVoiceObserver();
@@ -1055,6 +1056,8 @@ function initWhiteout() {
 
 function cleanupWhiteout() {
     const chapterText = document.querySelector('.chapter-text');
+    const chapterScreenEl = document.getElementById('chapter-screen');
+    if (chapterScreenEl) chapterScreenEl.classList.remove('whiteout-phase');
     if (!chapterText) return;
 
     const whiteoutP = chapterText.querySelector('p.snow-whiteout');
@@ -1102,6 +1105,8 @@ function triggerWhiteoutSequence() {
     const chapterText = document.querySelector('.chapter-text');
     const chapterScreenEl = document.getElementById('chapter-screen');
     if (!chapterText || !chapterScreenEl) { window.__whiteoutActive = false; return; }
+    chapterScreenEl.classList.add('whiteout-phase');
+
 
     const paragraphs = Array.from(chapterText.querySelectorAll('p'));
     const whiteoutP = chapterText.querySelector('p.snow-whiteout');
