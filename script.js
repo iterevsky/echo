@@ -31,6 +31,7 @@ function saveState(patch) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
 }
 const state = loadState();
+initProgress();
 
 // === ПОСТРОЕНИЕ МАССИВА ГЛАВ ИЗ HTML ===
 const items = document.querySelectorAll('.contents-item');
@@ -50,6 +51,8 @@ document.querySelector('.nav-next').addEventListener('click', () => {
     if (currentChapter < chapters.length - 1) openChapter(currentChapter + 1);
 });
 document.querySelector('.nav-contents').addEventListener('click', () => {
+    cleanupSnowObserver();
+    cleanupWhiteout();
     cleanupVoiceObserver();
     chapterScreen.classList.remove('visible');
     if (menuTrigger) menuTrigger.classList.add('visible');
@@ -89,6 +92,8 @@ if (e.key === 'Escape') {
         closeMenu();
         return;
     }
+    cleanupSnowObserver();
+    cleanupWhiteout();
     cleanupVoiceObserver();
     chapterScreen.classList.remove('visible');
     if (menuTrigger) menuTrigger.classList.add('visible');
@@ -243,6 +248,11 @@ function openChapter(index) {
       );
 
     textEl.innerHTML = processedText;
+
+    initSnowObserver();
+    initWhiteout();
+    saveState({ lastChapter: index, lastVisit: new Date().toISOString(), chapterTitle: chapter.title });
+
 
     prevBtn.classList.toggle('inactive', index === 0);
     nextBtn.classList.toggle('inactive', index === chapters.length - 1);
@@ -773,3 +783,535 @@ document.addEventListener('touchend', function(e) {
     photoTouchTimer = null;
   }
 }, { passive: true });
+
+/* ============================================================
+   SNOW ENGINE + WHITEOUT + PROGRESS
+   ============================================================ */
+
+/* --- SnowEngine: Canvas-метель --- */
+class SnowEngine {
+    constructor() {
+        this.canvas = document.createElement('canvas');
+        this.canvas.id = 'snow-canvas';
+        this.ctx = this.canvas.getContext('2d');
+        this.canvas.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:7;';
+        document.body.appendChild(this.canvas);
+
+        this.resize();
+        window.addEventListener('resize', () => this.resize());
+
+        this.particles = [];
+        this.currentLevel = 'none';
+        this.targetConfig = this.getConfig('none');
+        this.currentConfig = { ...this.targetConfig };
+
+        this.touch = { x: -1000, y: -1000, active: false, fadeEnd: 0 };
+        this.isReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+        const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+        if (mq.addEventListener) {
+            mq.addEventListener('change', (e) => this.onMotionChange(e));
+        } else {
+            mq.addListener((e) => this.onMotionChange(e));
+        }
+
+        if (!this.isReducedMotion) {
+            this.animate();
+        } else {
+            this.canvas.style.display = 'none';
+        }
+    }
+
+    onMotionChange(e) {
+        this.isReducedMotion = e.matches;
+        if (this.isReducedMotion) {
+            this.canvas.style.display = 'none';
+            this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        } else {
+            this.canvas.style.display = 'block';
+            this.animate();
+        }
+    }
+
+    resize() {
+        const w = window.innerWidth || document.documentElement.clientWidth || 320;
+        const h = window.innerHeight || document.documentElement.clientHeight || 480;
+        this.canvas.width = w;
+        this.canvas.height = h;
+    }
+
+    getConfig(level) {
+        const map = {
+            none:     { count: 0,   sizeMin: 0, sizeMax: 0, speedMin: 0,   speedMax: 0,   opacityMin: 0,   opacityMax: 0   },
+            light:    { count: 60,  sizeMin: 1, sizeMax: 2, speedMin: 0.3, speedMax: 0.8, opacityMin: 0.3, opacityMax: 0.5 },
+            medium:   { count: 150, sizeMin: 1, sizeMax: 2, speedMin: 0.5, speedMax: 1.2, opacityMin: 0.4, opacityMax: 0.6 },
+            heavy:    { count: 350, sizeMin: 2, sizeMax: 3, speedMin: 1.0, speedMax: 2.0, opacityMin: 0.5, opacityMax: 0.8 },
+            blizzard: { count: 500, sizeMin: 2, sizeMax: 4, speedMin: 1.5, speedMax: 3.0, opacityMin: 0.6, opacityMax: 0.9 },
+            whiteout: { count: 600, sizeMin: 2, sizeMax: 5, speedMin: 2.0, speedMax: 4.0, opacityMin: 0.7, opacityMax: 1.0 }
+        };
+        return map[level] || map.none;
+    }
+
+    setLevel(level) {
+        this.currentLevel = level;
+        this.targetConfig = this.getConfig(level);
+        if (!this.targetConfig) this.targetConfig = this.getConfig('none');
+    }
+
+    setTouch(x, y, active) {
+        this.touch.x = x;
+        this.touch.y = y;
+        this.touch.active = active;
+        if (active) this.touch.fadeEnd = Date.now() + 800;
+    }
+
+    lerp(a, b, t) { return a + (b - a) * t; }
+
+    updateParticles() {
+        const k = 0.05;
+        this.currentConfig.count      = this.lerp(this.currentConfig.count,      this.targetConfig.count,      k);
+        this.currentConfig.sizeMin    = this.lerp(this.currentConfig.sizeMin,    this.targetConfig.sizeMin,    k);
+        this.currentConfig.sizeMax    = this.lerp(this.currentConfig.sizeMax,    this.targetConfig.sizeMax,    k);
+        this.currentConfig.speedMin   = this.lerp(this.currentConfig.speedMin,   this.targetConfig.speedMin,   k);
+        this.currentConfig.speedMax   = this.lerp(this.currentConfig.speedMax,   this.targetConfig.speedMax,   k);
+        this.currentConfig.opacityMin = this.lerp(this.currentConfig.opacityMin, this.targetConfig.opacityMin, k);
+        this.currentConfig.opacityMax = this.lerp(this.currentConfig.opacityMax, this.targetConfig.opacityMax, k);
+
+        const targetCount = Math.round(this.currentConfig.count);
+        while (this.particles.length < targetCount) {
+            this.particles.push({
+                x: Math.random() * this.canvas.width,
+                y: Math.random() * this.canvas.height,
+                sizeRatio: Math.random(),
+                speedRatio: Math.random(),
+                opacityRatio: Math.random(),
+                offset: Math.random() * Math.PI * 2
+            });
+        }
+        while (this.particles.length > targetCount) this.particles.pop();
+
+        for (let p of this.particles) {
+            const speed = this.currentConfig.speedMin + p.speedRatio * (this.currentConfig.speedMax - this.currentConfig.speedMin);
+            p.y += speed;
+            p.x += Math.sin(p.y * 0.01 + p.offset) * 0.3;
+            if (p.y > this.canvas.height) {
+                p.y = -10;
+                p.x = Math.random() * this.canvas.width;
+            }
+        }
+    }
+
+    draw() {
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        if (this.particles.length === 0) return;
+
+        const now = Date.now();
+        const touchActive = this.touch.active || now < this.touch.fadeEnd;
+        const tx = this.touch.x;
+        const ty = this.touch.y;
+        const rx = 70;
+        const ry = 45;
+
+        for (let p of this.particles) {
+            const size = this.currentConfig.sizeMin + p.sizeRatio * (this.currentConfig.sizeMax - this.currentConfig.sizeMin);
+            const opacity = this.currentConfig.opacityMin + p.opacityRatio * (this.currentConfig.opacityMax - this.currentConfig.opacityMin);
+
+            let drawOpacity = opacity;
+            // Снег равномерный — никакого centerGap
+
+            // Просвет пальцем/мышью (эллипс, без sqrt)
+            if (touchActive && drawOpacity > 0) {
+                const dx = p.x - tx;
+                const dy = p.y - ty;
+                const distSq = (dx * dx) / (rx * rx) + (dy * dy) / (ry * ry);
+                if (distSq < 1.0) {
+                    drawOpacity = 0;
+                } else if (distSq < 2.25) {
+                    const grad = (distSq - 1.0) / 1.25;
+                    drawOpacity *= Math.max(0, grad);
+                }
+            }
+
+            if (drawOpacity <= 0.01) continue;
+
+            this.ctx.beginPath();
+            this.ctx.arc(p.x, p.y, size, 0, Math.PI * 2);
+            this.ctx.fillStyle = `rgba(232, 230, 227, ${drawOpacity})`;
+            this.ctx.fill();
+        }
+    }
+
+    animate() {
+        if (this.isReducedMotion) return;
+        this.updateParticles();
+        this.draw();
+        requestAnimationFrame(() => this.animate());
+    }
+
+    clear() {
+        this.setLevel('none');
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    }
+}
+
+/* --- SnowObserver --- */
+let snowObserver = null;
+let snowEngine = null;
+const visibleSnowParagraphs = new Set();
+
+function initSnowObserver() {
+    if (!snowEngine) snowEngine = new SnowEngine();
+
+    cleanupSnowObserver();
+
+    const chapterText = document.querySelector('.chapter-text');
+    if (!chapterText) return;
+
+    const snowParagraphs = chapterText.querySelectorAll('p[class*="snow-"]');
+    if (snowParagraphs.length === 0) {
+        snowEngine.setLevel('none');
+        return;
+    }
+
+    const levelMap = {
+        'snow-none': 0, 'snow-light': 1, 'snow-medium': 2,
+        'snow-heavy': 3, 'snow-blizzard': 4, 'snow-whiteout': 5
+    };
+    const getLevelValue = (el) => {
+        for (let cls of el.classList) {
+            if (levelMap[cls] !== undefined) return levelMap[cls];
+        }
+        return 0;
+    };
+    const getLevelName = (val) => {
+        const names = ['none','light','medium','heavy','blizzard','whiteout'];
+        return names[val] || 'none';
+    };
+
+    snowObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) visibleSnowParagraphs.add(entry.target);
+            else visibleSnowParagraphs.delete(entry.target);
+        });
+
+        let maxLevel = 0;
+        visibleSnowParagraphs.forEach(el => {
+            const val = getLevelValue(el);
+            if (val > maxLevel) maxLevel = val;
+        });
+
+        if (visibleSnowParagraphs.size > 0) {
+            snowEngine.setLevel(getLevelName(maxLevel));
+        } else {
+            snowEngine.setLevel('none');
+        }
+    }, {
+        root: chapterScreen,
+        rootMargin: '-20% 0px -20% 0px',
+        threshold: 0
+    });
+
+    snowParagraphs.forEach(p => snowObserver.observe(p));
+}
+
+function cleanupSnowObserver() {
+    if (snowObserver) {
+        snowObserver.disconnect();
+        snowObserver = null;
+    }
+    visibleSnowParagraphs.clear();
+    if (snowEngine) snowEngine.setLevel('none');
+}
+
+/* --- WhiteoutSequence (ручной запуск по клику) --- */
+let whiteoutClickHandler = null;
+
+function initWhiteout() {
+    const chapterText = document.querySelector('.chapter-text');
+    if (!chapterText) return;
+
+    const whiteoutP = chapterText.querySelector('p.snow-whiteout');
+    if (!whiteoutP) return;
+
+    const paragraphs = Array.from(chapterText.querySelectorAll('p'));
+    const idx = paragraphs.indexOf(whiteoutP);
+    if (idx === -1) return;
+
+    // Скрываем все абзацы ПОСЛЕ snow-whiteout
+    for (let i = idx + 1; i < paragraphs.length; i++) {
+        paragraphs[i].classList.add('post-whiteout-hidden');
+    }
+
+    whiteoutClickHandler = (e) => {
+        if (e.target.closest('.photo-link')) return;
+        e.preventDefault();
+        e.stopPropagation();
+        if (typeof closeMenu === 'function') closeMenu();
+        triggerWhiteoutSequence();
+    };
+
+    whiteoutP.addEventListener('click', whiteoutClickHandler);
+}
+
+function cleanupWhiteout() {
+    const chapterText = document.querySelector('.chapter-text');
+    if (!chapterText) return;
+
+    const whiteoutP = chapterText.querySelector('p.snow-whiteout');
+    if (whiteoutP && whiteoutClickHandler) {
+        whiteoutP.removeEventListener('click', whiteoutClickHandler);
+        whiteoutClickHandler = null;
+    }
+
+    chapterText.querySelectorAll('.post-whiteout-hidden').forEach(el => {
+        el.classList.remove('post-whiteout-hidden');
+        el.style.cssText = '';
+    });
+
+    if (whiteoutP) {
+        whiteoutP.style.cssText = '';
+        whiteoutP.style.display = '';
+    }
+
+    const overlay = document.getElementById('whiteout-overlay');
+    if (overlay) {
+        overlay.style.opacity = '0';
+        overlay.style.pointerEvents = 'none';
+    }
+
+    window.__whiteoutActive = false;
+}
+
+function getOrCreateWhiteoutOverlay() {
+    let el = document.getElementById('whiteout-overlay');
+    if (!el) {
+        el = document.createElement('div');
+        el.id = 'whiteout-overlay';
+        el.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:#fff;z-index:1000;opacity:0;pointer-events:none;transition:opacity 0.4s ease;';
+        document.body.appendChild(el);
+    }
+    return el;
+}
+
+function triggerWhiteoutSequence() {
+    if (window.__whiteoutActive) return;
+    window.__whiteoutActive = true;
+
+    const isReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const overlay = getOrCreateWhiteoutOverlay();
+    const chapterText = document.querySelector('.chapter-text');
+    const chapterScreenEl = document.getElementById('chapter-screen');
+    if (!chapterText || !chapterScreenEl) { window.__whiteoutActive = false; return; }
+
+    const paragraphs = Array.from(chapterText.querySelectorAll('p'));
+    const whiteoutP = chapterText.querySelector('p.snow-whiteout');
+    const idx = paragraphs.indexOf(whiteoutP);
+    if (idx === -1) { window.__whiteoutActive = false; return; }
+
+    // Reduced motion — мгновенно
+    if (isReduced) {
+        for (let i = 0; i < idx; i++) {
+            paragraphs[i].style.cssText = 'opacity:0;height:0;margin:0;padding:0;overflow:hidden;';
+        }
+        whiteoutP.style.display = 'none';
+        for (let i = idx + 1; i < paragraphs.length; i++) {
+            paragraphs[i].classList.remove('post-whiteout-hidden');
+            paragraphs[i].style.cssText = '';
+        }
+        if (paragraphs[idx + 1]) {
+            paragraphs[idx + 1].scrollIntoView({ behavior: 'auto', block: 'center' });
+        }
+        window.__whiteoutActive = false;
+        return;
+    }
+
+    // Блокировка
+    const blockScroll = (e) => e.preventDefault();
+    chapterScreenEl.addEventListener('wheel', blockScroll, { passive: false });
+    chapterScreenEl.addEventListener('touchmove', blockScroll, { passive: false });
+    chapterScreenEl.style.overflow = 'hidden';
+
+    const blockKey = (e) => {
+        if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','PageUp','PageDown','Escape',' '].includes(e.key)) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+    };
+    document.addEventListener('keydown', blockKey, true);
+
+    // Фаза 1: абзац падает (0–700 мс)
+    whiteoutP.style.transition = 'transform 0.7s ease-in, filter 0.7s ease-in, opacity 0.7s ease-in';
+    whiteoutP.style.transform = 'translateY(40px) scale(0.98)';
+    whiteoutP.style.filter = 'blur(6px)';
+    whiteoutP.style.opacity = '0';
+
+    // Фаза 2: белый экран (700 мс)
+    setTimeout(() => {
+        overlay.style.transition = 'opacity 0.4s ease';
+        overlay.style.opacity = '1';
+        if (snowEngine) snowEngine.setLevel('none');
+    }, 700);
+
+    // Фаза 3: старый текст исчезает (3200 мс — пока экран белый)
+    setTimeout(() => {
+        for (let i = 0; i < idx; i++) {
+            const p = paragraphs[i];
+            p.style.transition = 'all 0.5s ease';
+            p.style.opacity = '0';
+            p.style.transform = 'translateY(-30px)';
+            p.style.filter = 'blur(4px)';
+            p.style.height = '0';
+            p.style.margin = '0';
+            p.style.padding = '0';
+            p.style.overflow = 'hidden';
+        }
+    }, 3200);
+
+    // Фаза 4: белый уходит (3600 мс)
+    setTimeout(() => {
+        overlay.style.transition = 'opacity 1.0s ease';
+        overlay.style.opacity = '0';
+    }, 3600);
+
+    // Фаза 5: пробуждение (4600 мс)
+    setTimeout(() => {
+        whiteoutP.style.display = 'none';
+
+        for (let i = idx + 1; i < paragraphs.length; i++) {
+            paragraphs[i].classList.remove('post-whiteout-hidden');
+            paragraphs[i].style.cssText = '';
+        }
+
+        const nextP = paragraphs[idx + 1];
+        if (nextP) {
+            nextP.style.opacity = '0';
+            nextP.style.transform = 'translateY(20px)';
+            nextP.style.filter = 'blur(2px)';
+            nextP.offsetHeight;
+            nextP.style.transition = 'opacity 0.8s ease, transform 0.8s ease, filter 0.8s ease';
+            nextP.style.opacity = '1';
+            nextP.style.transform = 'translateY(0)';
+            nextP.style.filter = 'blur(0)';
+
+            setTimeout(() => nextP.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
+        }
+
+        chapterScreenEl.removeEventListener('wheel', blockScroll);
+        chapterScreenEl.removeEventListener('touchmove', blockScroll);
+        chapterScreenEl.style.overflow = 'auto';
+        document.removeEventListener('keydown', blockKey, true);
+        window.__whiteoutActive = false;
+    }, 4600);
+}
+
+/* --- ProgressOverlay --- */
+function getOrCreateProgressOverlay() {
+    let el = document.getElementById('progress-overlay');
+    if (!el) {
+        el = document.createElement('div');
+        el.id = 'progress-overlay';
+        el.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:2000;background:rgba(0,0,0,0.85);opacity:0;pointer-events:none;display:flex;justify-content:center;align-items:center;transition:opacity 0.6s ease;';
+        document.body.appendChild(el);
+    }
+    return el;
+}
+
+function initProgress() {
+    const saved = loadState();
+    if (saved.lastChapter === undefined || saved.lastChapter < 0) return;
+
+    const chapter = chapters[saved.lastChapter];
+    if (!chapter) return;
+
+    isStarted = true;
+    coverScreen.style.opacity = '0';
+    coverScreen.style.pointerEvents = 'none';
+    textScreen.style.opacity = '0';
+    textScreen.style.pointerEvents = 'none';
+    finalScreen.style.opacity = '0';
+    finalScreen.style.pointerEvents = 'none';
+    titleScreen.style.opacity = '0';
+    titleScreen.style.pointerEvents = 'none';
+
+    contentsScreen.classList.add('visible');
+    if (menuTrigger) menuTrigger.classList.add('visible');
+
+    const items = document.querySelectorAll('.contents-item');
+    items.forEach((item, index) => {
+        setTimeout(() => item.classList.add('revealed'), 200 + index * 80);
+    });
+
+    contentsScreen.classList.add('progress-dimmed');
+
+    const overlay = getOrCreateProgressOverlay();
+    overlay.innerHTML = `
+        <div class="progress-content">
+            <div class="progress-title">Вы остановились на главе ${chapter.number}</div>
+            <div class="progress-subtitle">${chapter.title}</div>
+            <div class="progress-actions">
+                <span class="progress-continue">Продолжить</span>
+                <span class="progress-restart">Начать сначала</span>
+            </div>
+        </div>
+    `;
+    overlay.style.opacity = '1';
+    overlay.style.pointerEvents = 'all';
+
+    overlay.querySelector('.progress-continue').addEventListener('click', () => {
+        overlay.style.opacity = '0';
+        overlay.style.pointerEvents = 'none';
+        contentsScreen.classList.remove('progress-dimmed');
+        setTimeout(() => openChapter(saved.lastChapter), 400);
+    });
+
+    overlay.querySelector('.progress-restart').addEventListener('click', () => {
+        localStorage.removeItem(STORAGE_KEY);
+        overlay.style.opacity = '0';
+        overlay.style.pointerEvents = 'none';
+        contentsScreen.classList.remove('progress-dimmed');
+        location.reload();
+    });
+}
+
+/* --- Интерактивный просвет --- */
+let mouseDown = false;
+
+document.addEventListener('touchstart', (e) => {
+    const cs = document.getElementById('chapter-screen');
+    if (!cs || !cs.classList.contains('visible') || !snowEngine) return;
+    const t = e.touches[0];
+    let ty = t.clientY - 50;
+    if (ty < 50) ty = 45;
+    snowEngine.setTouch(t.clientX, ty, true);
+}, { passive: true });
+
+document.addEventListener('touchmove', (e) => {
+    const cs = document.getElementById('chapter-screen');
+    if (!cs || !cs.classList.contains('visible') || !snowEngine) return;
+    const t = e.touches[0];
+    let ty = t.clientY - 50;
+    if (ty < 50) ty = 45;
+    snowEngine.setTouch(t.clientX, ty, true);
+}, { passive: true });
+
+document.addEventListener('touchend', () => {
+    if (snowEngine) snowEngine.setTouch(-1000, -1000, false);
+}, { passive: true });
+
+document.addEventListener('mousedown', (e) => {
+    if (e.button !== 0) return;
+    const cs = document.getElementById('chapter-screen');
+    if (!cs || !cs.classList.contains('visible') || !snowEngine) return;
+    mouseDown = true;
+    snowEngine.setTouch(e.clientX, e.clientY - 28, true);
+});
+
+document.addEventListener('mousemove', (e) => {
+    if (!mouseDown || !snowEngine) return;
+    snowEngine.setTouch(e.clientX, e.clientY - 28, true);
+});
+
+document.addEventListener('mouseup', () => {
+    mouseDown = false;
+    if (snowEngine) snowEngine.setTouch(-1000, -1000, false);
+});
