@@ -32,6 +32,35 @@ function saveState(patch) {
 }
 const state = loadState();
 
+// === PROGRESS MANAGER ===
+const PROGRESS_KEY = 'echo_progress';
+
+const ProgressManager = {
+    save(chapterId, title) {
+        const data = {
+            chapter: chapterId,
+            lastVisit: new Date().toISOString(),
+            chapterTitle: title
+        };
+        localStorage.setItem(PROGRESS_KEY, JSON.stringify(data));
+    },
+    load() {
+        try {
+            const raw = localStorage.getItem(PROGRESS_KEY);
+            return raw ? JSON.parse(raw) : null;
+        } catch (e) {
+            return null;
+        }
+    },
+    clear() {
+        localStorage.removeItem(PROGRESS_KEY);
+    },
+    hasProgress() {
+        return this.load() !== null;
+    }
+};
+
+
 // === ПОСТРОЕНИЕ МАССИВА ГЛАВ ИЗ HTML ===
 const items = document.querySelectorAll('.contents-item');
 const chapters = Array.from(items).map((item, index) => {
@@ -50,7 +79,10 @@ document.querySelector('.nav-next').addEventListener('click', () => {
     if (currentChapter < chapters.length - 1) openChapter(currentChapter + 1);
 });
 document.querySelector('.nav-contents').addEventListener('click', () => {
+    cleanupSnowObserver();
+    cleanupWhiteout();
     cleanupVoiceObserver();
+
     chapterScreen.classList.remove('visible');
     if (menuTrigger) menuTrigger.classList.add('visible');
     setTimeout(() => {
@@ -89,8 +121,11 @@ if (e.key === 'Escape') {
         closeMenu();
         return;
     }
+        cleanupSnowObserver();
+    cleanupWhiteout();
     cleanupVoiceObserver();
     chapterScreen.classList.remove('visible');
+
     if (menuTrigger) menuTrigger.classList.add('visible');
         setTimeout(() => contentsScreen.classList.add('visible'), 500);
     }
@@ -242,7 +277,13 @@ function openChapter(index) {
         }
       );
 
-    textEl.innerHTML = processedText;
+        textEl.innerHTML = processedText;
+
+    // Инициализация снега и whiteout
+    initSnowObserver();
+    initWhiteout();
+    ProgressManager.save(currentChapter, chapter.title);
+
 
     prevBtn.classList.toggle('inactive', index === 0);
     nextBtn.classList.toggle('inactive', index === chapters.length - 1);
@@ -773,3 +814,519 @@ document.addEventListener('touchend', function(e) {
     photoTouchTimer = null;
   }
 }, { passive: true });
+
+/* ============================================================
+   SNOW ENGINE + WHITEOUT + PROGRESS
+   ============================================================ */
+
+/* --- SnowEngine: Canvas-метель --- */
+class SnowEngine {
+    constructor() {
+        this.canvas = document.createElement('canvas');
+        this.canvas.id = 'snow-canvas';
+        this.ctx = this.canvas.getContext('2d');
+        this.canvas.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:7;';
+        document.body.appendChild(this.canvas);
+
+        this.resize();
+        window.addEventListener('resize', () => this.resize());
+
+        this.particles = [];
+        this.currentLevel = 'none';
+        this.targetConfig = this.getConfig('none');
+        this.currentConfig = { ...this.targetConfig };
+
+        this.touch = { x: -1000, y: -1000, active: false, fadeEnd: 0 };
+        this.isReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+        const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+        mq.addEventListener('change', (e) => {
+            this.isReducedMotion = e.matches;
+            if (this.isReducedMotion) {
+                this.canvas.style.display = 'none';
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+            } else {
+                this.canvas.style.display = 'block';
+                this.animate();
+            }
+        });
+
+        if (!this.isReducedMotion) {
+            this.animate();
+        } else {
+            this.canvas.style.display = 'none';
+        }
+    }
+
+    resize() {
+        const w = window.innerWidth || 320;
+        const h = window.innerHeight || 480;
+        this.canvas.width = w;
+        this.canvas.height = h;
+    }
+
+    getConfig(level) {
+        const map = {
+            none:     { count: 0,   sizeMin: 0, sizeMax: 0, speedMin: 0,   speedMax: 0,   opacityMin: 0,   opacityMax: 0   },
+            light:    { count: 60,  sizeMin: 1, sizeMax: 2, speedMin: 0.3, speedMax: 0.8, opacityMin: 0.3, opacityMax: 0.5 },
+            medium:   { count: 150, sizeMin: 1, sizeMax: 2, speedMin: 0.5, speedMax: 1.2, opacityMin: 0.4, opacityMax: 0.6 },
+            heavy:    { count: 350, sizeMin: 2, sizeMax: 3, speedMin: 1.0, speedMax: 2.0, opacityMin: 0.5, opacityMax: 0.8 },
+            blizzard: { count: 500, sizeMin: 2, sizeMax: 4, speedMin: 1.5, speedMax: 3.0, opacityMin: 0.6, opacityMax: 0.9 },
+            whiteout: { count: 600, sizeMin: 2, sizeMax: 5, speedMin: 2.0, speedMax: 4.0, opacityMin: 0.7, opacityMax: 1.0 }
+        };
+        return map[level] || map.none;
+    }
+
+    setLevel(level) {
+        this.currentLevel = level;
+        this.targetConfig = this.getConfig(level);
+        if (!this.targetConfig) this.targetConfig = this.getConfig('none');
+    }
+
+    setTouch(x, y, active) {
+        this.touch.x = x;
+        this.touch.y = y;
+        this.touch.active = active;
+        if (active) this.touch.fadeEnd = Date.now() + 800;
+    }
+
+    lerp(a, b, t) { return a + (b - a) * t; }
+
+    updateParticles() {
+        const k = 0.05;
+        this.currentConfig.count      = this.lerp(this.currentConfig.count,      this.targetConfig.count,      k);
+        this.currentConfig.sizeMin    = this.lerp(this.currentConfig.sizeMin,    this.targetConfig.sizeMin,    k);
+        this.currentConfig.sizeMax    = this.lerp(this.currentConfig.sizeMax,    this.targetConfig.sizeMax,    k);
+        this.currentConfig.speedMin   = this.lerp(this.currentConfig.speedMin,   this.targetConfig.speedMin,   k);
+        this.currentConfig.speedMax   = this.lerp(this.currentConfig.speedMax,   this.targetConfig.speedMax,   k);
+        this.currentConfig.opacityMin = this.lerp(this.currentConfig.opacityMin, this.targetConfig.opacityMin, k);
+        this.currentConfig.opacityMax = this.lerp(this.currentConfig.opacityMax, this.targetConfig.opacityMax, k);
+
+        const targetCount = Math.round(this.currentConfig.count);
+        while (this.particles.length < targetCount) {
+            this.particles.push({
+                x: Math.random() * this.canvas.width,
+                y: Math.random() * this.canvas.height,
+                sizeRatio: Math.random(),
+                speedRatio: Math.random(),
+                opacityRatio: Math.random(),
+                offset: Math.random() * Math.PI * 2
+            });
+        }
+        while (this.particles.length > targetCount) this.particles.pop();
+
+        for (let p of this.particles) {
+            const speed = this.currentConfig.speedMin + p.speedRatio * (this.currentConfig.speedMax - this.currentConfig.speedMin);
+            p.y += speed;
+            p.x += Math.sin(p.y * 0.01 + p.offset) * 0.3;
+            if (p.y > this.canvas.height) {
+                p.y = -10;
+                p.x = Math.random() * this.canvas.width;
+            }
+        }
+    }
+
+    draw() {
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        if (this.particles.length === 0) return;
+
+        const now = Date.now();
+        const touchActive = this.touch.active || now < this.touch.fadeEnd;
+        const tx = this.touch.x;
+        const ty = this.touch.y - 50; // сдвиг вверх
+        const rx = 70;  // полуось X
+        const ry = 45;  // полуось Y
+
+        for (let p of this.particles) {
+            const size = this.currentConfig.sizeMin + p.sizeRatio * (this.currentConfig.sizeMax - this.currentConfig.sizeMin);
+            const opacity = this.currentConfig.opacityMin + p.opacityRatio * (this.currentConfig.opacityMax - this.currentConfig.opacityMin);
+
+            let drawOpacity = opacity;
+
+            // Просвет пальцем (эллипс, без sqrt)
+            if (touchActive && drawOpacity > 0) {
+                const dx = p.x - tx;
+                const dy = p.y - ty;
+                const distSq = (dx * dx) / (rx * rx) + (dy * dy) / (ry * ry);
+                if (distSq < 1.0) {
+                    drawOpacity = 0;
+                } else if (distSq < 2.25) {
+                    const grad = (distSq - 1.0) / 1.25;
+                    drawOpacity *= Math.max(0, grad);
+                }
+            }
+
+            if (drawOpacity <= 0.01) continue;
+
+            this.ctx.beginPath();
+            this.ctx.arc(p.x, p.y, size, 0, Math.PI * 2);
+            this.ctx.fillStyle = `rgba(232, 230, 227, ${drawOpacity})`;
+            this.ctx.fill();
+        }
+    }
+
+    animate() {
+        if (this.isReducedMotion) return;
+        this.updateParticles();
+        this.draw();
+        requestAnimationFrame(() => this.animate());
+    }
+
+    clear() {
+        this.setLevel('none');
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    }
+}
+
+/* --- SnowObserver --- */
+let snowObserver = null;
+let snowEngine = null;
+const visibleSnowParagraphs = new Set();
+
+function initSnowObserver() {
+    if (!snowEngine) snowEngine = new SnowEngine();
+
+    if (snowObserver) {
+        snowObserver.disconnect();
+        snowObserver = null;
+    }
+    visibleSnowParagraphs.clear();
+
+    const chapterText = document.querySelector('.chapter-text');
+    if (!chapterText) return;
+
+    const snowParagraphs = chapterText.querySelectorAll('p[class*="snow-"]');
+    if (snowParagraphs.length === 0) {
+        snowEngine.setLevel('none');
+        return;
+    }
+
+    const levelMap = {
+        'snow-none': 0, 'snow-light': 1, 'snow-medium': 2,
+        'snow-heavy': 3, 'snow-blizzard': 4, 'snow-whiteout': 5
+    };
+    const getLevelValue = (el) => {
+        for (let cls of el.classList) if (levelMap[cls] !== undefined) return levelMap[cls];
+        return 0;
+    };
+    const getLevelName = (val) => {
+        const names = ['none','light','medium','heavy','blizzard','whiteout'];
+        return names[val] || 'none';
+    };
+
+    snowObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) visibleSnowParagraphs.add(entry.target);
+            else visibleSnowParagraphs.delete(entry.target);
+        });
+
+        let maxLevel = 0;
+        visibleSnowParagraphs.forEach(el => {
+            const val = getLevelValue(el);
+            if (val > maxLevel) maxLevel = val;
+        });
+
+        if (visibleSnowParagraphs.size > 0) {
+            snowEngine.setLevel(getLevelName(maxLevel));
+        } else {
+            snowEngine.setLevel('none');
+        }
+    }, {
+        root: chapterScreen,
+        rootMargin: '-20% 0px -20% 0px',
+        threshold: 0
+    });
+
+    snowParagraphs.forEach(p => snowObserver.observe(p));
+}
+
+function cleanupSnowObserver() {
+    if (snowObserver) {
+        snowObserver.disconnect();
+        snowObserver = null;
+    }
+    visibleSnowParagraphs.clear();
+    if (snowEngine) snowEngine.setLevel('none');
+}
+
+/* --- Whiteout: ручной запуск --- */
+let whiteoutClickHandler = null;
+
+function initWhiteout() {
+    const chapterText = document.querySelector('.chapter-text');
+    if (!chapterText) return;
+
+    const whiteoutP = chapterText.querySelector('p.snow-whiteout');
+    if (!whiteoutP) return;
+
+    // Скрываем все абзацы ПОСЛЕ snow-whiteout
+    const allParagraphs = Array.from(chapterText.querySelectorAll('p'));
+    const idx = allParagraphs.indexOf(whiteoutP);
+    for (let i = idx + 1; i < allParagraphs.length; i++) {
+        allParagraphs[i].classList.add('post-whiteout-hidden');
+    }
+
+    // Пульсация
+    whiteoutP.classList.add('pulsing');
+
+    // Обработчик клика
+    whiteoutClickHandler = (e) => {
+        // Не срабатывать при клике на фото-ссылку
+        if (e.target.closest('.photo-link')) return;
+        triggerWhiteoutSequence();
+    };
+    whiteoutP.addEventListener('click', whiteoutClickHandler);
+}
+
+function cleanupWhiteout() {
+    const chapterText = document.querySelector('.chapter-text');
+    if (!chapterText) return;
+
+    const whiteoutP = chapterText.querySelector('p.snow-whiteout');
+    if (whiteoutP && whiteoutClickHandler) {
+        whiteoutP.removeEventListener('click', whiteoutClickHandler);
+        whiteoutClickHandler = null;
+    }
+
+    // Показываем все скрытые абзацы
+    chapterText.querySelectorAll('.post-whiteout-hidden').forEach(p => {
+        p.classList.remove('post-whiteout-hidden');
+    });
+
+    // Сбрасываем стили whiteout
+    if (whiteoutP) {
+        whiteoutP.classList.remove('pulsing');
+        whiteoutP.style.cssText = '';
+        whiteoutP.style.display = '';
+    }
+
+    // Убираем оверлей
+    const overlay = document.getElementById('whiteout-overlay');
+    if (overlay) {
+        overlay.style.opacity = '0';
+        overlay.style.pointerEvents = 'none';
+    }
+
+    window.__whiteoutActive = false;
+}
+
+function triggerWhiteoutSequence() {
+    if (window.__whiteoutActive) return;
+    window.__whiteoutActive = true;
+
+    // Закрываем меню, если открыто
+    if (isMenuOpen) closeMenu();
+
+    const overlay = document.getElementById('whiteout-overlay');
+    const chapterText = document.querySelector('.chapter-text');
+    if (!chapterText || !overlay) { window.__whiteoutActive = false; return; }
+
+    const paragraphs = Array.from(chapterText.querySelectorAll('p'));
+    const whiteoutP = chapterText.querySelector('p.snow-whiteout');
+    const idx = paragraphs.indexOf(whiteoutP);
+
+    if (idx === -1) { window.__whiteoutActive = false; return; }
+
+    // Проверка prefers-reduced-motion
+    const isReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    if (isReduced) {
+        // Мгновенный переход без анимаций
+        whiteoutP.style.display = 'none';
+        for (let i = 0; i < idx; i++) {
+            paragraphs[i].style.display = 'none';
+        }
+        for (let i = idx + 1; i < paragraphs.length; i++) {
+            paragraphs[i].classList.remove('post-whiteout-hidden');
+        }
+        if (snowEngine) snowEngine.setLevel('none');
+        window.__whiteoutActive = false;
+        return;
+    }
+
+    // Блокировка
+    const blockScroll = (e) => e.preventDefault();
+    chapterScreen.addEventListener('wheel', blockScroll, { passive: false });
+    chapterScreen.addEventListener('touchmove', blockScroll, { passive: false });
+    chapterScreen.style.overflow = 'hidden';
+
+    const blockKey = (e) => {
+        if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','PageUp','PageDown','Escape',' '].includes(e.key)) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+    };
+    document.addEventListener('keydown', blockKey, true);
+
+    // Фаза 1: абзац падает (0–700 мс)
+    whiteoutP.classList.remove('pulsing');
+    whiteoutP.style.transition = 'transform 0.7s ease-in, filter 0.7s ease-in, opacity 0.7s ease-in';
+    whiteoutP.style.transform = 'translateY(40px) scale(0.98)';
+    whiteoutP.style.filter = 'blur(6px)';
+    whiteoutP.style.opacity = '0';
+
+    // Фаза 2: белый экран (700 мс)
+    setTimeout(() => {
+        overlay.style.transition = 'opacity 0.4s ease';
+        overlay.style.opacity = '1';
+        overlay.style.pointerEvents = 'all';
+        if (snowEngine) snowEngine.setLevel('none');
+    }, 700);
+
+    // Фаза 3: старый текст исчезает (пока экран белый, 3200 мс)
+    setTimeout(() => {
+        for (let i = 0; i < idx; i++) {
+            const p = paragraphs[i];
+            p.style.transition = 'all 0.5s ease';
+            p.style.opacity = '0';
+            p.style.transform = 'translateY(-30px)';
+            p.style.filter = 'blur(4px)';
+            p.style.height = '0';
+            p.style.margin = '0';
+            p.style.padding = '0';
+            p.style.overflow = 'hidden';
+        }
+    }, 3200);
+
+    // Фаза 4: белый уходит (3600 мс)
+    setTimeout(() => {
+        overlay.style.transition = 'opacity 1.0s ease';
+        overlay.style.opacity = '0';
+        overlay.style.pointerEvents = 'none';
+    }, 3600);
+
+    // Фаза 5: пробуждение (4600 мс)
+    setTimeout(() => {
+        whiteoutP.style.display = 'none';
+
+        // Показываем скрытые абзацы
+        for (let i = idx + 1; i < paragraphs.length; i++) {
+            paragraphs[i].classList.remove('post-whiteout-hidden');
+        }
+
+        const nextP = paragraphs[idx + 1];
+        if (nextP) {
+            nextP.style.opacity = '0';
+            nextP.style.transform = 'translateY(20px)';
+            nextP.style.filter = 'blur(2px)';
+            nextP.offsetHeight; // reflow
+            nextP.style.transition = 'opacity 0.8s ease, transform 0.8s ease, filter 0.8s ease';
+            nextP.style.opacity = '1';
+            nextP.style.transform = 'translateY(0)';
+            nextP.style.filter = 'blur(0)';
+
+            setTimeout(() => nextP.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
+        }
+
+        chapterScreen.removeEventListener('wheel', blockScroll);
+        chapterScreen.removeEventListener('touchmove', blockScroll);
+        chapterScreen.style.overflow = 'auto';
+        document.removeEventListener('keydown', blockKey, true);
+        window.__whiteoutActive = false;
+    }, 4600);
+}
+
+/* --- Интерактивный просвет: touch / drag --- */
+let mouseDown = false;
+
+document.addEventListener('touchstart', (e) => {
+    if (!chapterScreen.classList.contains('visible') || !snowEngine) return;
+    const t = e.touches[0];
+    snowEngine.setTouch(t.clientX, t.clientY, true);
+}, { passive: true });
+
+document.addEventListener('touchmove', (e) => {
+    if (!chapterScreen.classList.contains('visible') || !snowEngine) return;
+    const t = e.touches[0];
+    snowEngine.setTouch(t.clientX, t.clientY, true);
+}, { passive: true });
+
+document.addEventListener('touchend', () => {
+    if (snowEngine) snowEngine.setTouch(-1000, -1000, false);
+}, { passive: true });
+
+document.addEventListener('mousedown', (e) => {
+    if (!chapterScreen.classList.contains('visible') || !snowEngine) return;
+    mouseDown = true;
+    snowEngine.setTouch(e.clientX, e.clientY, true);
+});
+
+document.addEventListener('mousemove', (e) => {
+    if (!mouseDown || !snowEngine) return;
+    snowEngine.setTouch(e.clientX, e.clientY, true);
+});
+
+document.addEventListener('mouseup', () => {
+    mouseDown = false;
+    if (snowEngine) snowEngine.setTouch(-1000, -1000, false);
+});
+
+/* --- Progress overlay --- */
+function initProgress() {
+    const saved = ProgressManager.load();
+    if (!saved || saved.chapter === undefined || saved.chapter < 0) return;
+
+    const chapter = chapters[saved.chapter];
+    if (!chapter) return;
+
+    // Пропускаем интро
+    isStarted = true;
+    coverScreen.style.opacity = '0';
+    coverScreen.style.pointerEvents = 'none';
+    textScreen.style.opacity = '0';
+    textScreen.style.pointerEvents = 'none';
+    finalScreen.style.opacity = '0';
+    finalScreen.style.pointerEvents = 'none';
+    titleScreen.style.opacity = '0';
+    titleScreen.style.pointerEvents = 'none';
+
+    // Показываем оглавление
+    contentsScreen.classList.add('visible');
+    if (menuTrigger) menuTrigger.classList.add('visible');
+
+    const items = document.querySelectorAll('.contents-item');
+    items.forEach((item, index) => {
+        setTimeout(() => item.classList.add('revealed'), 200 + index * 80);
+    });
+
+    // Затемняем
+    contentsScreen.classList.add('progress-dimmed');
+
+    // Заполняем оверлей
+    const overlay = document.getElementById('progress-overlay');
+    const titleEl = overlay.querySelector('.progress-title');
+    const subtitleEl = overlay.querySelector('.progress-subtitle');
+    titleEl.textContent = `Вы остановились на главе ${chapter.number}`;
+    subtitleEl.textContent = chapter.title;
+
+    overlay.classList.add('visible');
+
+    // Кнопки
+    overlay.querySelector('.progress-continue').addEventListener('click', () => {
+        overlay.classList.remove('visible');
+        contentsScreen.classList.remove('progress-dimmed');
+        setTimeout(() => openChapter(saved.chapter), 400);
+    });
+
+    overlay.querySelector('.progress-restart').addEventListener('click', () => {
+        ProgressManager.clear();
+        overlay.classList.remove('visible');
+        contentsScreen.classList.remove('progress-dimmed');
+        // Сброс стилей интро
+        coverScreen.style.opacity = '';
+        coverScreen.style.pointerEvents = '';
+        textScreen.style.opacity = '';
+        textScreen.style.pointerEvents = '';
+        finalScreen.style.opacity = '';
+        finalScreen.style.pointerEvents = '';
+        titleScreen.style.opacity = '';
+        titleScreen.style.pointerEvents = '';
+        isStarted = false;
+        // Перезагрузка для чистого старта
+        location.reload();
+    });
+}
+
+// Запуск
+initProgress();
+
