@@ -233,6 +233,13 @@ function openChapter(index) {
 
     numberEl.textContent = 'Глава ' + chapter.number;
     titleEl.textContent = chapter.title;
+        numberEl.style.display = '';
+    titleEl.style.display = '';
+    numberEl.style.opacity = '';
+    titleEl.style.opacity = '';
+    numberEl.style.transition = '';
+    titleEl.style.transition = '';
+
         // Парсим {{PHOTO:слово:файл}} и {{VOICE}}
     let processedText = chapter.text
       .replace(
@@ -1055,6 +1062,24 @@ function initWhiteout() {
 
 function cleanupWhiteout() {
     const chapterText = document.querySelector('.chapter-text');
+        const chapterScreenEl = document.getElementById('chapter-screen');
+    if (chapterScreenEl) {
+        chapterScreenEl.style.overflow = 'auto';
+    }
+
+    const numberEl = chapterScreenEl ? chapterScreenEl.querySelector('.chapter-number') : null;
+    const titleEl = chapterScreenEl ? chapterScreenEl.querySelector('.chapter-title') : null;
+    if (numberEl) {
+        numberEl.style.display = '';
+        numberEl.style.opacity = '';
+        numberEl.style.transition = '';
+    }
+    if (titleEl) {
+        titleEl.style.display = '';
+        titleEl.style.opacity = '';
+        titleEl.style.transition = '';
+    }
+
     if (!chapterText) return;
 
     const whiteoutP = chapterText.querySelector('p.snow-whiteout');
@@ -1173,11 +1198,27 @@ function triggerWhiteoutSequence() {
         overlay.style.opacity = '0';
     }, 3600);
 
-    // Фаза 5: пробуждение (4600 мс)
+        // Фаза 5: пробуждение (4600 мс)
     setTimeout(() => {
         whiteoutP.style.display = 'none';
 
+        // Скрываем номер и заголовок — эффект "проснуться посреди текста"
+        const numberEl = chapterScreen.querySelector('.chapter-number');
+        const titleEl = chapterScreen.querySelector('.chapter-title');
+        if (numberEl) {
+            numberEl.style.transition = 'opacity 0.6s ease';
+            numberEl.style.opacity = '0';
+            setTimeout(() => { numberEl.style.display = 'none'; }, 600);
+        }
+        if (titleEl) {
+            titleEl.style.transition = 'opacity 0.6s ease';
+            titleEl.style.opacity = '0';
+            setTimeout(() => { titleEl.style.display = 'none'; }, 600);
+        }
+
         for (let i = idx + 1; i < paragraphs.length; i++) {
+
+            
             paragraphs[i].classList.remove('post-whiteout-hidden');
             paragraphs[i].style.cssText = '';
         }
