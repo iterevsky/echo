@@ -266,8 +266,6 @@ function openChapter(index) {
         chapterScreen.scrollTop = 0;
         initVoiceObserver();
     }, 300);
-
-    saveState({ lastChapter: index });
 }
 
 /* === ФОТО: ОВЕРЛЕЙ === */
@@ -1042,13 +1040,15 @@ function initWhiteout() {
         paragraphs[i].classList.add('post-whiteout-hidden');
     }
 
-    whiteoutClickHandler = (e) => {
+        whiteoutClickHandler = (e) => {
+        if (window.__whiteoutActive) return;
         if (e.target.closest('.photo-link')) return;
         e.preventDefault();
         e.stopPropagation();
         if (typeof closeMenu === 'function') closeMenu();
         triggerWhiteoutSequence();
     };
+
 
     whiteoutP.addEventListener('click', whiteoutClickHandler);
 }
