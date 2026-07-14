@@ -19,19 +19,6 @@ let isMenuOpen = false;
 
 let currentChapter = 0;
 
-const STORAGE_KEY = 'echo_state';
-
-function loadState() {
-    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; }
-    catch (e) { return {}; }
-}
-function saveState(patch) {
-    const s = loadState();
-    Object.assign(s, patch);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
-}
-const state = loadState();
-
 // === PROGRESS MANAGER ===
 const PROGRESS_KEY = 'echo_progress';
 
