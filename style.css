@@ -1059,9 +1059,56 @@ html, body {
     transition: none !important;
     pointer-events: none;
 }
+/* === SWIPE TO NEXT CHAPTER === */
+#chapter-screen {
+    overscroll-behavior-y: none;
+}
+
+.swipe-hint {
+    position: fixed;
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    width: 40px;
+    height: 3px;
+    border-radius: 2px;
+    background: #00A8E8;
+    box-shadow: 0 0 10px rgba(0,168,232,0.6), 0 0 24px rgba(0,168,232,0.3);
+    opacity: 0;
+    pointer-events: none;
+    z-index: 11;
+    transition: opacity 0.4s ease, transform 0.4s ease;
+}
+
+.swipe-hint.visible {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+    animation: swipe-hint-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes swipe-hint-pulse {
+    0%, 100% { opacity: 0.6; box-shadow: 0 0 10px rgba(0,168,232,0.4), 0 0 20px rgba(0,168,232,0.15); }
+    50%      { opacity: 1;   box-shadow: 0 0 18px rgba(0,168,232,0.8), 0 0 40px rgba(0,168,232,0.35); }
+}
+
 
 /* --- Reduced motion --- */
 @media (prefers-reduced-motion: reduce) {
+@media (prefers-reduced-motion: reduce) {
+    #snow-canvas {
+        display: none !important;
+    }
+    .snow-whiteout {
+        animation: none;
+        text-shadow: none;
+    }
+    /* === ДОБАВИТЬ: === */
+    .swipe-hint.visible {
+        animation: none;
+        opacity: 1;
+    }
+}
+
     #snow-canvas {
         display: none !important;
     }
