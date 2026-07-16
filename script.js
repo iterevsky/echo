@@ -16,8 +16,23 @@ const donateCopyBtn = document.getElementById('donate-copy');
 const donateCard = document.getElementById('donate-card');
 
 let isMenuOpen = false;
-
 let currentChapter = 0;
+
+// === SWIPE TO NEXT CHAPTER ===
+const SWIPE_HINT_TIMEOUT = 3000;
+const LONG_SWIPE_THRESHOLD = 80;   // px — продолжительный свайп
+const MIN_SWIPE_DELTA = 30;        // px — минимум для засчитывания свайпа
+const MAX_SWIPE_DURATION = 600;    // ms — максимальная длительность свайпа
+
+let swipeHintEl = null;
+let swipeHintTimer = null;
+let swipeHintShown = false;
+
+let chapterSwipeActive = false;
+let chapterSwipeStartY = 0;
+let chapterSwipeStartTime = 0;
+let chapterSwipeAccumulated = 0;
+
 
 const STORAGE_KEY = 'echo_state';
 
@@ -31,6 +46,45 @@ function saveState(patch) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
 }
 const state = loadState();
+
+function isChapterAtEnd() {
+    const cs = document.getElementById('chapter-screen');
+    if (!cs) return false;
+    return cs.scrollTop + cs.clientHeight >= cs.scrollHeight - 4;
+}
+
+function getOrCreateSwipeHint() {
+    if (swipeHintEl) return swipeHintEl;
+    swipeHintEl = document.createElement('div');
+    swipeHintEl.className = 'swipe-hint';
+    document.body.appendChild(swipeHintEl);
+    return swipeHintEl;
+}
+
+function showSwipeHint() {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const el = getOrCreateSwipeHint();
+    el.classList.add('visible');
+    if (swipeHintTimer) clearTimeout(swipeHintTimer);
+    swipeHintTimer = setTimeout(() => {
+        el.classList.remove('visible');
+        swipeHintShown = false;
+    }, SWIPE_HINT_TIMEOUT);
+}
+
+function hideSwipeHint() {
+    if (swipeHintEl) swipeHintEl.classList.remove('visible');
+    if (swipeHintTimer) { clearTimeout(swipeHintTimer); swipeHintTimer = null; }
+    swipeHintShown = false;
+}
+
+function triggerNextChapter() {
+    hideSwipeHint();
+    if (currentChapter < chapters.length - 1) {
+        openChapter(currentChapter + 1);
+    }
+}
+
 
 // === ПОСТРОЕНИЕ МАССИВА ГЛАВ ИЗ HTML ===
 const items = document.querySelectorAll('.contents-item');
@@ -262,6 +316,7 @@ function openChapter(index) {
 
 
     setTimeout(() => {
+        hideSwipeHint();
         chapterScreen.classList.remove('whiteout-phase');
         chapterScreen.classList.add('visible');
         chapterScreen.scrollTop = 0;
@@ -1320,3 +1375,72 @@ document.addEventListener('mouseup', () => {
     mouseDown = false;
     if (snowEngine) snowEngine.setTouch(-1000, -1000, false);
 });
+
+/* === SWIPE TO NEXT CHAPTER: обработчики === */
+(function initChapterSwipe() {
+    const cs = document.getElementById('chapter-screen');
+    if (!cs) return;
+
+    cs.addEventListener('touchstart', (e) => {
+        if (!cs.classList.contains('visible')) return;
+        if (photoOverlay && photoOverlay.classList.contains('active')) return;
+        if (isMenuOpen) return;
+        if (window.__whiteoutActive) return;
+
+        chapterSwipeActive = true;
+        chapterSwipeStartY = e.touches[0].clientY;
+        chapterSwipeStartTime = Date.now();
+        chapterSwipeAccumulated = 0;
+    }, { passive: true });
+
+    cs.addEventListener('touchmove', (e) => {
+        if (!chapterSwipeActive) return;
+        if (!cs.classList.contains('visible')) return;
+        if (window.__whiteoutActive) return;
+
+        const currentY = e.touches[0].clientY;
+        const deltaY = currentY - chapterSwipeStartY;
+
+        // Только движение вниз (deltaY > 0) в конце текста
+        if (deltaY > 0 && isChapterAtEnd()) {
+            chapterSwipeAccumulated = deltaY;
+            // Продолжительный свайп — сразу переход
+            if (chapterSwipeAccumulated > LONG_SWIPE_THRESHOLD) {
+                e.preventDefault(); // подавляем rubber-band iOS
+                chapterSwipeActive = false;
+                triggerNextChapter();
+            }
+        }
+    }, { passive: false });
+
+    cs.addEventListener('touchend', (e) => {
+        if (!chapterSwipeActive) return;
+        chapterSwipeActive = false;
+
+        if (!cs.classList.contains('visible')) return;
+        if (window.__whiteoutActive) return;
+
+        const deltaY = e.changedTouches[0].clientY - chapterSwipeStartY;
+        const duration = Date.now() - chapterSwipeStartTime;
+
+        // Проверяем пороги: достаточно длинно, достаточно быстро, в конце текста
+        if (deltaY > MIN_SWIPE_DELTA && duration < MAX_SWIPE_DURATION && isChapterAtEnd()) {
+            if (swipeHintShown) {
+                // Второй свайп — переход
+                triggerNextChapter();
+            } else {
+                // Первый свайп — показываем подсказку
+                showSwipeHint();
+                swipeHintShown = true;
+            }
+        }
+    }, { passive: true });
+
+    // Если ушли от конца — скрываем подсказку
+    cs.addEventListener('scroll', () => {
+        if (!isChapterAtEnd()) {
+            hideSwipeHint();
+        }
+    }, { passive: true });
+})();
+
