@@ -1376,7 +1376,54 @@ document.addEventListener('mouseup', () => {
     if (snowEngine) snowEngine.setTouch(-1000, -1000, false);
 });
 
-/* === SWIPE TO NEXT CHAPTER: обработчики === */
+/* === SWIPE TO NEXT CHAPTER (v2) === */
+let swipeHintEl = null;
+let swipeHintTimer = null;
+let swipeHintShown = false;
+
+let chTouchStartY = 0;
+let chTouchStartTime = 0;
+let chTouchMaxDelta = 0;
+let chTouchAtEnd = false;
+
+function isChapterAtEnd() {
+    const cs = document.getElementById('chapter-screen');
+    if (!cs) return false;
+    return cs.scrollTop + cs.clientHeight >= cs.scrollHeight - 10;
+}
+
+function getOrCreateSwipeHint() {
+    if (swipeHintEl) return swipeHintEl;
+    swipeHintEl = document.createElement('div');
+    swipeHintEl.className = 'swipe-hint';
+    document.body.appendChild(swipeHintEl);
+    return swipeHintEl;
+}
+
+function showSwipeHint() {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const el = getOrCreateSwipeHint();
+    el.classList.add('visible');
+    if (swipeHintTimer) clearTimeout(swipeHintTimer);
+    swipeHintTimer = setTimeout(() => {
+        el.classList.remove('visible');
+        swipeHintShown = false;
+    }, 3000);
+}
+
+function hideSwipeHint() {
+    if (swipeHintEl) swipeHintEl.classList.remove('visible');
+    if (swipeHintTimer) { clearTimeout(swipeHintTimer); swipeHintTimer = null; }
+    swipeHintShown = false;
+}
+
+function triggerNextChapter() {
+    hideSwipeHint();
+    if (currentChapter < chapters.length - 1) {
+        openChapter(currentChapter + 1);
+    }
+}
+
 (function initChapterSwipe() {
     const cs = document.getElementById('chapter-screen');
     if (!cs) return;
@@ -1387,60 +1434,53 @@ document.addEventListener('mouseup', () => {
         if (isMenuOpen) return;
         if (window.__whiteoutActive) return;
 
-        chapterSwipeActive = true;
-        chapterSwipeStartY = e.touches[0].clientY;
-        chapterSwipeStartTime = Date.now();
-        chapterSwipeAccumulated = 0;
+        chTouchStartY = e.touches[0].clientY;
+        chTouchStartTime = Date.now();
+        chTouchMaxDelta = 0;
+        chTouchAtEnd = isChapterAtEnd();
     }, { passive: true });
 
     cs.addEventListener('touchmove', (e) => {
-        if (!chapterSwipeActive) return;
         if (!cs.classList.contains('visible')) return;
         if (window.__whiteoutActive) return;
+        if (!chTouchAtEnd) return;
 
-        const currentY = e.touches[0].clientY;
-        const deltaY = currentY - chapterSwipeStartY;
-
-        // Только движение вниз (deltaY > 0) в конце текста
-        if (deltaY > 0 && isChapterAtEnd()) {
-            chapterSwipeAccumulated = deltaY;
-            // Продолжительный свайп — сразу переход
-            if (chapterSwipeAccumulated > LONG_SWIPE_THRESHOLD) {
-                e.preventDefault(); // подавляем rubber-band iOS
-                chapterSwipeActive = false;
-                triggerNextChapter();
-            }
+        const deltaY = e.touches[0].clientY - chTouchStartY;
+        if (deltaY > 0) {
+            chTouchMaxDelta = Math.max(chTouchMaxDelta, deltaY);
         }
-    }, { passive: false });
+    }, { passive: true });
 
     cs.addEventListener('touchend', (e) => {
-        if (!chapterSwipeActive) return;
-        chapterSwipeActive = false;
-
         if (!cs.classList.contains('visible')) return;
         if (window.__whiteoutActive) return;
+        if (!chTouchAtEnd) return;
 
-        const deltaY = e.changedTouches[0].clientY - chapterSwipeStartY;
-        const duration = Date.now() - chapterSwipeStartTime;
+        const deltaY = e.changedTouches[0].clientY - chTouchStartY;
+        const duration = Date.now() - chTouchStartTime;
 
-        // Проверяем пороги: достаточно длинно, достаточно быстро, в конце текста
-        if (deltaY > MIN_SWIPE_DELTA && duration < MAX_SWIPE_DURATION && isChapterAtEnd()) {
+        // Продолжительный свайп: тянули вниз больше 80px
+        if (chTouchMaxDelta > 80) {
+            triggerNextChapter();
+            return;
+        }
+
+        // Короткий свайп: быстрый толчок вниз (>30px, <600ms)
+        if (deltaY > 30 && duration < 600) {
             if (swipeHintShown) {
-                // Второй свайп — переход
                 triggerNextChapter();
             } else {
-                // Первый свайп — показываем подсказку
                 showSwipeHint();
                 swipeHintShown = true;
             }
         }
+
+        chTouchAtEnd = false;
+        chTouchMaxDelta = 0;
     }, { passive: true });
 
-    // Если ушли от конца — скрываем подсказку
     cs.addEventListener('scroll', () => {
-        if (!isChapterAtEnd()) {
-            hideSwipeHint();
-        }
+        if (!isChapterAtEnd()) hideSwipeHint();
     }, { passive: true });
 })();
 
