@@ -16,23 +16,8 @@ const donateCopyBtn = document.getElementById('donate-copy');
 const donateCard = document.getElementById('donate-card');
 
 let isMenuOpen = false;
+
 let currentChapter = 0;
-
-// === SWIPE TO NEXT CHAPTER ===
-const SWIPE_HINT_TIMEOUT = 3000;
-const LONG_SWIPE_THRESHOLD = 80;   // px — продолжительный свайп
-const MIN_SWIPE_DELTA = 30;        // px — минимум для засчитывания свайпа
-const MAX_SWIPE_DURATION = 600;    // ms — максимальная длительность свайпа
-
-let swipeHintEl = null;
-let swipeHintTimer = null;
-let swipeHintShown = false;
-
-let chapterSwipeActive = false;
-let chapterSwipeStartY = 0;
-let chapterSwipeStartTime = 0;
-let chapterSwipeAccumulated = 0;
-
 
 const STORAGE_KEY = 'echo_state';
 
@@ -46,45 +31,6 @@ function saveState(patch) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
 }
 const state = loadState();
-
-function isChapterAtEnd() {
-    const cs = document.getElementById('chapter-screen');
-    if (!cs) return false;
-    return cs.scrollTop + cs.clientHeight >= cs.scrollHeight - 4;
-}
-
-function getOrCreateSwipeHint() {
-    if (swipeHintEl) return swipeHintEl;
-    swipeHintEl = document.createElement('div');
-    swipeHintEl.className = 'swipe-hint';
-    document.body.appendChild(swipeHintEl);
-    return swipeHintEl;
-}
-
-function showSwipeHint() {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    const el = getOrCreateSwipeHint();
-    el.classList.add('visible');
-    if (swipeHintTimer) clearTimeout(swipeHintTimer);
-    swipeHintTimer = setTimeout(() => {
-        el.classList.remove('visible');
-        swipeHintShown = false;
-    }, SWIPE_HINT_TIMEOUT);
-}
-
-function hideSwipeHint() {
-    if (swipeHintEl) swipeHintEl.classList.remove('visible');
-    if (swipeHintTimer) { clearTimeout(swipeHintTimer); swipeHintTimer = null; }
-    swipeHintShown = false;
-}
-
-function triggerNextChapter() {
-    hideSwipeHint();
-    if (currentChapter < chapters.length - 1) {
-        openChapter(currentChapter + 1);
-    }
-}
-
 
 // === ПОСТРОЕНИЕ МАССИВА ГЛАВ ИЗ HTML ===
 const items = document.querySelectorAll('.contents-item');
@@ -316,7 +262,6 @@ function openChapter(index) {
 
 
     setTimeout(() => {
-        hideSwipeHint();
         chapterScreen.classList.remove('whiteout-phase');
         chapterScreen.classList.add('visible');
         chapterScreen.scrollTop = 0;
@@ -1375,145 +1320,3 @@ document.addEventListener('mouseup', () => {
     mouseDown = false;
     if (snowEngine) snowEngine.setTouch(-1000, -1000, false);
 });
-
-/* === SWIPE TO NEXT CHAPTER (v2) === */
-let swipeHintEl = null;
-let swipeHintTimer = null;
-let swipeHintShown = false;
-
-function isChapterAtEnd() {
-    const cs = document.getElementById('chapter-screen');
-    if (!cs) return false;
-    return cs.scrollTop + cs.clientHeight >= cs.scrollHeight - 10;
-}
-
-function getOrCreateSwipeHint() {
-    if (swipeHintEl) return swipeHintEl;
-    swipeHintEl = document.createElement('div');
-    swipeHintEl.className = 'swipe-hint';
-    document.body.appendChild(swipeHintEl);
-    return swipeHintEl;
-}
-
-function showSwipeHint() {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    const el = getOrCreateSwipeHint();
-    el.classList.add('visible');
-    if (swipeHintTimer) clearTimeout(swipeHintTimer);
-    swipeHintTimer = setTimeout(() => {
-        el.classList.remove('visible');
-        swipeHintShown = false;
-    }, 3000);
-}
-
-function hideSwipeHint() {
-    if (swipeHintEl) swipeHintEl.classList.remove('visible');
-    if (swipeHintTimer) { clearTimeout(swipeHintTimer); swipeHintTimer = null; }
-    swipeHintShown = false;
-}
-
-function triggerNextChapter() {
-    hideSwipeHint();
-    if (currentChapter < chapters.length - 1) {
-        openChapter(currentChapter + 1);
-    }
-}
-
-/* === SWIPE TO NEXT CHAPTER (v3) === */
-(function initChapterSwipeV3() {
-    const cs = document.getElementById('chapter-screen');
-    if (!cs) return;
-
-    // Glow-элемент внизу экрана
-    let glowEl = document.querySelector('.swipe-glow');
-    if (!glowEl) {
-        glowEl = document.createElement('div');
-        glowEl.className = 'swipe-glow';
-        document.body.appendChild(glowEl);
-    }
-
-    let startY = 0;
-    let startX = 0;
-    let startTime = 0;
-    let maxDy = 0;
-    let atEnd = false;
-    let firstSwipeConsumed = false;
-
-    function isAtEnd() {
-        return cs.scrollTop + cs.clientHeight >= cs.scrollHeight - 10;
-    }
-
-    function canSwipe() {
-        return cs.classList.contains('visible')
-            && !window.__whiteoutActive
-            && !isMenuOpen
-            && !(photoOverlay && photoOverlay.classList.contains('active'));
-    }
-
-    function triggerGlow() {
-        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-        glowEl.classList.remove('pulse');
-        void glowEl.offsetWidth; // reflow
-        glowEl.classList.add('pulse');
-    }
-
-    function triggerNext() {
-        if (currentChapter < chapters.length - 1) {
-            openChapter(currentChapter + 1);
-        }
-    }
-
-    cs.addEventListener('touchstart', (e) => {
-        if (!canSwipe()) return;
-        const t = e.touches[0];
-        startY = t.clientY;
-        startX = t.clientX;
-        startTime = Date.now();
-        maxDy = 0;
-        atEnd = isAtEnd();
-        firstSwipeConsumed = false;
-    }, { passive: true });
-
-    cs.addEventListener('touchmove', (e) => {
-        if (!canSwipe() || !atEnd) return;
-        const t = e.touches[0];
-        const dy = t.clientY - startY;
-        const dx = t.clientX - startX;
-
-        // Блокируем нативный rubber-band overscroll при свайпе вниз в конце текста
-        if (dy > 10 && dy > Math.abs(dx)) {
-            e.preventDefault();
-            maxDy = Math.max(maxDy, dy);
-        }
-    }, { passive: false });
-
-    cs.addEventListener('touchend', (e) => {
-        if (!canSwipe() || !atEnd) return;
-
-        const dy = e.changedTouches[0].clientY - startY;
-        const dx = e.changedTouches[0].clientX - startX;
-        const duration = Date.now() - startTime;
-
-        // Игнорируем горизонтальные жесты (меню справа-налево)
-        if (Math.abs(dx) > Math.abs(dy) * 1.2) return;
-        // Игнорируем свайпы вверх
-        if (dy <= 0) return;
-
-        // Режим 2: Продолжительный свайп (>80 px)
-        if (maxDy > 80) {
-            triggerNext();
-            return;
-        }
-
-        // Режим 1: Двойной свайп
-        if (dy > 20 && duration < 500) {
-            if (!firstSwipeConsumed) {
-                triggerGlow();
-                firstSwipeConsumed = true;
-            } else {
-                triggerNext();
-            }
-        }
-    }, { passive: true });
-})();
-
