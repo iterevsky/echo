@@ -1060,9 +1060,6 @@ html, body {
     pointer-events: none;
 }
 /* === SWIPE TO NEXT CHAPTER === */
-#chapter-screen {
-    overscroll-behavior-y: none;
-}
 
 .swipe-hint {
     position: fixed;
