@@ -29,8 +29,8 @@ let swipeStartX = 0;
 let swipeStartScrollTop = 0;
 let swipeMaxDy = 0;
 let swipeIsTracking = false;
-const SWIPE_HINT_THRESHOLD = 50;
-const SWIPE_LONG_THRESHOLD = 140;
+const SWIPE_HINT_THRESHOLD = 500;
+const SWIPE_LONG_THRESHOLD = 1400;
 const SWIPE_HINT_TIMEOUT = 2000;
 const MAX_PULL_OFFSET = 24;
 
