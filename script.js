@@ -26,23 +26,15 @@ let swipeHintState = 'idle'; // 'idle' | 'hint-shown'
 let swipeHintTimer = null;
 let swipeStartY = 0;
 let swipeStartX = 0;
-let swipeAnchorY = 0;      // точка, где палец был в момент достижения конца
-let swipeReachedBottom = false;
+let swipeStartScrollTop = 0;
 let swipeMaxDy = 0;
 let swipeIsTracking = false;
-const SWIPE_HINT_THRESHOLD = 310;
-const SWIPE_LONG_THRESHOLD = 510;
+const SWIPE_HINT_THRESHOLD = 50;
+const SWIPE_LONG_THRESHOLD = 140;
 const SWIPE_HINT_TIMEOUT = 2000;
-const BOTTOM_THRESHOLD = 200;
-const MAX_PULL_OFFSET = 20;
+const MAX_PULL_OFFSET = 24;
 
 const swipeHintEl = document.getElementById('swipe-hint');
-
-function isAtBottom() {
-    if (!chapterScreen) return false;
-    const remaining = chapterScreen.scrollHeight - chapterScreen.scrollTop - chapterScreen.clientHeight;
-    return remaining <= BOTTOM_THRESHOLD;
-}
 
 function showSwipeHint() {
     if (!swipeHintEl) return;
@@ -66,8 +58,6 @@ function resetSwipePull() {
 function resetSwipeHint() {
     swipeHintState = 'idle';
     swipeIsTracking = false;
-    swipeReachedBottom = false;
-    swipeAnchorY = 0;
     swipeMaxDy = 0;
     if (swipeHintTimer) {
         clearTimeout(swipeHintTimer);
@@ -98,8 +88,7 @@ function handleChapterTouchStart(e) {
     const t = e.touches[0];
     swipeStartY = t.clientY;
     swipeStartX = t.clientX;
-    swipeAnchorY = 0;
-    swipeReachedBottom = false;
+    swipeStartScrollTop = chapterScreen.scrollTop;
     swipeMaxDy = 0;
     swipeIsTracking = true;
 }
@@ -108,41 +97,35 @@ function handleChapterTouchMove(e) {
     if (!swipeIsTracking) return;
 
     const t = e.touches[0];
-    const totalDy = swipeStartY - t.clientY; // вверх = положительное
+    const rawDy = swipeStartY - t.clientY; // вверх = положительное
     const dx = t.clientX - swipeStartX;
 
     // Палец пошёл вниз или вбок — сброс
-    if (totalDy < 0 || Math.abs(totalDy) < Math.abs(dx) * 1.2) {
+    if (rawDy < 0 || Math.abs(rawDy) < Math.abs(dx) * 1.2) {
         swipeIsTracking = false;
         resetSwipePull();
         return;
     }
 
-    // Ещё не в конце — ничего не делаем, скролл работает нативно
-    if (!isAtBottom()) {
+    // Сколько можно было проскроллить от точки старта до самого конца
+    const maxScroll = chapterScreen.scrollHeight - chapterScreen.clientHeight;
+    const scrollableDy = Math.max(0, maxScroll - swipeStartScrollTop);
+
+    // "Лишнее" движение — только то, что ПОСЛЕ достижения конца
+    const excessDy = Math.max(0, rawDy - scrollableDy);
+
+    if (excessDy <= 0) {
+        // Ещё не в конце — нативный скролл работает
         resetSwipePull();
-        return;
-    }
-
-    // Только что достигли конца? Фиксируем точку
-    if (!swipeReachedBottom) {
-        swipeReachedBottom = true;
-        swipeAnchorY = t.clientY;
-    }
-
-    // Считаем "давление" от точки упора
-    const pullDy = swipeAnchorY - t.clientY;
-    if (pullDy <= 0) {
-        chapterScreen.style.setProperty('--swipe-pull-offset', '0px');
-        chapterScreen.classList.remove('swipe-pulling');
         return;
     }
 
     e.preventDefault();
 
-    swipeMaxDy = Math.max(swipeMaxDy, pullDy);
+    swipeMaxDy = Math.max(swipeMaxDy, excessDy);
 
-    const pullOffset = Math.min(pullDy * 0.2, MAX_PULL_OFFSET);
+    // Сопротивление: контент двигается медленнее пальца (25%)
+    const pullOffset = Math.min(excessDy * 0.25, MAX_PULL_OFFSET);
     chapterScreen.classList.add('swipe-pulling');
     chapterScreen.style.setProperty('--swipe-pull-offset', (-pullOffset) + 'px');
 }
@@ -151,9 +134,6 @@ function handleChapterTouchEnd(e) {
     if (!swipeIsTracking) return;
     swipeIsTracking = false;
     resetSwipePull();
-
-    // Действуем только если достигли конца во время жеста
-    if (!swipeReachedBottom) return;
 
     // Длинный свайп от точки упора — сразу переход
     if (swipeMaxDy >= SWIPE_LONG_THRESHOLD) {
@@ -184,29 +164,6 @@ function initSwipeHandlers() {
     chapterScreen.addEventListener('touchmove', handleChapterTouchMove, { passive: false });
     chapterScreen.addEventListener('touchend', handleChapterTouchEnd, { passive: true });
     chapterScreen.addEventListener('touchcancel', handleChapterTouchCancel, { passive: true });
-}
-
-function cleanupSwipeHandlers() {
-    resetSwipeHint();
-}
-
-function initSwipeHandlers() {
-    if (!chapterScreen) return;
-    chapterScreen.addEventListener('touchstart', handleChapterTouchStart, { passive: true });
-    chapterScreen.addEventListener('touchmove', handleChapterTouchMove, { passive: false });
-    chapterScreen.addEventListener('touchend', handleChapterTouchEnd, { passive: true });
-    chapterScreen.addEventListener('touchcancel', handleChapterTouchCancel, { passive: true });
-}
-
-function cleanupSwipeHandlers() {
-    resetSwipeHint();
-}
-
-function initSwipeHandlers() {
-    if (!chapterScreen) return;
-    chapterScreen.addEventListener('touchstart', handleChapterTouchStart, { passive: true });
-    chapterScreen.addEventListener('touchmove', handleChapterTouchMove, { passive: false });
-    chapterScreen.addEventListener('touchend', handleChapterTouchEnd, { passive: true });
 }
 
 function cleanupSwipeHandlers() {
