@@ -1070,3 +1070,49 @@ html, body {
         text-shadow: none;
     }
 }
+/* === СВАЙП ВНИЗ: ПОДСКАЗКА И ПОДТЯГИВАНИЕ === */
+#swipe-hint {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 4px;
+    background: #00A8E8;
+    box-shadow: 0 0 12px rgba(0, 168, 232, 0.6), 0 0 24px rgba(0, 168, 232, 0.3);
+    opacity: 0;
+    pointer-events: none;
+    z-index: 9;
+    transition: opacity 0.3s ease;
+}
+
+#swipe-hint.visible {
+    opacity: 1;
+    animation: swipe-hint-pulse 1.2s ease-out forwards;
+}
+
+@keyframes swipe-hint-pulse {
+    0%   { opacity: 0; transform: scaleX(0.3); }
+    30%  { opacity: 1; transform: scaleX(1); }
+    100% { opacity: 0; transform: scaleX(1); }
+}
+
+#chapter-screen {
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
+}
+
+#chapter-screen.swipe-pulling .chapter-text {
+    transition: transform 0.1s ease-out;
+    transform: translateY(var(--swipe-pull-offset, 0px));
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #swipe-hint.visible {
+        animation: none;
+        opacity: 0.7;
+    }
+    #chapter-screen.swipe-pulling .chapter-text {
+        transition: none;
+        transform: none;
+    }
+}
