@@ -12,6 +12,7 @@ html, body {
     width: 100%;
     color: #e8e6e3;
     -webkit-tap-highlight-color: transparent;
+    overscroll-behavior-y: none;
 }
 
 /* === ЭКРАН С ОБЛОЖКОЙ === */
@@ -1077,51 +1078,61 @@ html, body {
     bottom: 0;
     left: 0;
     width: 100%;
-    height: 100px;
+    height: 55vh;
     pointer-events: none;
-    z-index: 100;
+    z-index: 9;
     opacity: 0;
     background: linear-gradient(
         to top,
-        rgba(0, 168, 232, 0.22) 0%,
-        rgba(0, 168, 232, 0.08) 35%,
-        transparent 70%
+        rgba(0, 168, 232, 0.18) 0%,
+        rgba(0, 168, 232, 0.06) 45%,
+        transparent 85%
     );
-    filter: blur(2px);
-    transition: opacity 0.5s ease;
+    filter: blur(10px);
+    transition: opacity 0.4s ease;
 }
 
 #swipe-hint.visible {
     opacity: 1;
-    animation: swipe-hint-rise 2s ease-out forwards;
+    animation: swipe-hint-glow 2.4s ease-out forwards;
 }
 
-@keyframes swipe-hint-rise {
+@keyframes swipe-hint-glow {
     0% {
         opacity: 0;
-        transform: translateY(15px) scaleY(0.6);
+        transform: translateY(40px) scaleY(0.6);
     }
     20% {
-        opacity: 0.7;
+        opacity: 0.85;
         transform: translateY(0) scaleY(1);
     }
     50% {
-        opacity: 0.9;
-        transform: translateY(-8px) scaleY(1.05);
-    }
-    80% {
-        opacity: 0.3;
-        transform: translateY(-20px) scaleY(0.9);
+        opacity: 0.45;
+        transform: translateY(-15px) scaleY(1.05);
     }
     100% {
         opacity: 0;
-        transform: translateY(-35px) scaleY(0.6);
+        transform: translateY(-40px) scaleY(0.9);
     }
+}
+
+#chapter-screen {
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
+}
+
+#chapter-screen.swipe-pulling .chapter-text {
+    transition: transform 0.08s ease-out;
+    transform: translateY(var(--swipe-pull-offset, 0px));
 }
 
 @media (prefers-reduced-motion: reduce) {
     #swipe-hint.visible {
         animation: none;
-        opacity: 0.5;
+        opacity: 0.6;
+    }
+    #chapter-screen.swipe-pulling .chapter-text {
+        transition: none;
+        transform: none;
     }
 }
