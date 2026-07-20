@@ -21,27 +21,27 @@ let currentChapter = 0;
 
 const STORAGE_KEY = 'echo_state';
 
-/* === СВАЙП ВНИЗ: ПЕРЕХОД К СЛЕДУЮЩЕЙ ГЛАВЕ === */
+/* === СВАЙП ВВЕРХ: ПЕРЕХОД К СЛЕДУЮЩЕЙ ГЛАВЕ === */
 let swipeHintState = 'idle'; // 'idle' | 'hint-shown'
 let swipeHintTimer = null;
 let swipeStartY = 0;
 let swipeStartX = 0;
 let swipeMaxDy = 0;
 let swipeIsTracking = false;
-const SWIPE_HINT_THRESHOLD = 45;
-const SWIPE_LONG_THRESHOLD = 90;
+const SWIPE_HINT_THRESHOLD = 30;
+const SWIPE_LONG_THRESHOLD = 70;
 const SWIPE_HINT_TIMEOUT = 2000;
-const BOTTOM_THRESHOLD = 30;
+const BOTTOM_THRESHOLD = 120;
 const MAX_PULL_OFFSET = 20;
 
 const swipeHintEl = document.getElementById('swipe-hint');
 
 function isAtBottom() {
     if (!chapterScreen) return false;
-    const st = chapterScreen.scrollTop;
+    const st = Math.round(chapterScreen.scrollTop);
     const sh = chapterScreen.scrollHeight;
     const ch = chapterScreen.clientHeight;
-    return st + ch >= sh - BOTTOM_THRESHOLD;
+    return (st + ch) >= (sh - BOTTOM_THRESHOLD);
 }
 
 function showSwipeHint() {
@@ -56,6 +56,13 @@ function hideSwipeHint() {
     swipeHintEl.classList.remove('visible');
 }
 
+function resetSwipePull() {
+    if (chapterScreen) {
+        chapterScreen.style.setProperty('--swipe-pull-offset', '0px');
+        chapterScreen.classList.remove('swipe-pulling');
+    }
+}
+
 function resetSwipeHint() {
     swipeHintState = 'idle';
     swipeIsTracking = false;
@@ -65,10 +72,7 @@ function resetSwipeHint() {
         swipeHintTimer = null;
     }
     hideSwipeHint();
-    if (chapterScreen) {
-        chapterScreen.style.setProperty('--swipe-pull-offset', '0px');
-        chapterScreen.classList.remove('swipe-pulling');
-    }
+    resetSwipePull();
 }
 
 function goNextChapter() {
@@ -89,8 +93,6 @@ function canSwipe() {
 
 function handleChapterTouchStart(e) {
     if (!canSwipe()) return;
-    if (!isAtBottom()) return;
-
     const t = e.touches[0];
     swipeStartY = t.clientY;
     swipeStartX = t.clientX;
@@ -102,14 +104,20 @@ function handleChapterTouchMove(e) {
     if (!swipeIsTracking) return;
 
     const t = e.touches[0];
-    const dy = t.clientY - swipeStartY;
+    const dy = swipeStartY - t.clientY; // палец ВВЕРХ = положительное
     const dx = t.clientX - swipeStartX;
 
-    // Если пошли вверх или вбок — сбрасываем жест
-    if (dy <= 0 || Math.abs(dy) < Math.abs(dx) * 1.5) {
+    // Если палец пошёл вниз или вбок — сброс
+    if (dy <= 0 || Math.abs(dy) < Math.abs(dx) * 1.2) {
         swipeIsTracking = false;
-        chapterScreen.style.setProperty('--swipe-pull-offset', '0px');
-        chapterScreen.classList.remove('swipe-pulling');
+        resetSwipePull();
+        return;
+    }
+
+    // Только если в конце текста — блокируем скролл и даём feedback
+    if (!isAtBottom()) {
+        swipeIsTracking = false;
+        resetSwipePull();
         return;
     }
 
@@ -117,26 +125,27 @@ function handleChapterTouchMove(e) {
 
     swipeMaxDy = Math.max(swipeMaxDy, dy);
 
+    // Контент чуть-чуть «выталкивается» вверх за пальцем
     const pullOffset = Math.min(dy * 0.15, MAX_PULL_OFFSET);
     chapterScreen.classList.add('swipe-pulling');
-    chapterScreen.style.setProperty('--swipe-pull-offset', pullOffset + 'px');
+    chapterScreen.style.setProperty('--swipe-pull-offset', (-pullOffset) + 'px');
 }
 
 function handleChapterTouchEnd(e) {
     if (!swipeIsTracking) return;
     swipeIsTracking = false;
+    resetSwipePull();
 
-    chapterScreen.style.setProperty('--swipe-pull-offset', '0px');
-    chapterScreen.classList.remove('swipe-pulling');
+    if (!isAtBottom()) return;
 
-    // Продолжительный свайп — переход при отпускании
-    if (swipeMaxDy > SWIPE_LONG_THRESHOLD) {
+    // Длинный свайп вверх — сразу переход
+    if (swipeMaxDy >= SWIPE_LONG_THRESHOLD) {
         goNextChapter();
         return;
     }
 
-    // Короткий свайп — подсказка или переход, если подсказка уже была
-    if (swipeMaxDy > SWIPE_HINT_THRESHOLD) {
+    // Короткий свайп вверх — подсказка или переход
+    if (swipeMaxDy >= SWIPE_HINT_THRESHOLD) {
         if (swipeHintState === 'hint-shown') {
             goNextChapter();
         } else {
@@ -147,11 +156,17 @@ function handleChapterTouchEnd(e) {
     }
 }
 
+function handleChapterTouchCancel(e) {
+    swipeIsTracking = false;
+    resetSwipePull();
+}
+
 function initSwipeHandlers() {
     if (!chapterScreen) return;
     chapterScreen.addEventListener('touchstart', handleChapterTouchStart, { passive: true });
     chapterScreen.addEventListener('touchmove', handleChapterTouchMove, { passive: false });
     chapterScreen.addEventListener('touchend', handleChapterTouchEnd, { passive: true });
+    chapterScreen.addEventListener('touchcancel', handleChapterTouchCancel, { passive: true });
 }
 
 function cleanupSwipeHandlers() {
