@@ -31,7 +31,7 @@ let swipeReachedBottom = false;
 let swipeMaxPull = 0;
 let swipeIsTracking = false;
 
-const SWIPE_RESISTANCE = 0.05;   // тугость: палец 100px → контент 5px
+const SWIPE_RESISTANCE = 0.005;   // тугость: палец 100px → контент 5px
 const SWIPE_HINT_THRESHOLD = 5;  // смещение контента для подсказки
 const SWIPE_LONG_THRESHOLD = 12; // смещение контента для перехода
 const SWIPE_HINT_TIMEOUT = 2000;
