@@ -26,15 +26,24 @@ let swipeHintState = 'idle'; // 'idle' | 'hint-shown'
 let swipeHintTimer = null;
 let swipeStartY = 0;
 let swipeStartX = 0;
-let swipeStartScrollTop = 0;
-let swipeMaxDy = 0;
+let swipeAnchorY = 0;
+let swipeReachedBottom = false;
+let swipeMaxPull = 0;
 let swipeIsTracking = false;
-const SWIPE_HINT_THRESHOLD = 5000;
-const SWIPE_LONG_THRESHOLD = 14000;
+
+const SWIPE_RESISTANCE = 0.05;   // тугость: палец 100px → контент 5px
+const SWIPE_HINT_THRESHOLD = 5;  // смещение контента для подсказки
+const SWIPE_LONG_THRESHOLD = 12; // смещение контента для перехода
 const SWIPE_HINT_TIMEOUT = 2000;
-const MAX_PULL_OFFSET = 240;
+const MAX_PULL_OFFSET = 20;
 
 const swipeHintEl = document.getElementById('swipe-hint');
+
+function isAtBottom() {
+    if (!chapterScreen) return false;
+    const remaining = chapterScreen.scrollHeight - chapterScreen.scrollTop - chapterScreen.clientHeight;
+    return remaining <= 2;
+}
 
 function showSwipeHint() {
     if (!swipeHintEl) return;
@@ -58,7 +67,9 @@ function resetSwipePull() {
 function resetSwipeHint() {
     swipeHintState = 'idle';
     swipeIsTracking = false;
-    swipeMaxDy = 0;
+    swipeReachedBottom = false;
+    swipeAnchorY = 0;
+    swipeMaxPull = 0;
     if (swipeHintTimer) {
         clearTimeout(swipeHintTimer);
         swipeHintTimer = null;
@@ -88,8 +99,9 @@ function handleChapterTouchStart(e) {
     const t = e.touches[0];
     swipeStartY = t.clientY;
     swipeStartX = t.clientX;
-    swipeStartScrollTop = chapterScreen.scrollTop;
-    swipeMaxDy = 0;
+    swipeAnchorY = 0;
+    swipeReachedBottom = false;
+    swipeMaxPull = 0;
     swipeIsTracking = true;
 }
 
@@ -97,7 +109,7 @@ function handleChapterTouchMove(e) {
     if (!swipeIsTracking) return;
 
     const t = e.touches[0];
-    const rawDy = swipeStartY - t.clientY; // вверх = положительное
+    const rawDy = swipeStartY - t.clientY;
     const dx = t.clientX - swipeStartX;
 
     // Палец пошёл вниз или вбок — сброс
@@ -107,25 +119,31 @@ function handleChapterTouchMove(e) {
         return;
     }
 
-    // Сколько можно было проскроллить от точки старта до самого конца
-    const maxScroll = chapterScreen.scrollHeight - chapterScreen.clientHeight;
-    const scrollableDy = Math.max(0, maxScroll - swipeStartScrollTop);
+    // Ещё не в конце — ничего не делаем, скролл нативный
+    if (!isAtBottom()) {
+        resetSwipePull();
+        return;
+    }
 
-    // "Лишнее" движение — только то, что ПОСЛЕ достижения конца
-    const excessDy = Math.max(0, rawDy - scrollableDy);
+    // Только что достигли конца? Фиксируем точку
+    if (!swipeReachedBottom) {
+        swipeReachedBottom = true;
+        swipeAnchorY = t.clientY;
+    }
 
-    if (excessDy <= 0) {
-        // Ещё не в конце — нативный скролл работает
+    // Сколько пальцем «продавили» после упора
+    const dy = swipeAnchorY - t.clientY;
+    if (dy <= 0) {
         resetSwipePull();
         return;
     }
 
     e.preventDefault();
 
-    swipeMaxDy = Math.max(swipeMaxDy, excessDy);
+    // Сопротивление: контент двигается медленнее пальца
+    const pullOffset = Math.min(dy * SWIPE_RESISTANCE, MAX_PULL_OFFSET);
+    swipeMaxPull = Math.max(swipeMaxPull, pullOffset);
 
-    // Сопротивление: контент двигается медленнее пальца (25%)
-    const pullOffset = Math.min(excessDy * 0.25, MAX_PULL_OFFSET);
     chapterScreen.classList.add('swipe-pulling');
     chapterScreen.style.setProperty('--swipe-pull-offset', (-pullOffset) + 'px');
 }
@@ -135,14 +153,17 @@ function handleChapterTouchEnd(e) {
     swipeIsTracking = false;
     resetSwipePull();
 
-    // Длинный свайп от точки упора — сразу переход
-    if (swipeMaxDy >= SWIPE_LONG_THRESHOLD) {
+    // Действуем только если достигли конца во время жеста
+    if (!swipeReachedBottom) return;
+
+    // Длинное давление — сразу переход
+    if (swipeMaxPull >= SWIPE_LONG_THRESHOLD) {
         goNextChapter();
         return;
     }
 
-    // Короткий свайп от точки упора — подсказка или переход
-    if (swipeMaxDy >= SWIPE_HINT_THRESHOLD) {
+    // Короткое давление — подсказка или переход
+    if (swipeMaxPull >= SWIPE_HINT_THRESHOLD) {
         if (swipeHintState === 'hint-shown') {
             goNextChapter();
         } else {
