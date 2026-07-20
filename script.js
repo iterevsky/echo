@@ -31,11 +31,11 @@ let swipeReachedBottom = false;
 let swipeMaxPull = 0;
 let swipeIsTracking = false;
 
-const SWIPE_RESISTANCE = 0.03;   // тугость: палец 100px → контент 5px
+const SWIPE_RESISTANCE = 0.25;   // тугость: палец 100px → контент 5px
 const SWIPE_HINT_THRESHOLD = 5;  // смещение контента для подсказки
-const SWIPE_LONG_THRESHOLD = 15; // смещение контента для перехода
+const SWIPE_LONG_THRESHOLD = 35; // смещение контента для перехода
 const SWIPE_HINT_TIMEOUT = 2000;
-const MAX_PULL_OFFSET = 18;
+const MAX_PULL_OFFSET = 40;
 
 const swipeHintEl = document.getElementById('swipe-hint');
 
