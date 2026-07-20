@@ -1081,7 +1081,7 @@ html, body {
     box-shadow: 0 0 12px rgba(0, 168, 232, 0.6), 0 0 24px rgba(0, 168, 232, 0.3);
     opacity: 0;
     pointer-events: none;
-    z-index: 9;
+    z-index: 12;
     transition: opacity 0.3s ease;
 }
 
