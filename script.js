@@ -21,6 +21,145 @@ let currentChapter = 0;
 
 const STORAGE_KEY = 'echo_state';
 
+/* === СВАЙП ВНИЗ: ПЕРЕХОД К СЛЕДУЮЩЕЙ ГЛАВЕ === */
+let swipeHintState = 'idle'; // 'idle' | 'hint-shown'
+let swipeHintTimer = null;
+let swipeStartY = 0;
+let swipeStartX = 0;
+let swipeCurrentY = 0;
+let swipeCurrentX = 0;
+let swipeIsTracking = false;
+const SWIPE_HINT_THRESHOLD = 45;
+const SWIPE_LONG_THRESHOLD = 90;
+const SWIPE_HINT_TIMEOUT = 2000;
+const BOTTOM_THRESHOLD = 30;
+const MAX_PULL_OFFSET = 20;
+
+const swipeHintEl = document.getElementById('swipe-hint');
+
+function isAtBottom() {
+    if (!chapterScreen) return false;
+    const st = chapterScreen.scrollTop;
+    const sh = chapterScreen.scrollHeight;
+    const ch = chapterScreen.clientHeight;
+    return st + ch >= sh - BOTTOM_THRESHOLD;
+}
+
+function showSwipeHint() {
+    if (!swipeHintEl) return;
+    swipeHintEl.classList.remove('visible');
+    void swipeHintEl.offsetWidth;
+    swipeHintEl.classList.add('visible');
+}
+
+function hideSwipeHint() {
+    if (!swipeHintEl) return;
+    swipeHintEl.classList.remove('visible');
+}
+
+function resetSwipeHint() {
+    swipeHintState = 'idle';
+    if (swipeHintTimer) {
+        clearTimeout(swipeHintTimer);
+        swipeHintTimer = null;
+    }
+    hideSwipeHint();
+    if (chapterScreen) {
+        chapterScreen.style.setProperty('--swipe-pull-offset', '0px');
+        chapterScreen.classList.remove('swipe-pulling');
+    }
+}
+
+function goNextChapter() {
+    resetSwipeHint();
+    if (currentChapter < chapters.length - 1) {
+        openChapter(currentChapter + 1);
+    }
+}
+
+function handleChapterTouchStart(e) {
+    if (!chapterScreen.classList.contains('visible')) return;
+    if (window.__whiteoutActive) return;
+    if (isMenuOpen) return;
+    if (photoOverlay && photoOverlay.classList.contains('active')) return;
+    if (currentChapter >= chapters.length - 1) return;
+
+    const t = e.touches[0];
+    swipeStartY = t.clientY;
+    swipeStartX = t.clientX;
+    swipeCurrentY = t.clientY;
+    swipeCurrentX = t.clientX;
+    swipeIsTracking = true;
+}
+
+function handleChapterTouchMove(e) {
+    if (!swipeIsTracking) return;
+    if (!chapterScreen.classList.contains('visible')) return;
+    if (window.__whiteoutActive) return;
+    if (isMenuOpen) return;
+    if (photoOverlay && photoOverlay.classList.contains('active')) return;
+
+    const t = e.touches[0];
+    swipeCurrentY = t.clientY;
+    swipeCurrentX = t.clientX;
+
+    const dy = swipeCurrentY - swipeStartY;
+    const dx = swipeCurrentX - swipeStartX;
+
+    if (dy <= 0 || Math.abs(dy) < Math.abs(dx) * 1.5) return;
+
+    if (!isAtBottom()) {
+        resetSwipeHint();
+        return;
+    }
+
+    e.preventDefault();
+
+    const pullOffset = Math.min(dy * 0.15, MAX_PULL_OFFSET);
+    chapterScreen.classList.add('swipe-pulling');
+    chapterScreen.style.setProperty('--swipe-pull-offset', pullOffset + 'px');
+
+    if (dy > SWIPE_LONG_THRESHOLD) {
+        goNextChapter();
+        return;
+    }
+
+    if (swipeHintState === 'hint-shown' && dy > SWIPE_HINT_THRESHOLD) {
+        goNextChapter();
+        return;
+    }
+
+    if (swipeHintState === 'idle' && dy > SWIPE_HINT_THRESHOLD) {
+        swipeHintState = 'hint-shown';
+        showSwipeHint();
+        swipeHintTimer = setTimeout(() => resetSwipeHint(), SWIPE_HINT_TIMEOUT);
+    }
+}
+
+function handleChapterTouchEnd(e) {
+    if (!swipeIsTracking) return;
+    swipeIsTracking = false;
+
+    chapterScreen.style.setProperty('--swipe-pull-offset', '0px');
+    chapterScreen.classList.remove('swipe-pulling');
+
+    const dy = swipeCurrentY - swipeStartY;
+    if (swipeHintState !== 'hint-shown' && dy <= SWIPE_HINT_THRESHOLD) {
+        resetSwipeHint();
+    }
+}
+
+function initSwipeHandlers() {
+    if (!chapterScreen) return;
+    chapterScreen.addEventListener('touchstart', handleChapterTouchStart, { passive: true });
+    chapterScreen.addEventListener('touchmove', handleChapterTouchMove, { passive: false });
+    chapterScreen.addEventListener('touchend', handleChapterTouchEnd, { passive: true });
+}
+
+function cleanupSwipeHandlers() {
+    resetSwipeHint();
+}
+
 function loadState() {
     try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; }
     catch (e) { return {}; }
@@ -54,6 +193,7 @@ document.querySelector('.nav-contents').addEventListener('click', () => {
     cleanupSnowObserver();
     cleanupWhiteout();
     cleanupVoiceObserver();
+    cleanupSwipeHandlers();
     chapterScreen.classList.remove('visible');
     if (menuTrigger) menuTrigger.classList.add('visible');
     setTimeout(() => {
@@ -95,6 +235,7 @@ if (e.key === 'Escape') {
     cleanupSnowObserver();
     cleanupWhiteout();
     cleanupVoiceObserver();
+    cleanupSwipeHandlers();
     chapterScreen.classList.remove('visible');
     if (menuTrigger) menuTrigger.classList.add('visible');
         setTimeout(() => contentsScreen.classList.add('visible'), 500);
@@ -221,7 +362,9 @@ function showContents() {
 
 function openChapter(index) {
     if (index < 0 || index >= chapters.length) return;
-
+    
+    resetSwipeHint();
+    
     currentChapter = index;
     const chapter = chapters[index];
 
@@ -1320,3 +1463,5 @@ document.addEventListener('mouseup', () => {
     mouseDown = false;
     if (snowEngine) snowEngine.setTouch(-1000, -1000, false);
 });
+
+initSwipeHandlers();
