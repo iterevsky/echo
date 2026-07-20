@@ -26,8 +26,7 @@ let swipeHintState = 'idle'; // 'idle' | 'hint-shown'
 let swipeHintTimer = null;
 let swipeStartY = 0;
 let swipeStartX = 0;
-let swipeCurrentY = 0;
-let swipeCurrentX = 0;
+let swipeMaxDy = 0;
 let swipeIsTracking = false;
 const SWIPE_HINT_THRESHOLD = 45;
 const SWIPE_LONG_THRESHOLD = 90;
@@ -59,6 +58,8 @@ function hideSwipeHint() {
 
 function resetSwipeHint() {
     swipeHintState = 'idle';
+    swipeIsTracking = false;
+    swipeMaxDy = 0;
     if (swipeHintTimer) {
         clearTimeout(swipeHintTimer);
         swipeHintTimer = null;
@@ -77,63 +78,48 @@ function goNextChapter() {
     }
 }
 
+function canSwipe() {
+    if (!chapterScreen || !chapterScreen.classList.contains('visible')) return false;
+    if (window.__whiteoutActive) return false;
+    if (isMenuOpen) return false;
+    if (photoOverlay && photoOverlay.classList.contains('active')) return false;
+    if (currentChapter >= chapters.length - 1) return false;
+    return true;
+}
+
 function handleChapterTouchStart(e) {
-    if (!chapterScreen.classList.contains('visible')) return;
-    if (window.__whiteoutActive) return;
-    if (isMenuOpen) return;
-    if (photoOverlay && photoOverlay.classList.contains('active')) return;
-    if (currentChapter >= chapters.length - 1) return;
+    if (!canSwipe()) return;
+    if (!isAtBottom()) return;
 
     const t = e.touches[0];
     swipeStartY = t.clientY;
     swipeStartX = t.clientX;
-    swipeCurrentY = t.clientY;
-    swipeCurrentX = t.clientX;
+    swipeMaxDy = 0;
     swipeIsTracking = true;
 }
 
 function handleChapterTouchMove(e) {
     if (!swipeIsTracking) return;
-    if (!chapterScreen.classList.contains('visible')) return;
-    if (window.__whiteoutActive) return;
-    if (isMenuOpen) return;
-    if (photoOverlay && photoOverlay.classList.contains('active')) return;
 
     const t = e.touches[0];
-    swipeCurrentY = t.clientY;
-    swipeCurrentX = t.clientX;
+    const dy = t.clientY - swipeStartY;
+    const dx = t.clientX - swipeStartX;
 
-    const dy = swipeCurrentY - swipeStartY;
-    const dx = swipeCurrentX - swipeStartX;
-
-    if (dy <= 0 || Math.abs(dy) < Math.abs(dx) * 1.5) return;
-
-    if (!isAtBottom()) {
-        resetSwipeHint();
+    // Если пошли вверх или вбок — сбрасываем жест
+    if (dy <= 0 || Math.abs(dy) < Math.abs(dx) * 1.5) {
+        swipeIsTracking = false;
+        chapterScreen.style.setProperty('--swipe-pull-offset', '0px');
+        chapterScreen.classList.remove('swipe-pulling');
         return;
     }
 
     e.preventDefault();
 
+    swipeMaxDy = Math.max(swipeMaxDy, dy);
+
     const pullOffset = Math.min(dy * 0.15, MAX_PULL_OFFSET);
     chapterScreen.classList.add('swipe-pulling');
     chapterScreen.style.setProperty('--swipe-pull-offset', pullOffset + 'px');
-
-    if (dy > SWIPE_LONG_THRESHOLD) {
-        goNextChapter();
-        return;
-    }
-
-    if (swipeHintState === 'hint-shown' && dy > SWIPE_HINT_THRESHOLD) {
-        goNextChapter();
-        return;
-    }
-
-    if (swipeHintState === 'idle' && dy > SWIPE_HINT_THRESHOLD) {
-        swipeHintState = 'hint-shown';
-        showSwipeHint();
-        swipeHintTimer = setTimeout(() => resetSwipeHint(), SWIPE_HINT_TIMEOUT);
-    }
 }
 
 function handleChapterTouchEnd(e) {
@@ -143,10 +129,33 @@ function handleChapterTouchEnd(e) {
     chapterScreen.style.setProperty('--swipe-pull-offset', '0px');
     chapterScreen.classList.remove('swipe-pulling');
 
-    const dy = swipeCurrentY - swipeStartY;
-    if (swipeHintState !== 'hint-shown' && dy <= SWIPE_HINT_THRESHOLD) {
-        resetSwipeHint();
+    // Продолжительный свайп — переход при отпускании
+    if (swipeMaxDy > SWIPE_LONG_THRESHOLD) {
+        goNextChapter();
+        return;
     }
+
+    // Короткий свайп — подсказка или переход, если подсказка уже была
+    if (swipeMaxDy > SWIPE_HINT_THRESHOLD) {
+        if (swipeHintState === 'hint-shown') {
+            goNextChapter();
+        } else {
+            swipeHintState = 'hint-shown';
+            showSwipeHint();
+            swipeHintTimer = setTimeout(() => resetSwipeHint(), SWIPE_HINT_TIMEOUT);
+        }
+    }
+}
+
+function initSwipeHandlers() {
+    if (!chapterScreen) return;
+    chapterScreen.addEventListener('touchstart', handleChapterTouchStart, { passive: true });
+    chapterScreen.addEventListener('touchmove', handleChapterTouchMove, { passive: false });
+    chapterScreen.addEventListener('touchend', handleChapterTouchEnd, { passive: true });
+}
+
+function cleanupSwipeHandlers() {
+    resetSwipeHint();
 }
 
 function initSwipeHandlers() {
@@ -361,9 +370,9 @@ function showContents() {
 }
 
 function openChapter(index) {
+ resetSwipeHint();
     if (index < 0 || index >= chapters.length) return;
-    
-    resetSwipeHint();
+
     
     currentChapter = index;
     const chapter = chapters[index];
