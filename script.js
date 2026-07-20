@@ -32,7 +32,7 @@ let swipeIsTracking = false;
 const SWIPE_HINT_THRESHOLD = 500;
 const SWIPE_LONG_THRESHOLD = 1400;
 const SWIPE_HINT_TIMEOUT = 2000;
-const MAX_PULL_OFFSET = 24;
+const MAX_PULL_OFFSET = 240;
 
 const swipeHintEl = document.getElementById('swipe-hint');
 
