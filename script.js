@@ -1025,3 +1025,41 @@ function initProgress() {
 }
 
 initSwipeHandlers();
+
+/* === CRT: генерация шума === */
+(function() {
+    const el = document.getElementById('crt-noise');
+    if (!el) return;
+
+    const size = 512;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    const imgData = ctx.createImageData(size, size);
+    const data = imgData.data;
+
+    for (let y = 0; y < size; y++) {
+        const lineInt = Math.random();
+        const isBright = lineInt > 0.92;
+        const isMed = lineInt > 0.75 && !isBright;
+
+        for (let x = 0; x < size; x++) {
+            const i = (y * size + x) * 4;
+            let n = Math.random();
+            if (isBright) n = 0.4 + Math.random() * 0.5;
+            else if (isMed) n = 0.15 + Math.random() * 0.3;
+            else n = Math.random() * 0.12;
+
+            if (Math.random() > 0.7) n += Math.random() * 0.15;
+
+            data[i]     = Math.floor(n * 45 + 15);
+            data[i + 1] = Math.floor(n * 90 + 30);
+            data[i + 2] = Math.floor(n * 70 + 25);
+            data[i + 3] = Math.floor(n * 180 + 20);
+        }
+    }
+
+    ctx.putImageData(imgData, 0, 0);
+    el.style.backgroundImage = `url(${canvas.toDataURL('image/png')})`;
+})();
