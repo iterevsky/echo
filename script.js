@@ -1053,10 +1053,10 @@ initSwipeHandlers();
 
             if (Math.random() > 0.7) n += Math.random() * 0.15;
 
-            data[i]     = Math.floor(n * 40 + 10);
-            data[i + 1] = Math.floor(n * 45 + 12);
-            data[i + 2] = Math.floor(n * 40 + 10);
-            data[i + 3] = Math.floor(n * 180 + 20);
+            data[i]     = Math.floor(n * 48 + 14);
+            data[i + 1] = Math.floor(n * 58 + 18);
+            data[i + 2] = Math.floor(n * 44 + 12);
+            data[i + 3] = Math.floor(n * 200 + 30);
         }
     }
 
