@@ -289,7 +289,7 @@ html, body {
   inset: 0;
   background: radial-gradient(
     ellipse at center,
-    rgba(30, 45, 28, 0.10) 0%,
+    rgba(10, 15, 10, 0.10) 0%,
     rgba(8, 14, 8, 0.88) 65%,
     rgba(2, 5, 2, 0.98) 100%
   );
