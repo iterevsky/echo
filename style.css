@@ -269,7 +269,7 @@ html, body {
     left: 0;
     width: 100%;
     height: 100%;
-    background: #000;
+    background: #1f2e1f;
     z-index: 6;
     opacity: 0;
     pointer-events: none;
@@ -283,6 +283,39 @@ html, body {
     pointer-events: all;
 }
 
+/* === CRT ФОНОВЫЕ СЛОИ === */
+.crt-vignette {
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(ellipse at center, rgba(47, 70, 47, 0.25) 0%, rgba(10, 18, 10, 0.85) 70%, rgba(5, 10, 5, 0.95) 100%);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.crt-scanlines {
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.12) 2px,
+    rgba(0, 0, 0, 0.12) 4px
+  );
+  pointer-events: none;
+  z-index: 2;
+}
+
+.crt-noise {
+  position: fixed;
+  inset: 0;
+  background-size: 256px 256px;
+  opacity: 0.55;
+  pointer-events: none;
+  z-index: 2;
+  mix-blend-mode: screen;
+}
+
 .chapter-number {
     font-family: 'PT Serif', serif;
     font-size: 0.75rem;
@@ -290,6 +323,8 @@ html, body {
     letter-spacing: 0.2em;
     text-transform: uppercase;
     margin-bottom: 8px;
+    position: relative;
+    z-index: 8;
 }
 
 .chapter-title {
@@ -298,6 +333,8 @@ html, body {
     color: #e8e6e3;
     margin-bottom: 40px;
     line-height: 1.3;
+    position: relative;
+    z-index: 8;
 }
 
 .chapter-text {
@@ -307,6 +344,8 @@ html, body {
     line-height: 1.8;
     max-width: 640px;
     margin: 0 auto;
+    position: relative;
+    z-index: 8;
 }
 
 .chapter-text p {
@@ -331,7 +370,7 @@ html, body {
     justify-content: space-between;
     align-items: center;
     padding: 20px 24px;
-    background: linear-gradient(to top, #000 60%, transparent);
+    background: linear-gradient(to top, #1f2e1f 55%, transparent);
     font-family: 'PT Serif', serif;
     font-size: 0.85rem;
     color: #6b6b6b;
@@ -956,23 +995,6 @@ html, body {
     opacity: 0.25;
     filter: blur(2px);
     transition: opacity 0.5s ease, filter 0.5s ease;
-}
-
-/* --- Whiteout-абзац (пульсация + подчёркивание) --- */
-.snow-whiteout {
-    cursor: pointer;
-    position: relative;
-    text-shadow:
-        0 0 10px rgba(0,168,232,0.5),
-        0 0 24px rgba(0,168,232,0.25),
-        0 0 48px rgba(0,168,232,0.1);
-    animation:
-        whiteout-pulse-blue 1.4s ease-in-out infinite,
-        whiteout-vibrate 0.08s steps(1) infinite;
-    border-bottom: 1px solid rgba(0,168,232,0.6);
-    display: inline-block;
-    width: fit-content;
-    color: #e8e6e3;
 }
 
 /* === СВАЙП ВВЕРХ: ПОДСКАЗКА === */
