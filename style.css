@@ -287,9 +287,12 @@ html, body {
 .crt-vignette {
   position: fixed;
   inset: 0;
-  background: radial-gradient(ellipse at center, rgba(47, 70, 47, 0.25) 0%, rgba(10, 18, 10, 0.85) 70%, rgba(5, 10, 5, 0.95) 100%);
-  pointer-events: none;
-  z-index: 1;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(30, 45, 28, 0.10) 0%,
+    rgba(8, 14, 8, 0.88) 65%,
+    rgba(2, 5, 2, 0.98) 100%
+  );
 }
 
 .crt-scanlines {
