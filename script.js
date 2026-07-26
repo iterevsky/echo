@@ -1021,3 +1021,5 @@ function initProgress() {
         location.reload();
     });
 }
+
+initSwipeHandlers();
