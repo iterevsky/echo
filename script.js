@@ -108,14 +108,16 @@ function handleChapterTouchMove(e) {
     if (!swipeIsTracking) return;
 
     const t = e.touches[0];
-    const rawDy = swipeStartY - t.clientY;
-    const dx = t.clientX - swipeStartX;
 
-    // Палец пошёл вниз или вбок — сброс
-    if (rawDy < 0 || Math.abs(rawDy) < Math.abs(dx) * 1.2) {
-        swipeIsTracking = false;
-        resetSwipePull();
-        return;
+    // Проверка направления — только пока не достигли дна
+    if (!swipeReachedBottom) {
+        const rawDy = swipeStartY - t.clientY;
+        const dx = t.clientX - swipeStartX;
+        if (rawDy < 0 || Math.abs(rawDy) < Math.abs(dx) * 1.2) {
+            swipeIsTracking = false;
+            resetSwipePull();
+            return;
+        }
     }
 
     // Ещё не в конце — ничего не делаем, скролл нативный
@@ -124,7 +126,7 @@ function handleChapterTouchMove(e) {
         return;
     }
 
-    // Только что достигли конца? Фиксируем точку
+    // Только что достигли конца? Фиксируем точку отсчёта
     if (!swipeReachedBottom) {
         swipeReachedBottom = true;
         swipeAnchorY = t.clientY;
