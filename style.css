@@ -117,59 +117,86 @@ html, body {
 }
 
 @keyframes glitch-to-dark {
-    0% { transform: translate(0); filter: none; opacity: 1; }
-    10% { transform: translate(-2px, 1px); filter: blur(0.3px); opacity: 0.95; }
-    20% { transform: translate(2px, -1px); filter: blur(0.6px); opacity: 0.85; }
-    30% { transform: translate(-1px, -2px); filter: blur(1px); opacity: 0.7; }
-    40% { transform: translate(2px, 2px); filter: blur(2px); opacity: 0.5; }
-    50% { transform: translate(-2px, 0); filter: blur(3px); opacity: 0.3; }
-    60% { transform: translate(1px, -2px); filter: blur(5px); opacity: 0.15; }
-    70% { transform: translate(-1px, 1px); filter: blur(7px); opacity: 0.05; }
-    80% { transform: translate(2px, -1px); filter: blur(9px); opacity: 0; }
-    90% { transform: translate(-2px, 2px); filter: blur(11px); opacity: 0; }
-    100% { transform: translate(0); filter: blur(12px); opacity: 0; }
+    /* Нарастание: сигнал начинает сбоить */
+    0% { transform: translate(0); filter: none; opacity: 1; color: #e8e6e3; text-shadow: none; clip-path: inset(0 0 0 0); }
+    5% { transform: translate(-1px, 0); opacity: 0.96; }
+    10% { transform: translate(1px, 0); opacity: 0.98; text-shadow: 1px 0 rgba(196,30,58,0.25), -1px 0 rgba(0,168,232,0.25); }
+    15% { transform: translate(-1px, 1px); opacity: 0.94; text-shadow: -1px 0 rgba(196,30,58,0.35), 1px 0 rgba(0,168,232,0.35); }
+    20% { transform: translate(1px, -1px); opacity: 0.97; text-shadow: 1px 0 rgba(196,30,58,0.2), -1px 0 rgba(0,168,232,0.2); }
+    25% { transform: translate(-1px, 0); opacity: 0.95; text-shadow: -1px 0 rgba(196,30,58,0.4), 1px 0 rgba(0,168,232,0.4); }
+    30% { transform: translate(0); opacity: 1; text-shadow: none; }
+    
+    /* Разрыв: срезы и сильное RGB-раздвоение */
+    33% { transform: translate(-3px, 1px); opacity: 0.85; clip-path: inset(10% 0 75% 0); }
+    36% { transform: translate(3px, -1px); opacity: 0.9; clip-path: inset(50% 0 30% 0); }
+    39% { transform: translate(-2px, 2px); opacity: 0.82; clip-path: inset(25% 0 55% 0); }
+    42% { transform: translate(4px, 0); opacity: 0.88; clip-path: inset(60% 0 20% 0); }
+    45% { transform: translate(-4px, -1px); opacity: 0.8; clip-path: inset(5% 0 80% 0); }
+    48% { transform: translate(2px, 1px); opacity: 0.86; clip-path: inset(40% 0 40% 0); }
+    51% { transform: translate(-3px, -2px); opacity: 0.78; clip-path: inset(15% 0 65% 0); }
+    54% { transform: translate(3px, 0); opacity: 0.84; clip-path: inset(70% 0 10% 0); }
+    57% { transform: translate(-2px, 1px); opacity: 0.8; clip-path: inset(30% 0 50% 0); }
+    60% { transform: translate(0); opacity: 1; clip-path: inset(0 0 0 0); }
+    
+    /* Зависание: застрявший кадр */
+    63% { transform: translate(4px, -1px); opacity: 0.75; clip-path: inset(20% 0 60% 0); }
+    66% { transform: translate(4px, -1px); opacity: 0.75; clip-path: inset(20% 0 60% 0); }
+    69% { transform: translate(4px, -1px); opacity: 0.75; clip-path: inset(20% 0 60% 0); }
+    72% { transform: translate(4px, -1px); opacity: 0.75; clip-path: inset(20% 0 60% 0); }
+    
+    /* Затухание: сигнал уходит в тишину */
+    78% { transform: translate(-1px, 0); filter: blur(2px); opacity: 0.45; color: #e8e6e3; }
+    84% { transform: translate(2px, 1px); filter: blur(6px); opacity: 0.18; color: #c41e3a; }
+    90% { transform: translate(-2px, -1px); filter: blur(10px); opacity: 0.04; color: #c41e3a; }
+    100% { transform: translate(0); filter: blur(12px); opacity: 0; color: #e8e6e3; }
 }
 
 @keyframes glitch-channel-red {
-    0%, 18% { opacity: 0; clip-path: inset(0 0 0 0); transform: translateX(-2px); }
-    20% { opacity: 0.75; clip-path: inset(10% 0 75% 0); transform: translateX(-4px); }
-    23% { opacity: 0.35; clip-path: inset(50% 0 30% 0); transform: translateX(-1px); }
-    27% { opacity: 0.8; clip-path: inset(20% 0 60% 0); transform: translateX(-5px); }
-    32% { opacity: 0.25; clip-path: inset(60% 0 15% 0); transform: translateX(-2px); }
-    38% { opacity: 0.7; clip-path: inset(5% 0 80% 0); transform: translateX(-6px); }
-    45% { opacity: 0.2; clip-path: inset(40% 0 40% 0); transform: translateX(-1px); }
-    52% { opacity: 0.55; clip-path: inset(15% 0 65% 0); transform: translateX(-4px); }
-    60% { opacity: 0.1; clip-path: inset(70% 0 10% 0); transform: translateX(-2px); }
-    68% { opacity: 0.4; clip-path: inset(30% 0 50% 0); transform: translateX(-5px); }
-    78% { opacity: 0; transform: translateX(-2px); }
-    100% { opacity: 0; clip-path: inset(0 0 0 0); transform: translateX(-2px); }
+    0%, 30% { opacity: 0; clip-path: inset(0 0 0 0); transform: translateX(-2px); }
+    33% { opacity: 0.5; clip-path: inset(10% 0 75% 0); transform: translateX(-5px); }
+    36% { opacity: 0.8; clip-path: inset(50% 0 30% 0); transform: translateX(-3px); }
+    39% { opacity: 0.4; clip-path: inset(25% 0 55% 0); transform: translateX(-6px); }
+    42% { opacity: 0.75; clip-path: inset(60% 0 20% 0); transform: translateX(-2px); }
+    45% { opacity: 0.3; clip-path: inset(5% 0 80% 0); transform: translateX(-7px); }
+    48% { opacity: 0.7; clip-path: inset(40% 0 40% 0); transform: translateX(-4px); }
+    51% { opacity: 0.25; clip-path: inset(15% 0 65% 0); transform: translateX(-6px); }
+    54% { opacity: 0.65; clip-path: inset(70% 0 10% 0); transform: translateX(-3px); }
+    57% { opacity: 0.35; clip-path: inset(30% 0 50% 0); transform: translateX(-5px); }
+    60% { opacity: 0.8; clip-path: inset(45% 0 35% 0); transform: translateX(-2px); }
+    63%, 72% { opacity: 0.75; clip-path: inset(20% 0 60% 0); transform: translateX(-6px); }
+    78% { opacity: 0.3; clip-path: inset(40% 0 40% 0); transform: translateX(-3px); }
+    84% { opacity: 0.1; clip-path: inset(60% 0 20% 0); transform: translateX(-2px); }
+    90%, 100% { opacity: 0; clip-path: inset(0 0 0 0); transform: translateX(-2px); }
 }
 
 @keyframes glitch-channel-cyan {
-    0%, 16% { opacity: 0; clip-path: inset(0 0 0 0); transform: translateX(2px); }
-    19% { opacity: 0.65; clip-path: inset(45% 0 35% 0); transform: translateX(5px); }
-    22% { opacity: 0.3; clip-path: inset(5% 0 80% 0); transform: translateX(1px); }
-    26% { opacity: 0.75; clip-path: inset(65% 0 15% 0); transform: translateX(4px); }
-    31% { opacity: 0.2; clip-path: inset(25% 0 55% 0); transform: translateX(6px); }
-    37% { opacity: 0.7; clip-path: inset(55% 0 25% 0); transform: translateX(2px); }
-    44% { opacity: 0.15; clip-path: inset(10% 0 70% 0); transform: translateX(5px); }
-    51% { opacity: 0.5; clip-path: inset(35% 0 45% 0); transform: translateX(1px); }
-    59% { opacity: 0.1; clip-path: inset(75% 0 10% 0); transform: translateX(4px); }
-    67% { opacity: 0.35; clip-path: inset(15% 0 60% 0); transform: translateX(6px); }
-    76% { opacity: 0; transform: translateX(2px); }
-    100% { opacity: 0; clip-path: inset(0 0 0 0); transform: translateX(2px); }
+    0%, 30% { opacity: 0; clip-path: inset(0 0 0 0); transform: translateX(2px); }
+    33% { opacity: 0.45; clip-path: inset(45% 0 35% 0); transform: translateX(5px); }
+    36% { opacity: 0.75; clip-path: inset(5% 0 80% 0); transform: translateX(3px); }
+    39% { opacity: 0.35; clip-path: inset(65% 0 15% 0); transform: translateX(6px); }
+    42% { opacity: 0.7; clip-path: inset(25% 0 55% 0); transform: translateX(2px); }
+    45% { opacity: 0.28; clip-path: inset(55% 0 25% 0); transform: translateX(7px); }
+    48% { opacity: 0.65; clip-path: inset(10% 0 70% 0); transform: translateX(4px); }
+    51% { opacity: 0.22; clip-path: inset(35% 0 45% 0); transform: translateX(6px); }
+    54% { opacity: 0.6; clip-path: inset(75% 0 10% 0); transform: translateX(3px); }
+    57% { opacity: 0.3; clip-path: inset(15% 0 60% 0); transform: translateX(5px); }
+    60% { opacity: 0.75; clip-path: inset(40% 0 40% 0); transform: translateX(2px); }
+    63%, 72% { opacity: 0.7; clip-path: inset(20% 0 60% 0); transform: translateX(6px); }
+    78% { opacity: 0.25; clip-path: inset(50% 0 30% 0); transform: translateX(3px); }
+    84% { opacity: 0.08; clip-path: inset(70% 0 10% 0); transform: translateX(2px); }
+    90%, 100% { opacity: 0; clip-path: inset(0 0 0 0); transform: translateX(2px); }
 }
 
 .glitching .glitch-base {
-    animation: glitch-to-dark 2s ease forwards;
+    animation: glitch-to-dark 3.8s ease forwards;
 }
 
 .glitching .glitch-red {
-    animation: glitch-channel-red 2s ease forwards;
+    animation: glitch-channel-red 3.8s ease forwards;
 }
 
 .glitching .glitch-cyan {
-    animation: glitch-channel-cyan 2s ease forwards;
+    animation: glitch-channel-cyan 3.8s ease forwards;
 }
 
 /* === ФИНАЛЬНЫЙ ТЁМНЫЙ ЭКРАН === */
@@ -188,6 +215,15 @@ html, body {
 
 #final-screen.visible {
     opacity: 1;
+}
+
+@keyframes final-flash {
+    0%, 100% { background: #000; box-shadow: none; }
+    50% { background: #0a0a0a; box-shadow: inset 0 0 120px rgba(0, 168, 232, 0.06); }
+}
+
+.final-flash {
+    animation: final-flash 0.15s ease-out forwards;
 }
 
 /* === ЭКРАН С НАЗВАНИЕМ === */
@@ -283,7 +319,7 @@ html, body {
     gap: 12px;
     opacity: 0;
     transform: translateY(8px);
-    transition: color 0.4s ease, border-color 0.4s ease, opacity 0.6s ease, transform 0.6s ease;
+    transition: color 0.4s ease, border-color 0.4s ease;
 }
 
 .contents-item .dot {
@@ -304,9 +340,17 @@ html, body {
     background: #00A8E8;
 }
 
+@keyframes contents-item-reveal {
+    0%   { opacity: 0; transform: translateY(4px); filter: blur(1px); }
+    20%  { opacity: 0.3; transform: translateY(2px); filter: blur(0.5px); }
+    40%  { opacity: 0.85; transform: translateY(-1px); filter: none; }
+    60%  { opacity: 0.5; transform: translateY(1px); }
+    80%  { opacity: 0.95; transform: translateY(0); }
+    100% { opacity: 1; transform: translateY(0); filter: none; }
+}
+
 .contents-item.revealed {
-    opacity: 1;
-    transform: translateY(0);
+    animation: contents-item-reveal 0.35s steps(1) forwards;
 }
 
 /* === УТИЛИТЫ === */
@@ -408,6 +452,46 @@ html, body {
 @keyframes crt-roll {
     from { transform: translateY(-100%); }
     to { transform: translateY(100vh); }
+}
+
+/* === CRT внутри главы: только статичные слои === */
+#chapter-screen .crt-noise {
+    animation: none;
+    opacity: 0.18;
+}
+
+#chapter-screen .crt-rolling {
+    display: none;
+}
+
+#chapter-screen .crt-vignette {
+    opacity: 0.75;
+}
+
+/* === CRT в оглавлении: полная анимация === */
+#contents-screen .crt-vignette,
+#contents-screen .crt-scanlines,
+#contents-screen .crt-noise,
+#contents-screen .crt-rolling {
+    display: block;
+}
+
+#contents-screen .crt-noise {
+    opacity: 0.45;
+    animation: crt-noise-shift 0.4s steps(1) infinite;
+}
+
+#contents-screen .crt-rolling {
+    opacity: 1;
+}
+
+#contents-screen .crt-vignette {
+    opacity: 1;
+}
+
+#contents-screen .contents-list {
+    position: relative;
+    z-index: 3;
 }
 
 .chapter-number {

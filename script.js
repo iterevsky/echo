@@ -348,13 +348,13 @@ function startSequence() {
             setTimeout(() => {
                 glitchText.classList.remove('blinking');
 
-                // 4. Глитч с затуханием в тьму — 2 секунды
+                // 4. Глитч с затуханием в тьму — 3.8 секунды
                 glitchText.classList.add('glitching');
 
                 // Затухаем text-screen параллельно с глитчем
                 setTimeout(() => {
                     textScreen.style.opacity = '0';
-                }, 1200);
+                }, 3000);
 
                 // После окончания глитча — чёрный экран
                 setTimeout(() => {
@@ -363,6 +363,8 @@ function startSequence() {
 
                     // Показываем финальный чёрный экран
                     finalScreen.classList.add('visible');
+                    finalScreen.classList.add('final-flash');
+                    setTimeout(() => finalScreen.classList.remove('final-flash'), 150);
 
                     // 5. Через 1.5 секунды — показываем название
                     setTimeout(() => {
@@ -377,7 +379,7 @@ function startSequence() {
 
                     }, 1500);
 
-                }, 2000); // глитч длится 2 секунды
+                }, 3800); // глитч длится 3.8 секунды
 
             }, 1800); // мигание
 
@@ -1059,8 +1061,8 @@ initSwipeHandlers();
 
 /* === CRT: генерация шума и бегущей развёртки === */
 (function() {
-    const el = document.getElementById('crt-noise');
-    if (el) {
+    const noiseElements = document.querySelectorAll('.crt-noise');
+    if (noiseElements.length > 0) {
         const size = 512;
         const canvas = document.createElement('canvas');
         canvas.width = size;
@@ -1091,7 +1093,10 @@ initSwipeHandlers();
         }
 
         ctx.putImageData(imgData, 0, 0);
-        el.style.backgroundImage = `url(${canvas.toDataURL('image/png')})`;
+        const dataUrl = canvas.toDataURL('image/png');
+        noiseElements.forEach(el => {
+            el.style.backgroundImage = `url(${dataUrl})`;
+        });
     }
 
     const chapterScreen = document.getElementById('chapter-screen');
