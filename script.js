@@ -6,6 +6,33 @@ const titleScreen = document.getElementById('title-screen');
 const contentsScreen = document.getElementById('contents-screen');
 const chapterScreen = document.getElementById('chapter-screen');
 
+/* === ПОДГОТОВКА СТРУКТУРЫ ГЛИТЧ-ТЕКСТА === */
+(function initGlitchText() {
+    if (!glitchText) return;
+    const text = glitchText.textContent.trim();
+    if (!text) return;
+
+    glitchText.innerHTML = '';
+
+    const base = document.createElement('span');
+    base.className = 'glitch-base';
+    base.textContent = text;
+
+    const red = document.createElement('span');
+    red.className = 'glitch-red';
+    red.textContent = text;
+    red.setAttribute('aria-hidden', 'true');
+
+    const cyan = document.createElement('span');
+    cyan.className = 'glitch-cyan';
+    cyan.textContent = text;
+    cyan.setAttribute('aria-hidden', 'true');
+
+    glitchText.appendChild(base);
+    glitchText.appendChild(red);
+    glitchText.appendChild(cyan);
+})();
+
 let isStarted = false;
 let touchStartX = 0;
 
@@ -13,7 +40,6 @@ const menuTrigger = document.getElementById('menu-trigger');
 const menuOverlay = document.getElementById('menu-overlay');
 const menuClose = document.getElementById('menu-close');
 const donateCopyBtn = document.getElementById('donate-copy');
-const donateCard = document.getElementById('donate-card');
 
 let isMenuOpen = false;
 
@@ -201,7 +227,6 @@ function saveState(patch) {
     Object.assign(s, patch);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
 }
-const state = loadState();
 
 // === ПОСТРОЕНИЕ МАССИВА ГЛАВ ИЗ HTML ===
 const items = document.querySelectorAll('.contents-item');
@@ -535,50 +560,111 @@ if (photoOverlay) {
 /* === МЕХАНИЧЕСКИЙ ГОЛОС: РАНДОМНАЯ АНИМАЦИЯ И ОТСЛЕЖИВАНИЕ === */
 let voiceObserver = null;
 
+function createVoiceSpan(cls, text) {
+    const span = document.createElement('span');
+    span.className = cls;
+    span.textContent = text;
+    span.setAttribute('aria-hidden', 'true');
+    return span;
+}
+
+function prepareVoiceElement(el) {
+    let text = el.dataset.voiceText;
+    if (!text) {
+        text = el.textContent.trim();
+        el.dataset.voiceText = text;
+    }
+    el.innerHTML = '';
+    el.setAttribute('aria-label', text);
+    return text;
+}
+
 function generateAggressiveGlitch(el) {
+    const text = prepareVoiceElement(el);
     const animId = 'voice-glitch-' + Math.random().toString(36).substr(2, 9);
-    
-    const palettes = [
-        ['#ff0040', '#00A8E8'],
-        ['#c41e3a', '#00A8E8'],
-        ['#ff6b00', '#0040ff'],
-        ['#9b59b6', '#2ecc71'],
-        ['#e74c3c', '#3498db'],
-        ['#ff0000', '#00ffff'],
-        ['#ff3366', '#33ccff']
-    ];
-    const [c1, c2] = palettes[Math.floor(Math.random() * palettes.length)];
-    const maxShift = 2 + Math.floor(Math.random() * 3);
-    const maxSkew = 2 + Math.floor(Math.random() * 4);
     const duration = (2.4 + Math.random() * 2.6).toFixed(2);
+    const steps = 16;
     
-    const steps = 20;
-    let frames = '';
+    const base = document.createElement('span');
+    base.className = 'voice-base';
+    base.textContent = text;
+    
+    const red = createVoiceSpan('voice-red', text);
+    const cyan = createVoiceSpan('voice-cyan', text);
+    const slice1 = createVoiceSpan('voice-slice', text);
+    const slice2 = createVoiceSpan('voice-slice', text);
+    
+    el.appendChild(base);
+    el.appendChild(red);
+    el.appendChild(cyan);
+    el.appendChild(slice1);
+    el.appendChild(slice2);
+    
+    const c1 = '#c41e3a';
+    const c2 = '#00A8E8';
+    let baseFrames = '';
+    let redFrames = '';
+    let cyanFrames = '';
+    let slice1Frames = '';
+    let slice2Frames = '';
+    
     for (let i = 0; i <= steps; i++) {
         const pct = Math.round((i / steps) * 100);
-        const tx = (Math.random() > 0.5 ? 1 : -1) * Math.floor(Math.random() * maxShift + 1);
-        const ty = (Math.random() > 0.5 ? 1 : -1) * Math.floor(Math.random() * 3);
-        const sk = (Math.random() > 0.5 ? 1 : -1) * Math.floor(Math.random() * maxSkew + 1);
+        
+        const tx = (Math.random() > 0.5 ? 1 : -1) * Math.floor(Math.random() * 3 + 1);
+        const ty = (Math.random() > 0.5 ? 1 : -1) * Math.floor(Math.random() * 2);
+        const sk = (Math.random() > 0.5 ? 1 : -1) * Math.floor(Math.random() * 4 + 1);
         const op = (0.5 + Math.random() * 0.5).toFixed(2);
-        const sc = (0.95 + Math.random() * 0.10).toFixed(2);
         const br = (0.6 + Math.random() * 0.8).toFixed(2);
-        const bl = Math.random() > 0.5 ? (Math.random() * 2).toFixed(1) : 0;
         const hasShadow = Math.random() > 0.25;
         const ts = hasShadow 
-            ? `${Math.floor(Math.random()*4+1)}px 0 ${c1}, -${Math.floor(Math.random()*4+1)}px 0 ${c2}`
+            ? `${Math.floor(Math.random()*3+1)}px 0 ${c1}, -${Math.floor(Math.random()*3+1)}px 0 ${c2}`
             : 'none';
+        baseFrames += `            ${pct}% { transform: translate(${tx}px, ${ty}px) skewX(${sk}deg); opacity: ${op}; text-shadow: ${ts}; filter: brightness(${br}); }\n`;
         
-        frames += `            ${pct}% { transform: translate(${tx}px, ${ty}px) skewX(${sk}deg) scale(${sc}); opacity: ${op}; text-shadow: ${ts}; filter: brightness(${br}) blur(${bl}px); }\n`;
+        const redClip = Math.random() > 0.35 
+            ? `inset(${Math.floor(Math.random()*70)}% 0 ${Math.floor(Math.random()*70)}% 0)` 
+            : 'inset(0 0 0 0)';
+        const redTx = -2 - Math.floor(Math.random() * 5);
+        const redOp = Math.random() > 0.45 ? (0.4 + Math.random() * 0.6).toFixed(2) : 0;
+        redFrames += `            ${pct}% { opacity: ${redOp}; clip-path: ${redClip}; transform: translateX(${redTx}px); }\n`;
+        
+        const cyanClip = Math.random() > 0.35 
+            ? `inset(${Math.floor(Math.random()*70)}% 0 ${Math.floor(Math.random()*70)}% 0)` 
+            : 'inset(0 0 0 0)';
+        const cyanTx = 2 + Math.floor(Math.random() * 5);
+        const cyanOp = Math.random() > 0.45 ? (0.4 + Math.random() * 0.6).toFixed(2) : 0;
+        cyanFrames += `            ${pct}% { opacity: ${cyanOp}; clip-path: ${cyanClip}; transform: translateX(${cyanTx}px); }\n`;
+        
+        const slice1Clip = `inset(${Math.floor(Math.random()*80)}% 0 ${Math.floor(Math.random()*10)}% 0)`;
+        const slice1Tx = (Math.random() > 0.5 ? 1 : -1) * Math.floor(Math.random() * 5 + 2);
+        const slice1Op = Math.random() > 0.5 ? (0.3 + Math.random() * 0.5).toFixed(2) : 0;
+        slice1Frames += `            ${pct}% { opacity: ${slice1Op}; clip-path: ${slice1Clip}; transform: translateX(${slice1Tx}px); }\n`;
+        
+        const slice2Clip = `inset(${Math.floor(Math.random()*10)}% 0 ${Math.floor(Math.random()*80)}% 0)`;
+        const slice2Tx = (Math.random() > 0.5 ? 1 : -1) * Math.floor(Math.random() * 5 + 2);
+        const slice2Op = Math.random() > 0.5 ? (0.3 + Math.random() * 0.5).toFixed(2) : 0;
+        slice2Frames += `            ${pct}% { opacity: ${slice2Op}; clip-path: ${slice2Clip}; transform: translateX(${slice2Tx}px); }\n`;
     }
     
-    const keyframes = `@keyframes ${animId} {\n${frames}        }`;
+    const keyframes = `
+        @keyframes ${animId} { ${baseFrames} }
+        @keyframes ${animId}-red { ${redFrames} }
+        @keyframes ${animId}-cyan { ${cyanFrames} }
+        @keyframes ${animId}-slice1 { ${slice1Frames} }
+        @keyframes ${animId}-slice2 { ${slice2Frames} }
+    `;
     
     const style = document.createElement('style');
     style.textContent = keyframes;
     style.dataset.voiceGlitch = animId;
     document.head.appendChild(style);
     
-    el.style.animation = `${animId} ${duration}s steps(1) forwards`;
+    base.style.animation = `${animId} ${duration}s steps(1) forwards`;
+    red.style.animation = `${animId}-red ${duration}s steps(1) forwards`;
+    cyan.style.animation = `${animId}-cyan ${duration}s steps(1) forwards`;
+    slice1.style.animation = `${animId}-slice1 ${duration}s steps(1) forwards`;
+    slice2.style.animation = `${animId}-slice2 ${duration}s steps(1) forwards`;
     
     // Ударная волна
     const parentP = el.closest('p');
@@ -601,71 +687,35 @@ function generateAggressiveGlitch(el) {
     }
     
     setTimeout(() => {
-        el.style.animation = '';
+        base.style.animation = '';
+        red.style.animation = '';
+        cyan.style.animation = '';
+        slice1.style.animation = '';
+        slice2.style.animation = '';
         if (style.parentNode) style.remove();
     }, parseFloat(duration) * 1000);
 }
 
 function generateStandardGlitch(el) {
+    const text = prepareVoiceElement(el);
     const animId = 'voice-standard-' + Math.random().toString(36).substr(2, 9);
+    const duration = (2.4 + Math.random() * 2.6).toFixed(2);
+    const steps = 12;
     
-    // Те же RGB-палитры, что у aggressive
-    const palettes = [
-        ['#ff0040', '#00A8E8'],
-        ['#c41e3a', '#00A8E8'],
-        ['#ff6b00', '#0040ff'],
-        ['#9b59b6', '#2ecc71'],
-        ['#e74c3c', '#3498db'],
-        ['#ff0000', '#00ffff'],
-        ['#ff3366', '#33ccff']
-    ];
-    const [c1, c2] = palettes[Math.floor(Math.random() * palettes.length)];
+    const base = document.createElement('span');
+    base.className = 'voice-base';
+    base.textContent = text;
+    el.appendChild(base);
     
-    // Ослабленные параметры
-    const maxShift = 1 + Math.floor(Math.random() * 2);   // 1–2px (было 2–4)
-    const maxSkew = 1 + Math.floor(Math.random() * 2);    // 1–2deg (было 2–5)
-    const duration = (2.4 + Math.random() * 2.6).toFixed(2); // та же длительность
-    
-    const steps = 20;
     let frames = '';
-    
     for (let i = 0; i <= steps; i++) {
         const pct = Math.round((i / steps) * 100);
-        
-        // Микро-сдвиги
-        const tx = (Math.random() > 0.5 ? 1 : -1) * Math.floor(Math.random() * maxShift + 1);
-        const ty = (Math.random() > 0.5 ? 1 : -1) * Math.floor(Math.random() * 2);
-        const sk = (Math.random() > 0.5 ? 1 : -1) * Math.floor(Math.random() * maxSkew + 1);
-        
-        // Opacity: в основном высокая, иногда провал
-        const op = (0.6 + Math.random() * 0.4).toFixed(2);
-        
-        // Scale почти 1.0
-        const sc = (0.98 + Math.random() * 0.04).toFixed(2);
-        
-        // Яркость
-        const br = (0.8 + Math.random() * 0.4).toFixed(2);
-        
-        // Blur лёгкий
-        const bl = Math.random() > 0.6 ? (Math.random() * 1.5).toFixed(1) : 0;
-        
-        // === КЛЮЧЕВОЕ: цвет ===
-        // В 60% кадров — белый текст (как обычный)
-        // В 40% — цветная вспышка (как aggressive)
-        const colorRoll = Math.random();
-        let color, ts;
-        
-        if (colorRoll < 0.6) {
-            // Белый/светлый — базовый текст
-            color = '#e8e6e3';
-            ts = 'none';
-        } else {
-            // Цветная вспышка — глитч
-            color = Math.random() > 0.5 ? c1 : c2;
-            ts = `${Math.floor(Math.random()*3+1)}px 0 ${c2}, -${Math.floor(Math.random()*3+1)}px 0 ${c1}`;
-        }
-        
-        frames += `            ${pct}% { transform: translate(${tx}px, ${ty}px) skewX(${sk}deg) scale(${sc}); opacity: ${op}; color: ${color}; text-shadow: ${ts}; filter: brightness(${br}) blur(${bl}px); }\n`;
+        const hasShadow = Math.random() > 0.4;
+        const ts = hasShadow
+            ? `${Math.floor(Math.random()*2+1)}px 0 #c41e3a, -${Math.floor(Math.random()*2+1)}px 0 #00A8E8`
+            : 'none';
+        const op = (0.85 + Math.random() * 0.15).toFixed(2);
+        frames += `            ${pct}% { text-shadow: ${ts}; opacity: ${op}; }\n`;
     }
     
     const keyframes = `@keyframes ${animId} {\n${frames}        }`;
@@ -675,47 +725,34 @@ function generateStandardGlitch(el) {
     style.dataset.voiceGlitch = animId;
     document.head.appendChild(style);
     
-    // steps(1) — мигание, как у aggressive
-    el.style.animation = `${animId} ${duration}s steps(1) forwards`;
-    
-    // БЕЗ ударной волны
-    // БЕЗ вибрации
+    base.style.animation = `${animId} ${duration}s steps(1) forwards`;
     
     setTimeout(() => {
-        el.style.animation = '';
+        base.style.animation = '';
         if (style.parentNode) style.remove();
     }, parseFloat(duration) * 1000);
 }
 
 function generateWhisperGlitch(el) {
+    const text = prepareVoiceElement(el);
     const animId = 'voice-whisper-' + Math.random().toString(36).substr(2, 9);
+    const duration = (3.0 + Math.random() * 2.0).toFixed(2);
+    const steps = 14;
     
-    const duration = (3.0 + Math.random() * 2.0).toFixed(2); // 3.0–5.0 с
+    const base = document.createElement('span');
+    base.className = 'voice-base';
+    base.textContent = text;
+    el.appendChild(base);
     
-    // 12 очень мягких кадров
-    const steps = 12;
     let frames = '';
-    
     for (let i = 0; i <= steps; i++) {
         const pct = Math.round((i / steps) * 100);
-        
-        // Пульсация opacity: 0.15–0.65 (полупрозрачный, как шёпот)
         const op = (0.15 + Math.random() * 0.5).toFixed(2);
-        
-        // Микро-дрожание: max 0.5px
         const tx = (Math.random() > 0.5 ? 1 : -1) * (Math.random() * 0.5).toFixed(2);
-        
-        // letter-spacing: иногда расширяется, как будто слова разваливаются
-        const ls = Math.random() > 0.7 ? (Math.random() * 0.03).toFixed(3) : 0;
-        
-        // blur: 0–2px (размытость шёпота)
-        const bl = (Math.random() * 2.0).toFixed(2);
-        
-        // Цвет: почти исчезающий
-        const colors = ['#8a8680', '#6b6760', '#9a9690', '#b8b5b0'];
-        const color = colors[Math.floor(Math.random() * colors.length)];
-        
-        frames += `            ${pct}% { transform: translateX(${tx}px); opacity: ${op}; color: ${color}; letter-spacing: ${ls}em; filter: blur(${bl}px); }\n`;
+        const sx = (1.01 + Math.random() * 0.02).toFixed(3);
+        const bl = (Math.random() * 1.0).toFixed(2);
+        const br = (0.9 + Math.random() * 0.25).toFixed(2);
+        frames += `            ${pct}% { transform: translateX(${tx}px) scaleX(${sx}); opacity: ${op}; filter: blur(${bl}px) brightness(${br}); }\n`;
     }
     
     const keyframes = `@keyframes ${animId} {\n${frames}        }`;
@@ -725,13 +762,10 @@ function generateWhisperGlitch(el) {
     style.dataset.voiceGlitch = animId;
     document.head.appendChild(style);
     
-    el.style.animation = `${animId} ${duration}s ease-in-out forwards`;
-    
-    // БЕЗ ударной волны
-    // БЕЗ вибрации
+    base.style.animation = `${animId} ${duration}s ease-in-out forwards`;
     
     setTimeout(() => {
-        el.style.animation = '';
+        base.style.animation = '';
         if (style.parentNode) style.remove();
     }, parseFloat(duration) * 1000);
 }
@@ -769,14 +803,6 @@ function initVoiceObserver() {
             if (entry.isIntersecting && !entry.target.dataset.voiceTriggered) {
                 entry.target.dataset.voiceTriggered = 'true';
                 generateGlitchAnimation(entry.target);
-                
-// Вибрация только для агрессивного режима
-if (entry.target.dataset.voiceMode !== 'standard' && 
-    entry.target.dataset.voiceMode !== 'whisper' &&
-    navigator.vibrate) {
-    navigator.vibrate([30, 60, 30]);
-}
-
             }
         });
     }, options);
@@ -795,6 +821,11 @@ function cleanupVoiceObserver() {
     document.querySelectorAll('.voice-glitch').forEach(el => {
         el.style.animation = '';
         delete el.dataset.voiceTriggered;
+        if (el.dataset.voiceText) {
+            el.textContent = el.dataset.voiceText;
+            delete el.dataset.voiceText;
+        }
+        el.removeAttribute('aria-label');
     });
 }
 
@@ -1026,40 +1057,47 @@ function initProgress() {
 
 initSwipeHandlers();
 
-/* === CRT: генерация шума === */
+/* === CRT: генерация шума и бегущей развёртки === */
 (function() {
     const el = document.getElementById('crt-noise');
-    if (!el) return;
+    if (el) {
+        const size = 512;
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        const imgData = ctx.createImageData(size, size);
+        const data = imgData.data;
 
-    const size = 512;
-    const canvas = document.createElement('canvas');
-    canvas.width = size;
-    canvas.height = size;
-    const ctx = canvas.getContext('2d');
-    const imgData = ctx.createImageData(size, size);
-    const data = imgData.data;
+        for (let y = 0; y < size; y++) {
+            const lineInt = Math.random();
+            const isBright = lineInt > 0.92;
+            const isMed = lineInt > 0.75 && !isBright;
 
-    for (let y = 0; y < size; y++) {
-        const lineInt = Math.random();
-        const isBright = lineInt > 0.92;
-        const isMed = lineInt > 0.75 && !isBright;
+            for (let x = 0; x < size; x++) {
+                const i = (y * size + x) * 4;
+                let n = Math.random();
+                if (isBright) n = 0.4 + Math.random() * 0.5;
+                else if (isMed) n = 0.15 + Math.random() * 0.3;
+                else n = Math.random() * 0.12;
 
-        for (let x = 0; x < size; x++) {
-            const i = (y * size + x) * 4;
-            let n = Math.random();
-            if (isBright) n = 0.4 + Math.random() * 0.5;
-            else if (isMed) n = 0.15 + Math.random() * 0.3;
-            else n = Math.random() * 0.12;
+                if (Math.random() > 0.7) n += Math.random() * 0.15;
 
-            if (Math.random() > 0.7) n += Math.random() * 0.15;
-
-            data[i]     = Math.floor(n * 48 + 14);
-            data[i + 1] = Math.floor(n * 58 + 18);
-            data[i + 2] = Math.floor(n * 44 + 12);
-            data[i + 3] = Math.floor(n * 200 + 30);
+                data[i]     = Math.floor(n * 48 + 14);
+                data[i + 1] = Math.floor(n * 58 + 18);
+                data[i + 2] = Math.floor(n * 44 + 12);
+                data[i + 3] = Math.floor(n * 200 + 30);
+            }
         }
+
+        ctx.putImageData(imgData, 0, 0);
+        el.style.backgroundImage = `url(${canvas.toDataURL('image/png')})`;
     }
 
-    ctx.putImageData(imgData, 0, 0);
-    el.style.backgroundImage = `url(${canvas.toDataURL('image/png')})`;
+    const chapterScreen = document.getElementById('chapter-screen');
+    if (chapterScreen && !chapterScreen.querySelector('.crt-rolling')) {
+        const rolling = document.createElement('div');
+        rolling.className = 'crt-rolling';
+        chapterScreen.appendChild(rolling);
+    }
 })();
