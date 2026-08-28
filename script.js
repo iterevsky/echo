@@ -416,10 +416,26 @@ function showContents() {
 }
 
 function openChapter(index) {
- resetSwipeHint();
+    const tearOverlay = document.getElementById('tear-overlay');
+    const chScreen = document.getElementById('chapter-screen');
+    if (tearOverlay && chScreen) {
+        tearOverlay.style.display = 'block';
+        tearOverlay.querySelector('.tear-top').style.animation = 'tear-top-shift 0.12s steps(1) forwards';
+        tearOverlay.querySelector('.tear-bottom').style.animation = 'tear-bottom-shift 0.12s steps(1) forwards';
+        tearOverlay.querySelector('.tear-line').style.animation = 'tear-line-fly 0.1s linear forwards';
+        chScreen.classList.add('tear-flash');
+
+        setTimeout(() => {
+            chScreen.classList.remove('tear-flash');
+            tearOverlay.style.display = 'none';
+            tearOverlay.querySelectorAll('*').forEach(el => el.style.animation = '');
+        }, 150);
+    }
+
+    resetSwipeHint();
     if (index < 0 || index >= chapters.length) return;
 
-    
+
     currentChapter = index;
     const chapter = chapters[index];
 
@@ -556,6 +572,17 @@ if (photoOverlay) {
 
     // Запускаем цикл
     setInterval(triggerGlitch, INTERVAL_MS);
+
+    // Аналоговый просад: кратковременное «плывущее» искажение всего оглавления
+    function triggerAnalogDrop() {
+        if (!contentsScreen.classList.contains('visible')) return;
+        contentsScreen.classList.add('analog-drop');
+        setTimeout(() => {
+            contentsScreen.classList.remove('analog-drop');
+        }, 200);
+    }
+
+    setInterval(triggerAnalogDrop, 25000 + Math.random() * 15000);
 })();
 
                           
@@ -582,120 +609,132 @@ function prepareVoiceElement(el) {
 }
 
 function generateAggressiveGlitch(el) {
-    const text = prepareVoiceElement(el);
-    const animId = 'voice-glitch-' + Math.random().toString(36).substr(2, 9);
-    const duration = (2.4 + Math.random() * 2.6).toFixed(2);
-    const steps = 16;
-    
-    const base = document.createElement('span');
-    base.className = 'voice-base';
-    base.textContent = text;
-    
-    const red = createVoiceSpan('voice-red', text);
-    const cyan = createVoiceSpan('voice-cyan', text);
-    const slice1 = createVoiceSpan('voice-slice', text);
-    const slice2 = createVoiceSpan('voice-slice', text);
-    
-    el.appendChild(base);
-    el.appendChild(red);
-    el.appendChild(cyan);
-    el.appendChild(slice1);
-    el.appendChild(slice2);
-    
-    const c1 = '#c41e3a';
-    const c2 = '#00A8E8';
-    let baseFrames = '';
-    let redFrames = '';
-    let cyanFrames = '';
-    let slice1Frames = '';
-    let slice2Frames = '';
-    
-    for (let i = 0; i <= steps; i++) {
-        const pct = Math.round((i / steps) * 100);
-        
-        const tx = (Math.random() > 0.5 ? 1 : -1) * Math.floor(Math.random() * 3 + 1);
-        const ty = (Math.random() > 0.5 ? 1 : -1) * Math.floor(Math.random() * 2);
-        const sk = (Math.random() > 0.5 ? 1 : -1) * Math.floor(Math.random() * 4 + 1);
-        const op = (0.5 + Math.random() * 0.5).toFixed(2);
-        const br = (0.6 + Math.random() * 0.8).toFixed(2);
-        const hasShadow = Math.random() > 0.25;
-        const ts = hasShadow 
-            ? `${Math.floor(Math.random()*3+1)}px 0 ${c1}, -${Math.floor(Math.random()*3+1)}px 0 ${c2}`
-            : 'none';
-        baseFrames += `            ${pct}% { transform: translate(${tx}px, ${ty}px) skewX(${sk}deg); opacity: ${op}; text-shadow: ${ts}; filter: brightness(${br}); }\n`;
-        
-        const redClip = Math.random() > 0.35 
-            ? `inset(${Math.floor(Math.random()*70)}% 0 ${Math.floor(Math.random()*70)}% 0)` 
-            : 'inset(0 0 0 0)';
-        const redTx = -2 - Math.floor(Math.random() * 5);
-        const redOp = Math.random() > 0.45 ? (0.4 + Math.random() * 0.6).toFixed(2) : 0;
-        redFrames += `            ${pct}% { opacity: ${redOp}; clip-path: ${redClip}; transform: translateX(${redTx}px); }\n`;
-        
-        const cyanClip = Math.random() > 0.35 
-            ? `inset(${Math.floor(Math.random()*70)}% 0 ${Math.floor(Math.random()*70)}% 0)` 
-            : 'inset(0 0 0 0)';
-        const cyanTx = 2 + Math.floor(Math.random() * 5);
-        const cyanOp = Math.random() > 0.45 ? (0.4 + Math.random() * 0.6).toFixed(2) : 0;
-        cyanFrames += `            ${pct}% { opacity: ${cyanOp}; clip-path: ${cyanClip}; transform: translateX(${cyanTx}px); }\n`;
-        
-        const slice1Clip = `inset(${Math.floor(Math.random()*80)}% 0 ${Math.floor(Math.random()*10)}% 0)`;
-        const slice1Tx = (Math.random() > 0.5 ? 1 : -1) * Math.floor(Math.random() * 5 + 2);
-        const slice1Op = Math.random() > 0.5 ? (0.3 + Math.random() * 0.5).toFixed(2) : 0;
-        slice1Frames += `            ${pct}% { opacity: ${slice1Op}; clip-path: ${slice1Clip}; transform: translateX(${slice1Tx}px); }\n`;
-        
-        const slice2Clip = `inset(${Math.floor(Math.random()*10)}% 0 ${Math.floor(Math.random()*80)}% 0)`;
-        const slice2Tx = (Math.random() > 0.5 ? 1 : -1) * Math.floor(Math.random() * 5 + 2);
-        const slice2Op = Math.random() > 0.5 ? (0.3 + Math.random() * 0.5).toFixed(2) : 0;
-        slice2Frames += `            ${pct}% { opacity: ${slice2Op}; clip-path: ${slice2Clip}; transform: translateX(${slice2Tx}px); }\n`;
+    const chapterScreen = document.getElementById('chapter-screen');
+
+    if (chapterScreen) {
+        chapterScreen.classList.add('xray-flash');
     }
-    
-    const keyframes = `
-        @keyframes ${animId} { ${baseFrames} }
-        @keyframes ${animId}-red { ${redFrames} }
-        @keyframes ${animId}-cyan { ${cyanFrames} }
-        @keyframes ${animId}-slice1 { ${slice1Frames} }
-        @keyframes ${animId}-slice2 { ${slice2Frames} }
-    `;
-    
-    const style = document.createElement('style');
-    style.textContent = keyframes;
-    style.dataset.voiceGlitch = animId;
-    document.head.appendChild(style);
-    
-    base.style.animation = `${animId} ${duration}s steps(1) forwards`;
-    red.style.animation = `${animId}-red ${duration}s steps(1) forwards`;
-    cyan.style.animation = `${animId}-cyan ${duration}s steps(1) forwards`;
-    slice1.style.animation = `${animId}-slice1 ${duration}s steps(1) forwards`;
-    slice2.style.animation = `${animId}-slice2 ${duration}s steps(1) forwards`;
-    
-    // Ударная волна
-    const parentP = el.closest('p');
-    if (parentP) {
-        const prev = parentP.previousElementSibling;
-        const next = parentP.nextElementSibling;
-        if (prev && prev.tagName === 'P') {
-            prev.classList.add('voice-shock-prev');
-            setTimeout(() => prev.classList.remove('voice-shock-prev'), 700);
-        }
-        if (next && next.tagName === 'P') {
-            next.classList.add('voice-shock-next');
-            setTimeout(() => next.classList.remove('voice-shock-next'), 700);
-        }
-    }
-    
-    // Вибрация
-    if (navigator.vibrate) {
-        navigator.vibrate([30, 60, 30]);
-    }
-    
+
     setTimeout(() => {
-        base.style.animation = '';
-        red.style.animation = '';
-        cyan.style.animation = '';
-        slice1.style.animation = '';
-        slice2.style.animation = '';
-        if (style.parentNode) style.remove();
-    }, parseFloat(duration) * 1000);
+        if (chapterScreen) {
+            chapterScreen.classList.remove('xray-flash');
+        }
+
+        const text = prepareVoiceElement(el);
+        const animId = 'voice-glitch-' + Math.random().toString(36).substr(2, 9);
+        const duration = (2.4 + Math.random() * 2.6).toFixed(2);
+        const steps = 16;
+
+        const base = document.createElement('span');
+        base.className = 'voice-base';
+        base.textContent = text;
+
+        const red = createVoiceSpan('voice-red', text);
+        const cyan = createVoiceSpan('voice-cyan', text);
+        const slice1 = createVoiceSpan('voice-slice', text);
+        const slice2 = createVoiceSpan('voice-slice', text);
+
+        el.appendChild(base);
+        el.appendChild(red);
+        el.appendChild(cyan);
+        el.appendChild(slice1);
+        el.appendChild(slice2);
+
+        const c1 = '#c41e3a';
+        const c2 = '#00A8E8';
+        let baseFrames = '';
+        let redFrames = '';
+        let cyanFrames = '';
+        let slice1Frames = '';
+        let slice2Frames = '';
+
+        for (let i = 0; i <= steps; i++) {
+            const pct = Math.round((i / steps) * 100);
+
+            const tx = (Math.random() > 0.5 ? 1 : -1) * Math.floor(Math.random() * 3 + 1);
+            const ty = (Math.random() > 0.5 ? 1 : -1) * Math.floor(Math.random() * 2);
+            const sk = (Math.random() > 0.5 ? 1 : -1) * Math.floor(Math.random() * 4 + 1);
+            const op = (0.5 + Math.random() * 0.5).toFixed(2);
+            const br = (0.6 + Math.random() * 0.8).toFixed(2);
+            const hasShadow = Math.random() > 0.25;
+            const ts = hasShadow
+                ? `${Math.floor(Math.random()*3+1)}px 0 ${c1}, -${Math.floor(Math.random()*3+1)}px 0 ${c2}`
+                : 'none';
+            baseFrames += `            ${pct}% { transform: translate(${tx}px, ${ty}px) skewX(${sk}deg); opacity: ${op}; text-shadow: ${ts}; filter: brightness(${br}); }\n`;
+
+            const redClip = Math.random() > 0.35
+                ? `inset(${Math.floor(Math.random()*70)}% 0 ${Math.floor(Math.random()*70)}% 0)`
+                : 'inset(0 0 0 0)';
+            const redTx = -2 - Math.floor(Math.random() * 5);
+            const redOp = Math.random() > 0.45 ? (0.4 + Math.random() * 0.6).toFixed(2) : 0;
+            redFrames += `            ${pct}% { opacity: ${redOp}; clip-path: ${redClip}; transform: translateX(${redTx}px); }\n`;
+
+            const cyanClip = Math.random() > 0.35
+                ? `inset(${Math.floor(Math.random()*70)}% 0 ${Math.floor(Math.random()*70)}% 0)`
+                : 'inset(0 0 0 0)';
+            const cyanTx = 2 + Math.floor(Math.random() * 5);
+            const cyanOp = Math.random() > 0.45 ? (0.4 + Math.random() * 0.6).toFixed(2) : 0;
+            cyanFrames += `            ${pct}% { opacity: ${cyanOp}; clip-path: ${cyanClip}; transform: translateX(${cyanTx}px); }\n`;
+
+            const slice1Clip = `inset(${Math.floor(Math.random()*80)}% 0 ${Math.floor(Math.random()*10)}% 0)`;
+            const slice1Tx = (Math.random() > 0.5 ? 1 : -1) * Math.floor(Math.random() * 5 + 2);
+            const slice1Op = Math.random() > 0.5 ? (0.3 + Math.random() * 0.5).toFixed(2) : 0;
+            slice1Frames += `            ${pct}% { opacity: ${slice1Op}; clip-path: ${slice1Clip}; transform: translateX(${slice1Tx}px); }\n`;
+
+            const slice2Clip = `inset(${Math.floor(Math.random()*10)}% 0 ${Math.floor(Math.random()*80)}% 0)`;
+            const slice2Tx = (Math.random() > 0.5 ? 1 : -1) * Math.floor(Math.random() * 5 + 2);
+            const slice2Op = Math.random() > 0.5 ? (0.3 + Math.random() * 0.5).toFixed(2) : 0;
+            slice2Frames += `            ${pct}% { opacity: ${slice2Op}; clip-path: ${slice2Clip}; transform: translateX(${slice2Tx}px); }\n`;
+        }
+
+        const keyframes = `
+            @keyframes ${animId} { ${baseFrames} }
+            @keyframes ${animId}-red { ${redFrames} }
+            @keyframes ${animId}-cyan { ${cyanFrames} }
+            @keyframes ${animId}-slice1 { ${slice1Frames} }
+            @keyframes ${animId}-slice2 { ${slice2Frames} }
+        `;
+
+        const style = document.createElement('style');
+        style.textContent = keyframes;
+        style.dataset.voiceGlitch = animId;
+        document.head.appendChild(style);
+
+        base.style.animation = `${animId} ${duration}s steps(1) forwards`;
+        red.style.animation = `${animId}-red ${duration}s steps(1) forwards`;
+        cyan.style.animation = `${animId}-cyan ${duration}s steps(1) forwards`;
+        slice1.style.animation = `${animId}-slice1 ${duration}s steps(1) forwards`;
+        slice2.style.animation = `${animId}-slice2 ${duration}s steps(1) forwards`;
+
+        // Ударная волна
+        const parentP = el.closest('p');
+        if (parentP) {
+            const prev = parentP.previousElementSibling;
+            const next = parentP.nextElementSibling;
+            if (prev && prev.tagName === 'P') {
+                prev.classList.add('voice-shock-prev');
+                setTimeout(() => prev.classList.remove('voice-shock-prev'), 700);
+            }
+            if (next && next.tagName === 'P') {
+                next.classList.add('voice-shock-next');
+                setTimeout(() => next.classList.remove('voice-shock-next'), 700);
+            }
+        }
+
+        // Вибрация
+        if (navigator.vibrate) {
+            navigator.vibrate([30, 60, 30]);
+        }
+
+        setTimeout(() => {
+            base.style.animation = '';
+            red.style.animation = '';
+            cyan.style.animation = '';
+            slice1.style.animation = '';
+            slice2.style.animation = '';
+            if (style.parentNode) style.remove();
+        }, parseFloat(duration) * 1000);
+    }, 70);
 }
 
 function generateStandardGlitch(el) {
