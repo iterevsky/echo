@@ -395,6 +395,7 @@ function startSequence() {
 }
 
 function showContents() {
+    titleScreen.classList.remove('film-enter');
     // Буквы растают
     titleScreen.classList.add('melting');
 
@@ -1347,6 +1348,8 @@ function runFilmSequence() {
     const setFrame = (i) => {
         filmImage.src = FILM_FRAMES[i];
         if (filmHalo) filmHalo.src = FILM_FRAMES[i];
+        filmImage.style.setProperty('--frame-hue', (Math.random() * 10 - 8).toFixed(1) + 'deg');
+        filmImage.style.setProperty('--frame-bright', (Math.random() * 0.05 - 0.02).toFixed(3));
     };
 
     /* хроматический разрыв: красный и циановый клоны кадра */
@@ -1398,9 +1401,9 @@ function runFilmSequence() {
         filmScreen.classList.remove('visible');
         await sleep(330);
         if (finished) return;
-        titleScreen.classList.add('visible');
         titleScreen.classList.add('film-enter');
-        setTimeout(() => titleScreen.classList.remove('film-enter'), 750);
+        void titleScreen.offsetWidth;
+        titleScreen.classList.add('visible');
         endToTitle();
     };
 
