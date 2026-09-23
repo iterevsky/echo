@@ -301,6 +301,270 @@ html, body {
     animation: author-breathe 5.5s ease-in-out 1.5s infinite;
 }
 
+/* === ПРОЕКТОРНАЯ ПЛЁНКА === */
+#film-screen {
+    position: fixed;
+    inset: 0;
+    height: 100vh;
+    height: 100dvh;
+    background: #000;
+    z-index: 3;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+}
+
+#film-screen.visible {
+    opacity: 1;
+}
+
+/* окно проектора: чёрная колодка по периметру */
+.film-gate {
+    position: absolute;
+    inset: 0;
+    padding: 2.5vmin;
+    background: #000;
+}
+
+.film-image {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 1.5vmin;
+    transform: scale(1.03);
+    -webkit-user-drag: none;
+    user-select: none;
+}
+
+/* внутренняя виньетка окна кадра */
+.film-gate::after {
+    content: '';
+    position: absolute;
+    inset: 2.5vmin;
+    border-radius: 1.5vmin;
+    background: radial-gradient(ellipse at center, transparent 52%, rgba(0, 0, 0, 0.5) 100%);
+    pointer-events: none;
+    z-index: 3;
+}
+
+/* перфорационные полосы по краям */
+.film-rail {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 3.5%;
+    background-color: #0a0a0a;
+    background-image: radial-gradient(50% 42% at 50% 50%, #141414 62%, transparent 63%);
+    background-size: 100% 4.5%;
+    opacity: 0.85;
+    z-index: 4;
+    pointer-events: none;
+}
+
+.film-rail-left { left: 0; }
+.film-rail-right { right: 0; }
+
+/* зерно плёнки */
+.film-grain {
+    position: absolute;
+    inset: 0;
+    background-size: 256px 256px;
+    opacity: 0.22;
+    mix-blend-mode: screen;
+    pointer-events: none;
+    z-index: 5;
+}
+
+#film-screen.film-live .film-grain {
+    animation: film-grain-shift 0.35s steps(1) infinite;
+}
+
+@keyframes film-grain-shift {
+    0% { background-position: 0 0; }
+    20% { background-position: -64px 32px; }
+    40% { background-position: 32px -96px; }
+    60% { background-position: -96px -32px; }
+    80% { background-position: 64px 64px; }
+    100% { background-position: 0 0; }
+}
+
+/* царапина на плёнке */
+.film-scratch {
+    position: absolute;
+    top: 0;
+    width: 1px;
+    height: 100%;
+    background: linear-gradient(to bottom, transparent, rgba(232, 230, 227, 0.55) 15%, rgba(232, 230, 227, 0.55) 85%, transparent);
+    z-index: 6;
+    pointer-events: none;
+    opacity: 0;
+}
+
+.film-scratch.run {
+    animation: film-scratch-fly 0.5s linear forwards;
+}
+
+@keyframes film-scratch-fly {
+    0% { transform: translateY(-10%); opacity: 0; }
+    15% { opacity: 0.8; }
+    85% { opacity: 0.8; }
+    100% { transform: translateY(110%); opacity: 0; }
+}
+
+/* клоны кадра для хроматического разрыва */
+.film-clone {
+    position: absolute;
+    inset: 2.5vmin;
+    width: auto;
+    height: auto;
+    object-fit: cover;
+    border-radius: 1.5vmin;
+    transform: scale(1.03);
+    opacity: 0.5;
+    mix-blend-mode: screen;
+    pointer-events: none;
+    -webkit-user-drag: none;
+    user-select: none;
+    z-index: 2;
+}
+
+/* механическое дрожание плёнки */
+.filming .film-image {
+    animation: film-jitter 0.9s ease-in-out infinite;
+}
+
+@keyframes film-jitter {
+    0% { transform: translate(-2px, -1px) rotate(-0.1deg) scale(1.03); }
+    25% { transform: translate(1px, 1px) rotate(0.12deg) scale(1.03); }
+    50% { transform: translate(2px, -1px) rotate(-0.08deg) scale(1.03); }
+    75% { transform: translate(-1px, 1px) rotate(0.1deg) scale(1.03); }
+    100% { transform: translate(-2px, -1px) rotate(-0.1deg) scale(1.03); }
+}
+
+/* мерцание кадра */
+.film-flick {
+    animation: film-flick 90ms linear;
+}
+
+@keyframes film-flick {
+    0% { filter: brightness(1); }
+    30% { filter: brightness(0.82); }
+    60% { filter: brightness(1.05); }
+    100% { filter: brightness(1); }
+}
+
+/* прошивка кадра (кадры 3–5) */
+.film-tear .film-image {
+    animation: film-tear 200ms steps(1);
+}
+
+.film-tear.film-zoom .film-image {
+    animation: film-tear 200ms steps(1), film-zoom 500ms ease-in-out;
+}
+
+@keyframes film-tear {
+    0% { clip-path: inset(0); filter: brightness(1); }
+    20% { clip-path: inset(12% 0 8% 0); filter: brightness(0.75); }
+    40% { clip-path: inset(6% 0 14% 0); filter: brightness(0.75); }
+    60% { clip-path: inset(0); filter: brightness(1); }
+    100% { clip-path: inset(0); filter: brightness(1); }
+}
+
+/* zoom-пульс смены кадра */
+.film-zoom .film-image {
+    animation: film-zoom 500ms ease-in-out;
+}
+
+@keyframes film-zoom {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.04); }
+    100% { transform: scale(1.03); }
+}
+
+/* удар кадра 6 */
+.film-hit .film-image {
+    animation: film-hit 300ms ease-out;
+}
+
+@keyframes film-hit {
+    0% { transform: scale(1.03); filter: brightness(1); }
+    50% { transform: scale(1.09); filter: brightness(1.15); }
+    100% { transform: scale(1.03); filter: brightness(1); }
+}
+
+/* проскок плёнки */
+.film-slip {
+    animation: film-slip 140ms ease-in-out;
+}
+
+@keyframes film-slip {
+    0% { transform: translateY(0); }
+    43% { transform: translateY(8px); }
+    100% { transform: translateY(0); }
+}
+
+/* чёрные провалы между кадрами */
+.film-gap .film-image {
+    opacity: 0;
+}
+
+/* обрыв ленты в финале */
+.film-break-half {
+    pointer-events: none;
+}
+
+.film-break-top {
+    animation: film-break-top 100ms steps(1) forwards;
+}
+
+.film-break-bottom {
+    animation: film-break-bottom 100ms steps(1) forwards;
+}
+
+@keyframes film-break-top {
+    0% { transform: translateY(0); }
+    100% { transform: translateY(-10px); }
+}
+
+@keyframes film-break-bottom {
+    0% { transform: translateY(0); }
+    100% { transform: translateY(10px); }
+}
+
+/* тихая ветка для reduced-motion */
+#film-screen.reduced {
+    transition: opacity 0.8s ease;
+}
+
+#film-screen.reduced .film-image {
+    transition: opacity 0.8s ease;
+}
+
+#film-screen.reduced .film-grain {
+    opacity: 0.1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .filming .film-image,
+    .film-flick,
+    .film-tear .film-image,
+    .film-tear.film-zoom .film-image,
+    .film-zoom .film-image,
+    .film-hit .film-image,
+    .film-slip,
+    .film-scratch.run,
+    .film-break-top,
+    .film-break-bottom {
+        animation: none !important;
+    }
+
+    #film-screen.film-live .film-grain {
+        animation: none;
+        opacity: 0.1;
+    }
+}
+
 /* === ЭКРАН С ОГЛАВЛЕНИЕМ === */
 #contents-screen {
     position: fixed;

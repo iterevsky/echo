@@ -366,10 +366,16 @@ function startSequence() {
                     finalScreen.classList.add('final-flash');
                     setTimeout(() => finalScreen.classList.remove('final-flash'), 150);
 
-                    // 5. Через 1.5 секунды — показываем название
+                    // 5. Через 1.5 секунды — плёнка или название
                     setTimeout(() => {
                         // Затухаем чёрный экран
                         finalScreen.classList.remove('visible');
+
+                        // Эпизод проекторной плёнки (только если все кадры загрузились)
+                        if (filmReady) {
+                            runFilmSequence();
+                            return;
+                        }
 
                         // Показываем название
                         titleScreen.classList.add('visible');
@@ -1145,3 +1151,307 @@ initSwipeHandlers();
         chapterScreen.appendChild(rolling);
     }
 })();
+
+/* ============================================================
+   ПРОЕКТОРНАЯ ПЛЁНКА: ЭПИЗОД МЕЖДУ ВСПЫШКОЙ И НАЗВАНИЕМ
+   ============================================================ */
+
+const FILM_FRAMES = [
+    'images/frame/frame-01.jpg',
+    'images/frame/frame-02.jpg',
+    'images/frame/frame-03.jpg',
+    'images/frame/frame-04.jpg',
+    'images/frame/frame-05.jpg',
+    'images/frame/frame-06.jpg',
+    'images/frame/frame-07.jpg'
+];
+
+const filmScreen = document.getElementById('film-screen');
+const filmGate = filmScreen ? filmScreen.querySelector('.film-gate') : null;
+const filmImage = filmGate ? filmGate.querySelector('.film-image') : null;
+const filmGrain = filmScreen ? filmScreen.querySelector('.film-grain') : null;
+
+let filmReady = false;
+let filmRunning = false;
+
+function preloadFilmFrames() {
+    return Promise.all(FILM_FRAMES.map((src) => new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+            if (img.decode) {
+                img.decode().then(() => resolve(true)).catch(() => resolve(false));
+            } else {
+                resolve(true);
+            }
+        };
+        img.onerror = () => resolve(false);
+        img.src = src;
+    }))).then((results) => results.every(Boolean));
+}
+
+/* зерно: текстура генерируется на canvas, по образцу CRT-шума */
+function buildFilmGrain() {
+    if (!filmGrain) return;
+    const size = 256;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    const imgData = ctx.createImageData(size, size);
+    const data = imgData.data;
+
+    for (let y = 0; y < size; y++) {
+        const lineInt = Math.random();
+        const isBright = lineInt > 0.965;
+        const isMed = lineInt > 0.87 && !isBright;
+
+        for (let x = 0; x < size; x++) {
+            const i = (y * size + x) * 4;
+            let n = Math.random();
+            if (isBright) n = 0.4 + Math.random() * 0.4;
+            else if (isMed) n = 0.12 + Math.random() * 0.2;
+            else n = Math.random() * 0.14;
+
+            if (Math.random() > 0.72) n += Math.random() * 0.18;
+
+            const v = Math.floor(Math.min(n, 1) * 255);
+            data[i] = v;
+            data[i + 1] = v;
+            data[i + 2] = v;
+            data[i + 3] = Math.floor(n * 220 + 25);
+        }
+    }
+
+    ctx.putImageData(imgData, 0, 0);
+    filmGrain.style.backgroundImage = `url(${canvas.toDataURL('image/png')})`;
+}
+
+buildFilmGrain();
+preloadFilmFrames().then((ok) => { filmReady = ok; });
+
+function runFilmSequence() {
+    if (filmRunning || !filmScreen || !filmGate || !filmImage) return;
+    filmRunning = true;
+
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const timers = [];
+    const clones = [];
+    let finished = false;
+
+    const later = (fn, ms) => {
+        const id = setTimeout(fn, ms);
+        timers.push(id);
+        return id;
+    };
+    const clearAllTimers = () => {
+        timers.forEach((id) => clearTimeout(id));
+        timers.length = 0;
+    };
+    const removeClones = () => {
+        clones.forEach((el) => { if (el.parentNode) el.parentNode.removeChild(el); });
+        clones.length = 0;
+    };
+
+    const onVisibilityHidden = () => {
+        if (document.hidden) endToTitle();
+    };
+
+    /* выход из серии: снять классы, таймеры, клоны; довести до названия */
+    const endToTitle = () => {
+        if (finished) return;
+        finished = true;
+        clearAllTimers();
+        document.removeEventListener('visibilitychange', onVisibilityHidden);
+
+        filmScreen.classList.remove('film-live');
+        filmScreen.classList.remove('visible');
+        filmGate.classList.remove('filming', 'film-flick', 'film-tear', 'film-zoom', 'film-slip', 'film-gap');
+        filmGate.style.visibility = '';
+        filmGate.style.clipPath = '';
+        filmGate.style.webkitClipPath = '';
+        filmGate.style.transition = '';
+        filmImage.style.opacity = '';
+
+        const scratch = filmGate.querySelector('.film-scratch');
+        if (scratch) scratch.remove();
+
+        titleScreen.classList.add('visible');
+        titleScreen.addEventListener('click', showContents, { once: true });
+
+        setTimeout(() => {
+            filmScreen.classList.remove('reduced');
+            filmScreen.style.transition = '';
+            removeClones();
+            filmRunning = false;
+        }, 450);
+    };
+
+    document.addEventListener('visibilitychange', onVisibilityHidden);
+
+    /* --- reduced-motion: плавные кроссфейды без эффектов --- */
+    if (reduced) {
+        filmScreen.classList.add('visible');
+        filmScreen.classList.add('reduced');
+
+        const buffer = document.createElement('img');
+        buffer.className = 'film-image film-clone';
+        buffer.alt = '';
+        buffer.draggable = false;
+        buffer.src = FILM_FRAMES[0];
+        buffer.style.opacity = '0';
+        filmGate.appendChild(buffer);
+        clones.push(buffer);
+
+        filmImage.src = FILM_FRAMES[0];
+        filmImage.style.opacity = '0';
+        void filmImage.offsetWidth;
+        filmImage.style.opacity = '1';
+
+        let active = filmImage;
+        let idle = buffer;
+        let t = 1000;
+        for (let i = 1; i < FILM_FRAMES.length; i++) {
+            const showFrame = () => {
+                idle.src = FILM_FRAMES[i];
+                idle.style.opacity = '1';
+                active.style.opacity = '0';
+                const tmp = active;
+                active = idle;
+                idle = tmp;
+            };
+            later(showFrame, t);
+            t += 1000;
+        }
+        later(endToTitle, t);
+        return;
+    }
+
+    /* --- обычная серия --- */
+
+    const pulse = (cls, ms) => {
+        filmGate.classList.remove(cls);
+        void filmGate.offsetWidth;
+        filmGate.classList.add(cls);
+        later(() => filmGate.classList.remove(cls), ms);
+    };
+
+    const flick = () => pulse('film-flick', 90);
+    const setFrame = (i) => { filmImage.src = FILM_FRAMES[i]; };
+
+    /* хроматический разрыв: красный и циановый клоны кадра */
+    const chromSplit = (src) => {
+        const makeClone = (filterValue, tx) => {
+            const img = document.createElement('img');
+            img.className = 'film-clone';
+            img.alt = '';
+            img.draggable = false;
+            img.src = src;
+            img.style.transform = `translateX(${tx}px) scale(1.03)`;
+            img.style.filter = filterValue;
+            filmGate.appendChild(img);
+            clones.push(img);
+        };
+        makeClone('grayscale(1) sepia(1) saturate(6) hue-rotate(-48deg) brightness(0.7)', -2);
+        makeClone('grayscale(1) sepia(1) saturate(5) hue-rotate(150deg) brightness(0.8)', 2);
+        later(removeClones, 80);
+    };
+
+    const runScratch = () => {
+        const scratch = document.createElement('div');
+        scratch.className = 'film-scratch';
+        scratch.style.left = (12 + Math.random() * 76) + '%';
+        filmGate.appendChild(scratch);
+        void scratch.offsetWidth;
+        scratch.classList.add('run');
+        later(() => { if (scratch.parentNode) scratch.remove(); }, 600);
+    };
+
+    /* обрыв ленты после седьмого кадра */
+    const doBreak = () => {
+        filmGate.classList.remove('filming', 'film-flick', 'film-tear', 'film-zoom', 'film-slip');
+        filmScreen.classList.remove('film-live');
+        filmGate.style.visibility = 'hidden';
+
+        const halves = [
+            { clip: 'inset(0 0 50% 0)', cls: 'film-break-top' },
+            { clip: 'inset(50% 0 0 0)', cls: 'film-break-bottom' }
+        ];
+        halves.forEach((h) => {
+            const clone = filmGate.cloneNode(true);
+            clone.className = 'film-gate film-break-half ' + h.cls;
+            clone.style.visibility = 'visible';
+            clone.style.clipPath = h.clip;
+            clone.style.webkitClipPath = h.clip;
+            filmScreen.insertBefore(clone, filmGrain);
+            clones.push(clone);
+        });
+
+        later(() => {
+            filmScreen.style.transition = 'opacity 0.4s ease';
+            filmScreen.classList.remove('visible');
+            titleScreen.classList.add('visible');
+        }, 100);
+
+        later(endToTitle, 520);
+    };
+
+    // показ экрана, дрожание, зерно
+    filmScreen.classList.add('visible');
+    filmGate.classList.add('filming');
+    filmScreen.classList.add('film-live');
+
+    // кадр 1 + световая щель-затвор
+    setFrame(0);
+    filmGate.style.transition = 'none';
+    filmGate.style.clipPath = 'inset(0 49.5% 0 49.5%)';
+    filmGate.style.webkitClipPath = 'inset(0 49.5% 0 49.5%)';
+    void filmGate.offsetWidth;
+    filmGate.style.transition = '-webkit-clip-path 300ms ease-out, clip-path 300ms ease-out';
+    filmGate.style.clipPath = 'inset(0 0 0 0)';
+    filmGate.style.webkitClipPath = 'inset(0 0 0 0)';
+    later(() => {
+        filmGate.style.transition = '';
+        filmGate.style.clipPath = '';
+        filmGate.style.webkitClipPath = '';
+    }, 340);
+    flick();
+
+    const VISIBLE = [800, 700, 550, 600, 500, 900, 1400];
+    const GAPS = [120, 100, 80, 90, 60, 250];
+    const scratchAtGap = 2 + Math.floor(Math.random() * 2); // провал после кадра 3 или 4
+
+    let t = 0;
+    for (let i = 0; i < 6; i++) {
+        t += VISIBLE[i];
+        const gapIndex = i;
+        const nextFrame = i + 1;
+
+        later(() => {
+            filmGate.classList.add('film-gap');
+            if (nextFrame === 3) {
+                pulse('film-slip', 140);
+                chromSplit(FILM_FRAMES[3]);
+            }
+            if (gapIndex === scratchAtGap) runScratch();
+        }, t);
+
+        t += GAPS[i];
+
+        later(() => {
+            setFrame(nextFrame);
+            filmGate.classList.remove('film-gap');
+            flick();
+            if (nextFrame >= 2 && nextFrame <= 4) {
+                pulse('film-tear', 200);
+                pulse('film-zoom', 500);
+            }
+            if (nextFrame === 5) {
+                pulse('film-hit', 300);
+                if (navigator.vibrate) navigator.vibrate(30);
+            }
+        }, t);
+    }
+
+    t += VISIBLE[6];
+    later(doBreak, t);
+}
