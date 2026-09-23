@@ -333,6 +333,7 @@ html, body {
     object-fit: cover;
     border-radius: 1.5vmin;
     transform: scale(1.03);
+    filter: brightness(0.85) contrast(0.88) saturate(0.8) blur(0.6px);
     -webkit-user-drag: none;
     user-select: none;
 }
@@ -370,14 +371,20 @@ html, body {
     position: absolute;
     inset: 0;
     background-size: 256px 256px;
-    opacity: 0.22;
+    opacity: 0.18;
     mix-blend-mode: screen;
     pointer-events: none;
     z-index: 5;
 }
 
 #film-screen.film-live .film-grain {
-    animation: film-grain-shift 0.35s steps(1) infinite;
+    animation: film-grain-shift 0.35s steps(1) infinite,
+               film-grain-hum 0.42s steps(2) infinite;
+}
+
+@keyframes film-grain-hum {
+    0%, 100% { opacity: 0.18; }
+    50% { opacity: 0.14; }
 }
 
 @keyframes film-grain-shift {
@@ -442,11 +449,6 @@ html, body {
     100% { transform: translate(-2px, -1px) rotate(-0.1deg) scale(1.03); }
 }
 
-/* мерцание кадра */
-.film-flick {
-    animation: film-flick 90ms linear;
-}
-
 @keyframes film-flick {
     0% { filter: brightness(1); }
     30% { filter: brightness(0.82); }
@@ -454,7 +456,12 @@ html, body {
     100% { filter: brightness(1); }
 }
 
-/* прошивка кадра (кадры 3–5) */
+@keyframes film-breathe {
+    0% { filter: brightness(0.93); }
+    100% { filter: brightness(1); }
+}
+
+/* прошивка кадра (кадры 3–5): только срезы, яркость живёт на экране */
 .film-tear .film-image {
     animation: film-tear 200ms steps(1);
 }
@@ -464,11 +471,11 @@ html, body {
 }
 
 @keyframes film-tear {
-    0% { clip-path: inset(0); filter: brightness(1); }
-    20% { clip-path: inset(12% 0 8% 0); filter: brightness(0.75); }
-    40% { clip-path: inset(6% 0 14% 0); filter: brightness(0.75); }
-    60% { clip-path: inset(0); filter: brightness(1); }
-    100% { clip-path: inset(0); filter: brightness(1); }
+    0% { clip-path: inset(0); }
+    20% { clip-path: inset(12% 0 8% 0); }
+    40% { clip-path: inset(6% 0 14% 0); }
+    60% { clip-path: inset(0); }
+    100% { clip-path: inset(0); }
 }
 
 /* zoom-пульс смены кадра */
@@ -482,15 +489,15 @@ html, body {
     100% { transform: scale(1.03); }
 }
 
-/* удар кадра 6 */
+/* удар кадра 6: только наезд, яркостный импульс даёт film-hit-light на экране */
 .film-hit .film-image {
     animation: film-hit 300ms ease-out;
 }
 
 @keyframes film-hit {
-    0% { transform: scale(1.03); filter: brightness(1); }
-    50% { transform: scale(1.09); filter: brightness(1.15); }
-    100% { transform: scale(1.03); filter: brightness(1); }
+    0% { transform: scale(1.03); }
+    50% { transform: scale(1.09); }
+    100% { transform: scale(1.03); }
 }
 
 /* проскок плёнки */
@@ -509,11 +516,7 @@ html, body {
     opacity: 0;
 }
 
-/* медленный дрейф окна кадра («ткань кадра»), всю серию поверх мелкой дрожи */
-.film-drift {
-    animation: film-drift 9s ease-in-out infinite;
-}
-
+/* дрейф окна кадра: только ключевые кадры, правила собираются у film-live-комбинаций ниже */
 @keyframes film-drift {
     0% { transform: translate(0, 0); }
     25% { transform: translate(1.5px, 1px); }
@@ -522,35 +525,14 @@ html, body {
     100% { transform: translate(0, 0); }
 }
 
-/* проскок плёнки поверх дрейфа */
-.film-drift.film-slip {
-    animation: film-drift 9s ease-in-out infinite, film-slip 140ms ease-in-out;
-}
-
-/* дыхание экспозиции: brightness 0.93 → 1 за время показа кадра */
-.film-breathe {
-    animation: film-breathe var(--breathe-dur, 800ms) ease-in-out 1 forwards;
-}
-
-@keyframes film-breathe {
-    0% { filter: brightness(0.93); }
-    100% { filter: brightness(1); }
-}
-
-/* мерцание поверх дыхания */
-.film-breathe.film-flick {
-    animation: film-breathe var(--breathe-dur, 800ms) ease-in-out 1 forwards, film-flick 90ms linear;
-}
-
-/* затухание лампы проектора: лента застревает, лампа дёргается и гаснет */
-.film-jam { animation: filmJam 160ms steps(2) 1; }
+/* лента застревает перед затуханием лампы */
+.film-jam { animation: filmJam 170ms linear 1; }
 @keyframes filmJam {
     0%   { transform: translate(0, 0); }
     50%  { transform: translate(1.5px, -1px); }
     100% { transform: translate(-1px, 0); }
 }
 
-.film-lamp-stutter { animation: filmLampStutter 230ms linear forwards; }
 @keyframes filmLampStutter {
     0%   { filter: brightness(1); }
     35%  { filter: brightness(0.55); }
@@ -558,11 +540,112 @@ html, body {
     100% { filter: brightness(0.9); }
 }
 
-.film-lamp-die { animation: filmLampDie 600ms cubic-bezier(0.4, 0, 0.8, 0.4) forwards; }
-@keyframes filmLampDie {
-    0%   { filter: brightness(0.9); transform: scale(1.04); }
-    100% { filter: brightness(0);   transform: scale(0.97); }
+/* === весь свет одним слоем: динамическая яркость на #film-screen === */
+
+/* мерцание, дыхание и лампа гасят весь луч, включая зерно */
+#film-screen.film-flick { animation: film-flick 90ms linear; }
+#film-screen.film-breathe { animation: film-breathe var(--breathe-dur, 800ms) ease-in-out 1 forwards; }
+#film-screen.film-breathe.film-flick {
+    animation: film-breathe var(--breathe-dur, 800ms) ease-in-out 1 forwards,
+               film-flick 90ms linear;
 }
+#film-screen.film-hit-light { animation: film-hit-light 300ms ease-out; }
+@keyframes film-hit-light {
+    0% { filter: brightness(1); }
+    50% { filter: brightness(1.14); }
+    100% { filter: brightness(1); }
+}
+
+#film-screen.film-lamp-stutter { animation: filmLampStutter 230ms linear forwards; }
+#film-screen.film-lamp-die { animation: filmLampDie 600ms cubic-bezier(0.4, 0, 0.8, 0.4) forwards; }
+@keyframes filmLampDie {
+    0%   { filter: brightness(0.9); transform: scale(1); }
+    100% { filter: brightness(0);   transform: scale(0.985); }
+}
+
+/* неравномерная засветка лампы: центр светлее краёв */
+#film-screen::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 4;
+    pointer-events: none;
+    background: radial-gradient(ellipse at 50% 42%,
+        rgba(255, 244, 224, 0.035) 0%,
+        transparent 42%,
+        rgba(0, 0, 0, 0.42) 100%);
+}
+
+/* непрерывное мерцание лампы (весь луч, включая зерно) */
+#film-screen.film-live .film-gate {
+    animation: film-hum 0.42s steps(2) infinite;
+}
+@keyframes film-hum {
+    0%, 100% { filter: brightness(1); }
+    50% { filter: brightness(0.955); }
+}
+#film-screen.film-live .film-gate.film-drift {
+    animation: film-hum 0.42s steps(2) infinite,
+               film-drift 9s ease-in-out infinite;
+}
+#film-screen.film-live .film-gate.film-drift.film-slip {
+    animation: film-hum 0.42s steps(2) infinite,
+               film-drift 9s ease-in-out infinite,
+               film-slip 140ms ease-in-out;
+}
+#film-screen.film-live .film-gate.film-jam {
+    animation: film-hum 0.42s steps(2) infinite,
+               filmJam 170ms linear 1;
+}
+
+/* живой транспорт плёнки: перфорация ползёт через окно */
+#film-screen.film-live .film-rail {
+    animation: film-rail-crawl 1.2s steps(4) infinite;
+}
+@keyframes film-rail-crawl {
+    from { background-position: 0 0; }
+    to { background-position: 0 -18%; }
+}
+
+/* мягкие провалы яркости вместо жёстких срезов (после 3-го и 6-го кадров) */
+@keyframes film-gap-dip {
+    0% { opacity: 1; }
+    30% { opacity: 0.1; }
+    65% { opacity: 0.1; }
+    100% { opacity: 1; }
+}
+#film-screen.film-live .film-gap-dip .film-image {
+    animation: film-jitter 0.9s ease-in-out infinite,
+               film-gap-dip 150ms ease-in-out 1;
+}
+
+/* медленный наезд на седьмой кадр */
+.film-push { animation: film-push 1400ms ease-in forwards; }
+@keyframes film-push {
+    from { transform: scale(1); }
+    to { transform: scale(1.06); }
+}
+#film-screen.film-live .film-gate.film-drift.film-push {
+    animation: film-hum 0.42s steps(2) infinite,
+               film-push 1400ms ease-in forwards;
+}
+
+/* гало вокруг ярких участков кадра */
+.film-halo {
+    position: absolute;
+    inset: 2.5vmin;
+    width: auto;
+    height: auto;
+    object-fit: cover;
+    border-radius: 1.5vmin;
+    transform: scale(1.06);
+    filter: blur(8px) brightness(1.05);
+    opacity: 0.22;
+    mix-blend-mode: screen;
+    pointer-events: none;
+    z-index: 1;
+}
+#film-screen.reduced .film-halo { display: none; }
 
 /* титульный экран после лампы — кроссфейд 700 мс */
 #title-screen.film-enter {
@@ -595,7 +678,12 @@ html, body {
     .film-jam,
     .film-lamp-stutter,
     .film-lamp-die,
-    .film-scratch.run {
+    .film-scratch.run,
+    #film-screen.film-live .film-gate,
+    #film-screen.film-live .film-rail,
+    #film-screen.film-live .film-grain,
+    #film-screen.film-live .film-gap-dip .film-image,
+    .film-push {
         animation: none !important;
     }
 

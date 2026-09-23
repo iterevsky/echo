@@ -1170,6 +1170,7 @@ const filmScreen = document.getElementById('film-screen');
 const filmGate = filmScreen ? filmScreen.querySelector('.film-gate') : null;
 const filmImage = filmGate ? filmGate.querySelector('.film-image') : null;
 const filmGrain = filmScreen ? filmScreen.querySelector('.film-grain') : null;
+const filmHalo = filmGate ? filmGate.querySelector('.film-halo') : null;
 
 let filmReady = false;
 let filmRunning = false;
@@ -1265,7 +1266,7 @@ function runFilmSequence() {
 
         filmScreen.classList.remove('film-live');
         filmScreen.classList.remove('visible');
-        filmGate.classList.remove('filming', 'film-flick', 'film-tear', 'film-zoom', 'film-slip', 'film-gap', 'film-drift', 'film-breathe', 'film-jam', 'film-lamp-stutter', 'film-lamp-die');
+        filmGate.classList.remove('filming', 'film-flick', 'film-tear', 'film-zoom', 'film-slip', 'film-gap', 'film-gap-dip', 'film-drift', 'film-breathe', 'film-jam', 'film-push', 'film-lamp-stutter', 'film-lamp-die');
         filmGate.style.visibility = '';
         filmGate.style.clipPath = '';
         filmGate.style.webkitClipPath = '';
@@ -1279,7 +1280,7 @@ function runFilmSequence() {
         titleScreen.addEventListener('click', showContents, { once: true });
 
         setTimeout(() => {
-            filmScreen.classList.remove('reduced');
+            filmScreen.classList.remove('reduced', 'film-flick', 'film-breathe', 'film-hit-light', 'film-lamp-stutter', 'film-lamp-die');
             filmScreen.style.transition = '';
             removeClones();
             filmRunning = false;
@@ -1335,8 +1336,18 @@ function runFilmSequence() {
         later(() => filmGate.classList.remove(cls), ms);
     };
 
-    const flick = () => pulse('film-flick', 90);
-    const setFrame = (i) => { filmImage.src = FILM_FRAMES[i]; };
+    const pulseScreen = (cls, ms) => {
+        filmScreen.classList.remove(cls);
+        void filmScreen.offsetWidth;
+        filmScreen.classList.add(cls);
+        later(() => filmScreen.classList.remove(cls), ms);
+    };
+
+    const flick = () => pulseScreen('film-flick', 90);
+    const setFrame = (i) => {
+        filmImage.src = FILM_FRAMES[i];
+        if (filmHalo) filmHalo.src = FILM_FRAMES[i];
+    };
 
     /* хроматический разрыв: красный и циановый клоны кадра */
     const chromSplit = (src) => {
@@ -1370,16 +1381,17 @@ function runFilmSequence() {
     const sleep = (ms) => new Promise((resolve) => { later(resolve, ms); });
 
     const runFilmEnding = async () => {
-        filmGate.classList.remove('film-drift', 'film-breathe');
+        filmGate.classList.remove('film-drift');
+        filmScreen.classList.remove('film-breathe');
         filmGate.classList.add('film-jam');
         await sleep(170);
         if (finished) return;
         filmGate.classList.remove('film-jam');
-        filmGate.classList.add('film-lamp-stutter');
+        filmScreen.classList.add('film-lamp-stutter');
         await sleep(240);
         if (finished) return;
-        filmGate.classList.remove('film-lamp-stutter');
-        filmGate.classList.add('film-lamp-die');
+        filmScreen.classList.remove('film-lamp-stutter');
+        filmScreen.classList.add('film-lamp-die');
         await sleep(620);
         if (finished) return;
         filmScreen.classList.remove('film-live');
@@ -1389,19 +1401,19 @@ function runFilmSequence() {
         titleScreen.classList.add('visible');
         titleScreen.classList.add('film-enter');
         setTimeout(() => titleScreen.classList.remove('film-enter'), 750);
-        titleScreen.addEventListener('click', showContents, { once: true });
         endToTitle();
     };
 
     const VISIBLE = [800, 700, 550, 600, 500, 900, 1400];
     const GAPS = [120, 100, 80, 90, 60, 250];
     const scratchAtGap = 2 + Math.floor(Math.random() * 2); // провал после кадра 3 или 4
+    const SOFT_GAPS = [false, false, true, false, false, true]; // мягкие провалы после 3-го и 6-го кадров
 
     const startBreathe = (ms) => {
-        filmGate.style.setProperty('--breathe-dur', ms + 'ms');
-        filmGate.classList.remove('film-breathe');
-        void filmGate.offsetWidth;
-        filmGate.classList.add('film-breathe');
+        filmScreen.style.setProperty('--breathe-dur', ms + 'ms');
+        filmScreen.classList.remove('film-breathe');
+        void filmScreen.offsetWidth;
+        filmScreen.classList.add('film-breathe');
     };
 
     // показ экрана, дрожание, дрейф, зерно
@@ -1434,8 +1446,12 @@ function runFilmSequence() {
         const nextFrame = i + 1;
 
         later(() => {
-            filmGate.classList.add('film-gap');
-            filmGate.classList.remove('film-breathe');
+            filmScreen.classList.remove('film-breathe');
+            if (SOFT_GAPS[gapIndex]) {
+                pulse('film-gap-dip', 160);
+            } else {
+                filmGate.classList.add('film-gap');
+            }
             if (nextFrame === 3) {
                 pulse('film-slip', 140);
                 chromSplit(FILM_FRAMES[3]);
@@ -1456,7 +1472,11 @@ function runFilmSequence() {
             }
             if (nextFrame === 5) {
                 pulse('film-hit', 300);
+                pulseScreen('film-hit-light', 300);
                 if (navigator.vibrate) navigator.vibrate(30);
+            }
+            if (nextFrame === 6) {
+                filmGate.classList.add('film-push');
             }
         }, t);
     }
