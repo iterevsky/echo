@@ -1265,7 +1265,7 @@ function runFilmSequence() {
 
         filmScreen.classList.remove('film-live');
         filmScreen.classList.remove('visible');
-        filmGate.classList.remove('filming', 'film-flick', 'film-tear', 'film-zoom', 'film-slip', 'film-gap');
+        filmGate.classList.remove('filming', 'film-flick', 'film-tear', 'film-zoom', 'film-slip', 'film-gap', 'film-drift', 'film-breathe', 'film-jam', 'film-lamp-stutter', 'film-lamp-die');
         filmGate.style.visibility = '';
         filmGate.style.clipPath = '';
         filmGate.style.webkitClipPath = '';
@@ -1366,42 +1366,53 @@ function runFilmSequence() {
         later(() => { if (scratch.parentNode) scratch.remove(); }, 600);
     };
 
-    /* обрыв ленты после седьмого кадра */
-    const doBreak = () => {
-        filmGate.classList.remove('filming', 'film-flick', 'film-tear', 'film-zoom', 'film-slip');
+    /* затухание лампы проектора после седьмого кадра */
+    const sleep = (ms) => new Promise((resolve) => { later(resolve, ms); });
+
+    const runFilmEnding = async () => {
+        filmGate.classList.remove('film-drift', 'film-breathe');
+        filmGate.classList.add('film-jam');
+        await sleep(170);
+        if (finished) return;
+        filmGate.classList.remove('film-jam');
+        filmGate.classList.add('film-lamp-stutter');
+        await sleep(240);
+        if (finished) return;
+        filmGate.classList.remove('film-lamp-stutter');
+        filmGate.classList.add('film-lamp-die');
+        await sleep(620);
+        if (finished) return;
         filmScreen.classList.remove('film-live');
-        filmGate.style.visibility = 'hidden';
-
-        const halves = [
-            { clip: 'inset(0 0 50% 0)', cls: 'film-break-top' },
-            { clip: 'inset(50% 0 0 0)', cls: 'film-break-bottom' }
-        ];
-        halves.forEach((h) => {
-            const clone = filmGate.cloneNode(true);
-            clone.className = 'film-gate film-break-half ' + h.cls;
-            clone.style.visibility = 'visible';
-            clone.style.clipPath = h.clip;
-            clone.style.webkitClipPath = h.clip;
-            filmScreen.insertBefore(clone, filmGrain);
-            clones.push(clone);
-        });
-
-        later(() => {
-            filmScreen.style.transition = 'opacity 0.4s ease';
-            filmScreen.classList.remove('visible');
-            titleScreen.classList.add('visible');
-        }, 100);
-
-        later(endToTitle, 520);
+        filmScreen.classList.remove('visible');
+        await sleep(330);
+        if (finished) return;
+        titleScreen.classList.add('visible');
+        titleScreen.classList.add('film-enter');
+        setTimeout(() => titleScreen.classList.remove('film-enter'), 750);
+        titleScreen.addEventListener('click', showContents, { once: true });
+        endToTitle();
     };
 
-    // показ экрана, дрожание, зерно
+    const VISIBLE = [800, 700, 550, 600, 500, 900, 1400];
+    const GAPS = [120, 100, 80, 90, 60, 250];
+    const scratchAtGap = 2 + Math.floor(Math.random() * 2); // провал после кадра 3 или 4
+
+    const startBreathe = (ms) => {
+        filmGate.style.setProperty('--breathe-dur', ms + 'ms');
+        filmGate.classList.remove('film-breathe');
+        void filmGate.offsetWidth;
+        filmGate.classList.add('film-breathe');
+    };
+
+    // показ экрана, дрожание, дрейф, зерно
     filmScreen.classList.add('visible');
     filmGate.classList.add('filming');
+    filmGate.classList.add('film-drift');
     filmScreen.classList.add('film-live');
 
     // кадр 1 + световая щель-затвор
     setFrame(0);
+    startBreathe(VISIBLE[0]);
     filmGate.style.transition = 'none';
     filmGate.style.clipPath = 'inset(0 49.5% 0 49.5%)';
     filmGate.style.webkitClipPath = 'inset(0 49.5% 0 49.5%)';
@@ -1416,10 +1427,6 @@ function runFilmSequence() {
     }, 340);
     flick();
 
-    const VISIBLE = [800, 700, 550, 600, 500, 900, 1400];
-    const GAPS = [120, 100, 80, 90, 60, 250];
-    const scratchAtGap = 2 + Math.floor(Math.random() * 2); // провал после кадра 3 или 4
-
     let t = 0;
     for (let i = 0; i < 6; i++) {
         t += VISIBLE[i];
@@ -1428,6 +1435,7 @@ function runFilmSequence() {
 
         later(() => {
             filmGate.classList.add('film-gap');
+            filmGate.classList.remove('film-breathe');
             if (nextFrame === 3) {
                 pulse('film-slip', 140);
                 chromSplit(FILM_FRAMES[3]);
@@ -1440,6 +1448,7 @@ function runFilmSequence() {
         later(() => {
             setFrame(nextFrame);
             filmGate.classList.remove('film-gap');
+            startBreathe(VISIBLE[nextFrame]);
             flick();
             if (nextFrame >= 2 && nextFrame <= 4) {
                 pulse('film-tear', 200);
@@ -1453,5 +1462,5 @@ function runFilmSequence() {
     }
 
     t += VISIBLE[6];
-    later(doBreak, t);
+    later(runFilmEnding, t);
 }

@@ -509,27 +509,64 @@ html, body {
     opacity: 0;
 }
 
-/* обрыв ленты в финале */
-.film-break-half {
-    pointer-events: none;
+/* медленный дрейф окна кадра («ткань кадра»), всю серию поверх мелкой дрожи */
+.film-drift {
+    animation: film-drift 9s ease-in-out infinite;
 }
 
-.film-break-top {
-    animation: film-break-top 100ms steps(1) forwards;
+@keyframes film-drift {
+    0% { transform: translate(0, 0); }
+    25% { transform: translate(1.5px, 1px); }
+    50% { transform: translate(0, 2px); }
+    75% { transform: translate(-1.5px, 1px); }
+    100% { transform: translate(0, 0); }
 }
 
-.film-break-bottom {
-    animation: film-break-bottom 100ms steps(1) forwards;
+/* проскок плёнки поверх дрейфа */
+.film-drift.film-slip {
+    animation: film-drift 9s ease-in-out infinite, film-slip 140ms ease-in-out;
 }
 
-@keyframes film-break-top {
-    0% { transform: translateY(0); }
-    100% { transform: translateY(-10px); }
+/* дыхание экспозиции: brightness 0.93 → 1 за время показа кадра */
+.film-breathe {
+    animation: film-breathe var(--breathe-dur, 800ms) ease-in-out 1 forwards;
 }
 
-@keyframes film-break-bottom {
-    0% { transform: translateY(0); }
-    100% { transform: translateY(10px); }
+@keyframes film-breathe {
+    0% { filter: brightness(0.93); }
+    100% { filter: brightness(1); }
+}
+
+/* мерцание поверх дыхания */
+.film-breathe.film-flick {
+    animation: film-breathe var(--breathe-dur, 800ms) ease-in-out 1 forwards, film-flick 90ms linear;
+}
+
+/* затухание лампы проектора: лента застревает, лампа дёргается и гаснет */
+.film-jam { animation: filmJam 160ms steps(2) 1; }
+@keyframes filmJam {
+    0%   { transform: translate(0, 0); }
+    50%  { transform: translate(1.5px, -1px); }
+    100% { transform: translate(-1px, 0); }
+}
+
+.film-lamp-stutter { animation: filmLampStutter 230ms linear forwards; }
+@keyframes filmLampStutter {
+    0%   { filter: brightness(1); }
+    35%  { filter: brightness(0.55); }
+    65%  { filter: brightness(0.85); }
+    100% { filter: brightness(0.9); }
+}
+
+.film-lamp-die { animation: filmLampDie 600ms cubic-bezier(0.4, 0, 0.8, 0.4) forwards; }
+@keyframes filmLampDie {
+    0%   { filter: brightness(0.9); transform: scale(1.04); }
+    100% { filter: brightness(0);   transform: scale(0.97); }
+}
+
+/* титульный экран после лампы — кроссфейд 700 мс */
+#title-screen.film-enter {
+    transition: opacity 0.7s ease;
 }
 
 /* тихая ветка для reduced-motion */
@@ -553,9 +590,12 @@ html, body {
     .film-zoom .film-image,
     .film-hit .film-image,
     .film-slip,
-    .film-scratch.run,
-    .film-break-top,
-    .film-break-bottom {
+    .film-drift,
+    .film-breathe,
+    .film-jam,
+    .film-lamp-stutter,
+    .film-lamp-die,
+    .film-scratch.run {
         animation: none !important;
     }
 
