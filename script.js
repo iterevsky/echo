@@ -1515,19 +1515,10 @@ function setBarHidden(hidden) {
 
 function updateChapterProgress() {
     const fill = document.querySelector('#chapter-progress .progress-fill');
-    const eta = document.querySelector('#chapter-progress .progress-eta');
-    if (!fill || !eta || !chapters[currentChapter]) return;
+    if (!fill || !chapters[currentChapter]) return;
     const total = chapterScreen.scrollHeight - chapterScreen.clientHeight;
     const frac = total > 0 ? Math.min(chapterScreen.scrollTop / total, 1) : 1;
     fill.style.width = (frac * 100) + '%';
-
-    const plain = chapters[currentChapter].text
-        .replace(/\{\{[^}]+\}\}/g, ' ')
-        .replace(/<[^>]+>/g, ' ');
-    const words = plain.trim().split(/\s+/).filter(Boolean).length;
-    const totalMin = words / 180;
-    const left = Math.ceil(totalMin * (1 - frac));
-    eta.textContent = left <= 1 ? 'почти конец главы' : 'осталось ~' + left + ' мин';
 }
 
 chapterScreen.addEventListener('scroll', () => {

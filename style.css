@@ -1081,13 +1081,6 @@ html, body {
     transition: width 0.15s linear;
 }
 
-.progress-eta {
-    font-family: 'PT Serif', serif;
-    font-size: 0.68rem;
-    color: #5a5a5a;
-    white-space: nowrap;
-}
-
 .chapter-nav {
     display: flex;
     justify-content: space-between;
