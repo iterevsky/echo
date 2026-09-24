@@ -171,10 +171,17 @@
         <div class="chapter-number"></div>
         <div class="chapter-title"></div>
         <div class="chapter-text"></div>
-        <div class="chapter-nav">
-            <span class="nav-prev">← назад</span>
-            <span class="nav-contents">оглавление</span>
-            <span class="nav-next">вперёд →</span>
+        <div id="chapter-bar">
+            <div id="chapter-progress">
+                <div class="progress-track"><div class="progress-fill"></div></div>
+                <span class="progress-eta"></span>
+            </div>
+            <div class="chapter-nav">
+                <span class="nav-prev">← назад</span>
+                <span class="nav-contents">оглавление</span>
+                <span class="nav-aa" aria-label="Настройки чтения">Aa</span>
+                <span class="nav-next">вперёд →</span>
+            </div>
         </div>
     </div>
 
@@ -257,7 +264,7 @@
   <div class="tear-line" style="position:absolute;top:0;left:0;width:100%;height:1px;background:rgba(232,230,227,0.3);box-shadow:0 0 8px rgba(232,230,227,0.2);opacity:0;"></div>
 </div>
 <!-- PHOTO overlay -->
-<div id="photo-overlay" class="hidden">
+<div id="photo-overlay">
   <div id="photo-backdrop"></div>
   <div id="photo-container">
     <img id="photo-image" src="" alt="">
@@ -266,6 +273,36 @@
 </div>
 
     <div id="swipe-hint"></div>
+
+    <!-- Шторка настроек чтения -->
+    <div id="reader-sheet-backdrop"></div>
+    <div id="reader-sheet">
+        <div class="rs-row">
+            <span class="rs-label">Размер</span>
+            <div class="rs-size">
+                <button class="rs-size-btn" data-dir="-1" aria-label="Меньше">−</button>
+                <div class="rs-size-dots">
+                    <span class="rs-dot"></span><span class="rs-dot"></span>
+                    <span class="rs-dot"></span><span class="rs-dot"></span>
+                </div>
+                <button class="rs-size-btn" data-dir="1" aria-label="Больше">+</button>
+            </div>
+        </div>
+        <div class="rs-row">
+            <span class="rs-label">Тон</span>
+            <div class="rs-tones">
+                <button class="rs-tone" data-tone="standard">Стандартный</button>
+                <button class="rs-tone" data-tone="soft">Мягкий</button>
+                <button class="rs-tone" data-tone="warm">Тёплый</button>
+            </div>
+        </div>
+        <div class="rs-row">
+            <span class="rs-label">Приглушение</span>
+            <input type="range" class="rs-dim" min="0" max="45" value="0" aria-label="Приглушение">
+        </div>
+    </div>
+    <div id="reader-dim"></div>
+
     <script src="chapters.js"></script>
 <script src="script.js"></script>
 

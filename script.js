@@ -422,7 +422,7 @@ function showContents() {
     }, 1200);
 }
 
-function openChapter(index) {
+function openChapter(index, opts = {}) {
     const tearOverlay = document.getElementById('tear-overlay');
     const chScreen = document.getElementById('chapter-screen');
     if (tearOverlay && chScreen) {
@@ -440,6 +440,7 @@ function openChapter(index) {
     }
 
     resetSwipeHint();
+    setBarHidden(false);
     if (index < 0 || index >= chapters.length) return;
 
 
@@ -483,8 +484,17 @@ function openChapter(index) {
     setTimeout(() => {
         chapterScreen.classList.add('visible');
         chapterScreen.scrollTop = 0;
+        if (opts.restore) {
+            const s = loadState();
+            const frac = s.readPos && s.readPos[index];
+            if (frac) {
+                const total = chapterScreen.scrollHeight - chapterScreen.clientHeight;
+                chapterScreen.scrollTop = frac * total;
+            }
+        }
         initVoiceObserver();
     }, 300);
+    setTimeout(updateChapterProgress, 350);
 }
 
 /* === ФОТО: ОВЕРЛЕЙ === */
@@ -1091,7 +1101,7 @@ function initProgress() {
         overlay.style.opacity = '0';
         overlay.style.pointerEvents = 'none';
         contentsScreen.classList.remove('progress-dimmed');
-        setTimeout(() => openChapter(saved.lastChapter), 400);
+        setTimeout(() => openChapter(saved.lastChapter, { restore: true }), 400);
     });
 
     overlay.querySelector('.progress-restart').addEventListener('click', () => {
@@ -1487,3 +1497,152 @@ function runFilmSequence() {
     t += VISIBLE[6];
     later(runFilmEnding, t);
 }
+
+/* ============================================================
+   ЧИТАТЕЛЬСКИЙ ИНТЕРФЕЙС: ПАНЕЛЬ, ПРОГРЕСС, ШТОРКА, МЕСТО В ГЛАВЕ
+   ============================================================ */
+
+let barHidden = false;
+let barLastScroll = 0;
+let readPosTimer = null;
+
+function setBarHidden(hidden) {
+    const bar = document.getElementById('chapter-bar');
+    if (!bar) return;
+    barHidden = hidden;
+    bar.classList.toggle('bar-hidden', hidden);
+}
+
+function updateChapterProgress() {
+    const fill = document.querySelector('#chapter-progress .progress-fill');
+    const eta = document.querySelector('#chapter-progress .progress-eta');
+    if (!fill || !eta || !chapters[currentChapter]) return;
+    const total = chapterScreen.scrollHeight - chapterScreen.clientHeight;
+    const frac = total > 0 ? Math.min(chapterScreen.scrollTop / total, 1) : 1;
+    fill.style.width = (frac * 100) + '%';
+
+    const plain = chapters[currentChapter].text
+        .replace(/\{\{[^}]+\}\}/g, ' ')
+        .replace(/<[^>]+>/g, ' ');
+    const words = plain.trim().split(/\s+/).filter(Boolean).length;
+    const totalMin = words / 180;
+    const left = Math.ceil(totalMin * (1 - frac));
+    eta.textContent = left <= 1 ? 'почти конец главы' : 'осталось ~' + left + ' мин';
+}
+
+chapterScreen.addEventListener('scroll', () => {
+    if (!chapterScreen.classList.contains('visible')) return;
+    const st = chapterScreen.scrollTop;
+    const delta = st - barLastScroll;
+    if (!isReaderSheetOpen()) {
+        if (delta > 8 && st > 60) setBarHidden(true);
+        else if (delta < -8) setBarHidden(false);
+    }
+    barLastScroll = st;
+
+    updateChapterProgress();
+
+    clearTimeout(readPosTimer);
+    readPosTimer = setTimeout(() => {
+        const total = chapterScreen.scrollHeight - chapterScreen.clientHeight;
+        if (total <= 0) return;
+        const frac = chapterScreen.scrollTop / total;
+        if (frac > 0.02) {
+            const s = loadState();
+            const readPos = s.readPos || {};
+            readPos[currentChapter] = Math.min(frac, 1);
+            saveState({ readPos });
+        }
+    }, 500);
+}, { passive: true });
+
+chapterScreen.addEventListener('click', (e) => {
+    if (!chapterScreen.classList.contains('visible')) return;
+    if (e.target.closest('.photo-link')) return;
+    if (e.target.closest('#chapter-bar')) return;
+    if (isReaderSheetOpen()) { toggleReaderSheet(false); return; }
+    setBarHidden(!barHidden);
+});
+
+/* --- шторка настроек чтения --- */
+
+function getReaderSettings() {
+    const s = loadState();
+    return s.readerSettings || { size: 1, tone: 'standard', dim: 0 };
+}
+
+function applyReaderSettings() {
+    const rs = getReaderSettings();
+    const chScreen = document.getElementById('chapter-screen');
+    chScreen.classList.remove('reader-size-0', 'reader-size-1', 'reader-size-2', 'reader-size-3');
+    chScreen.classList.remove('reader-tone-soft', 'reader-tone-warm');
+    chScreen.classList.add('reader-size-' + rs.size);
+    if (rs.tone !== 'standard') chScreen.classList.add('reader-tone-' + rs.tone);
+
+    const dim = document.getElementById('reader-dim');
+    if (dim) dim.style.opacity = (rs.dim / 100);
+
+    document.querySelectorAll('.rs-dot').forEach((d, i) => {
+        d.classList.toggle('active', i <= rs.size);
+    });
+    document.querySelectorAll('.rs-tone').forEach((t) => {
+        t.classList.toggle('active', t.dataset.tone === rs.tone);
+    });
+    const dimInput = document.querySelector('.rs-dim');
+    if (dimInput && Number(dimInput.value) !== rs.dim) dimInput.value = rs.dim;
+
+    const themeMeta = document.querySelector('meta[name="theme-color"]');
+    if (themeMeta) {
+        themeMeta.content = rs.tone === 'warm' ? '#14100a' :
+                            rs.tone === 'soft' ? '#0c0f0c' : '#0c0c0c';
+    }
+}
+
+function setReaderSetting(key, value) {
+    const rs = getReaderSettings();
+    rs[key] = value;
+    saveState({ readerSettings: rs });
+    applyReaderSettings();
+}
+
+function isReaderSheetOpen() {
+    const sheet = document.getElementById('reader-sheet');
+    return sheet && sheet.classList.contains('open');
+}
+
+function toggleReaderSheet(open) {
+    const sheet = document.getElementById('reader-sheet');
+    const backdrop = document.getElementById('reader-sheet-backdrop');
+    if (!sheet || !backdrop) return;
+    sheet.classList.toggle('open', open);
+    backdrop.classList.toggle('open', open);
+    if (open) setBarHidden(false);
+}
+
+const navAaBtn = document.querySelector('.nav-aa');
+if (navAaBtn) navAaBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleReaderSheet(!isReaderSheetOpen());
+});
+
+const readerBackdrop = document.getElementById('reader-sheet-backdrop');
+if (readerBackdrop) readerBackdrop.addEventListener('click', () => toggleReaderSheet(false));
+
+document.querySelectorAll('.rs-size-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+        const rs = getReaderSettings();
+        const next = Math.min(3, Math.max(0, rs.size + Number(btn.dataset.dir)));
+        setReaderSetting('size', next);
+    });
+});
+
+document.querySelectorAll('.rs-tone').forEach((btn) => {
+    btn.addEventListener('click', () => setReaderSetting('tone', btn.dataset.tone));
+});
+
+const rsDimInput = document.querySelector('.rs-dim');
+if (rsDimInput) rsDimInput.addEventListener('input', (e) => {
+    setReaderSetting('dim', Number(e.target.value));
+});
+
+applyReaderSettings();
