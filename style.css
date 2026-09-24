@@ -1852,9 +1852,13 @@ html, body {
 
 #reader-dim {
     position: fixed; inset: 0; z-index: 9;
-    background: #000; opacity: 0;
+    background: #000;
+    opacity: var(--dim-op, 0);
     pointer-events: none;
     transition: opacity 0.3s ease;
+}
+#chapter-screen:not(.visible) ~ #reader-dim {
+    opacity: 0;
 }
 
 /* тоны чтения: переменные на экране главы */

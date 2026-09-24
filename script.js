@@ -1571,7 +1571,7 @@ function applyReaderSettings() {
     if (rs.tone !== 'standard') chScreen.classList.add('reader-tone-' + rs.tone);
 
     const dim = document.getElementById('reader-dim');
-    if (dim) dim.style.opacity = (rs.dim / 100);
+    if (dim) dim.style.setProperty('--dim-op', (rs.dim / 100));
 
     document.querySelectorAll('.rs-dot').forEach((d, i) => {
         d.classList.toggle('active', i <= rs.size);
