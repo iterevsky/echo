@@ -1360,7 +1360,7 @@ html, body {
 /* === КНОПКА МЕНЮ (цапля) === */
 .menu-trigger {
   position: fixed;
-  top: 24px;
+  top: calc(24px + env(safe-area-inset-top));
   right: 24px;
   z-index: 15;
   background: none;
