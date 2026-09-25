@@ -375,6 +375,10 @@ html, body {
     user-select: none;
 }
 
+/* пока src пустой (лампа без кадра) — прячем значок битой картинки */
+.film-image[src=""],
+.film-halo[src=""] { visibility: hidden; }
+
 /* внутренняя виньетка окна кадра */
 .film-gate::after {
     content: '';
