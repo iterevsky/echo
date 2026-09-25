@@ -1277,7 +1277,7 @@ function runFilmSequence() {
 
         filmScreen.classList.remove('film-live');
         filmScreen.classList.remove('visible');
-        filmGate.classList.remove('filming', 'film-flick', 'film-tear', 'film-zoom', 'film-slip', 'film-gap', 'film-gap-dip', 'film-drift', 'film-breathe', 'film-jam', 'film-push', 'film-lamp-stutter', 'film-lamp-die');
+        filmGate.classList.remove('filming', 'film-flick', 'film-tear', 'film-zoom', 'film-slip', 'film-gap', 'film-gap-dip', 'film-drift', 'film-breathe', 'film-jam', 'film-push', 'film-catch', 'film-lamp-stutter', 'film-lamp-die');
         filmGate.style.visibility = '';
         filmGate.style.clipPath = '';
         filmGate.style.webkitClipPath = '';
@@ -1291,7 +1291,7 @@ function runFilmSequence() {
         titleScreen.addEventListener('click', showContents, { once: true });
 
         setTimeout(() => {
-            filmScreen.classList.remove('reduced', 'film-flick', 'film-breathe', 'film-hit-light', 'film-lamp-stutter', 'film-lamp-die');
+            filmScreen.classList.remove('reduced', 'film-flick', 'film-breathe', 'film-hit-light', 'film-lamp-stutter', 'film-lamp-die', 'film-startup', 'film-catch-light', 'film-lamp-ignite');
             filmScreen.style.transition = '';
             removeClones();
             filmRunning = false;
@@ -1417,7 +1417,7 @@ function runFilmSequence() {
         endToTitle();
     };
 
-    const VISIBLE = [800, 700, 550, 600, 500, 900, 1400];
+    const VISIBLE = [1700, 700, 550, 600, 500, 900, 1400];
     const GAPS = [120, 100, 80, 90, 60, 250];
     const scratchAtGap = 2 + Math.floor(Math.random() * 2); // провал после кадра 3 или 4
     const SOFT_GAPS = [false, false, true, false, false, true]; // мягкие провалы после 3-го и 6-го кадров
@@ -1429,30 +1429,41 @@ function runFilmSequence() {
         filmScreen.classList.add('film-breathe');
     };
 
-    // показ экрана, дрожание, дрейф, зерно
+    // === ЗАПУСК ПРОЕКТОРА: сначала свет, потом кадр ===
+    const LAMP_MS = 900;   // лампа зажигается: пустой луч с зерном и царапинами
+    const CATCH_MS = 520;  // ворот ловит первый кадр
+
+    // акт 1. ЛАМПА: экран виден, луч пустой (film-startup), изображения нет
     filmScreen.classList.add('visible');
-    filmGate.classList.add('filming');
-    filmGate.classList.add('film-drift');
     filmScreen.classList.add('film-live');
+    filmScreen.classList.add('film-startup');
+    filmGate.classList.add('filming');
+    void filmScreen.offsetWidth;
+    filmScreen.classList.add('film-lamp-ignite');
 
-    // кадр 1 + световая щель-затвор
-    setFrame(0);
-    startBreathe(VISIBLE[0]);
-    filmGate.style.transition = 'none';
-    filmGate.style.clipPath = 'inset(0 49.5% 0 49.5%)';
-    filmGate.style.webkitClipPath = 'inset(0 49.5% 0 49.5%)';
-    void filmGate.offsetWidth;
-    filmGate.style.transition = '-webkit-clip-path 300ms ease-out, clip-path 300ms ease-out';
-    filmGate.style.clipPath = 'inset(0 0 0 0)';
-    filmGate.style.webkitClipPath = 'inset(0 0 0 0)';
+    // пыль и царапины видны в пустом свете до появления кадра
+    later(runScratch, 260);
+    later(runScratch, 640);
+
+    // акт 2. ВОРОТ ЛОВИТ КАДР: влетает смещённым и пересвеченным
     later(() => {
-        filmGate.style.transition = '';
-        filmGate.style.clipPath = '';
-        filmGate.style.webkitClipPath = '';
-    }, 340);
-    flick();
+        filmScreen.classList.remove('film-lamp-ignite');
+        filmScreen.classList.remove('film-startup');
+        setFrame(0);
+        filmGate.classList.add('film-catch');
+        filmScreen.classList.add('film-catch-light');
+    }, LAMP_MS);
 
-    let t = 0;
+    // акт 3. КАДР СЕЛ: щелчок, начинаются дрейф и дыхание
+    later(() => {
+        filmGate.classList.remove('film-catch');
+        filmScreen.classList.remove('film-catch-light');
+        filmGate.classList.add('film-drift');
+        flick();
+        startBreathe(VISIBLE[0]);
+    }, LAMP_MS + CATCH_MS);
+
+    let t = LAMP_MS + CATCH_MS;
     for (let i = 0; i < 6; i++) {
         t += VISIBLE[i];
         const gapIndex = i;

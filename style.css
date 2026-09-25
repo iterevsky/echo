@@ -600,6 +600,59 @@ html, body {
     100% { filter: brightness(0);   transform: scale(0.985); }
 }
 
+/* === запуск проектора: сначала лампа, потом кадр === */
+
+/* пустой луч: тёплое молочное поле вместо кадра */
+#film-screen.film-startup .film-gate {
+    background:
+        radial-gradient(ellipse 78% 62% at 50% 46%,
+            rgba(206, 188, 150, 0.8) 0%,
+            rgba(128, 111, 82, 0.5) 46%,
+            rgba(30, 26, 20, 0.95) 80%,
+            #080706 100%);
+}
+
+/* лампа зажигается прерывисто: 2–3 вспышки */
+#film-screen.film-lamp-ignite { animation: filmLampIgnite 900ms linear; }
+@keyframes filmLampIgnite {
+    0%   { filter: brightness(0); }
+    10%  { filter: brightness(0.55); }
+    20%  { filter: brightness(0.1); }
+    36%  { filter: brightness(0.8); }
+    48%  { filter: brightness(0.3); }
+    64%  { filter: brightness(1.05); }
+    78%  { filter: brightness(0.85); }
+    100% { filter: brightness(1); }
+}
+
+/* ворот ловит кадр: окно дёргается по вертикали и встаёт на место */
+#film-screen.film-live .film-gate.film-catch {
+    animation: film-hum 0.42s steps(2) infinite,
+               film-catch 480ms cubic-bezier(0.3, 0.8, 0.35, 1) 1 forwards;
+}
+@keyframes film-catch {
+    0%   { transform: translateY(-3.2%); }
+    34%  { transform: translateY(1.1%); }
+    58%  { transform: translateY(-0.6%); }
+    78%  { transform: translateY(0.2%); }
+    100% { transform: translateY(0); }
+}
+
+/* переэкспонирование первого кадра: вспышка света и набухание гало */
+#film-screen.film-catch-light { animation: filmCatchLight 480ms ease-out; }
+@keyframes filmCatchLight {
+    0%   { filter: brightness(1.28); }
+    35%  { filter: brightness(1.16); }
+    100% { filter: brightness(1); }
+}
+#film-screen.film-live .film-gate.film-catch .film-halo {
+    animation: film-catch-halo 480ms ease-out 1;
+}
+@keyframes film-catch-halo {
+    0%   { opacity: 0.5; }
+    100% { opacity: 0.18; }
+}
+
 /* неравномерная засветка лампы: центр светлее краёв */
 #film-screen::before {
     content: '';
