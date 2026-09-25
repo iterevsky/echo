@@ -37,6 +37,29 @@ html, body {
     -webkit-user-drag: none;
     user-select: none;
     filter: contrast(1.05) brightness(0.95);
+    -webkit-mask-image: linear-gradient(to bottom,
+        transparent 0%, black 10%, black 90%, transparent 100%);
+    mask-image: linear-gradient(to bottom,
+        transparent 0%, black 10%, black 90%, transparent 100%);
+}
+
+/* дыхание разлома: тихая пульсация свечения в верхней трети по центру */
+#cover-screen::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse 42% 32% at 50% 27%,
+        rgba(0, 168, 232, 0.10), transparent 70%);
+    mix-blend-mode: screen;
+    animation: cover-breathe 10s ease-in-out infinite;
+    pointer-events: none;
+}
+@keyframes cover-breathe {
+    0%, 100% { opacity: 0.45; }
+    50% { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+    #cover-screen::after { animation: none; }
 }
 
 /* === ЭКРАН С ВОПРОСОМ === */
