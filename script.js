@@ -237,6 +237,41 @@ const chapters = Array.from(items).map((item, index) => {
     const text = chapterTexts[index] || `<p class="placeholder">Глава в процессе написания…</p>`;
     return { number: num, title, text };
 });
+
+/* --- память прочитанного: прочитанные тускнеют, текущая — с линией --- */
+function updateContentsMemory() {
+    const s = loadState();
+    const readPos = s.readPos || {};
+    const last = (typeof s.lastChapter === 'number') ? s.lastChapter : -1;
+
+    document.querySelectorAll('.contents-item').forEach((item) => {
+        const i = parseInt(item.dataset.chapter, 10);
+        if (isNaN(i)) return;
+
+        const frac = readPos[i];
+        const isRead = (typeof frac === 'number') && frac >= 0.85;
+        const isCurrent = (i === last) && !isRead;
+
+        item.classList.toggle('read', isRead);
+        item.classList.toggle('current', isCurrent);
+
+        let line = item.querySelector('.toc-line');
+        if (isCurrent) {
+            if (!line) {
+                line = document.createElement('span');
+                line.className = 'toc-line';
+                line.innerHTML = '<i></i>';
+                item.appendChild(line);
+            }
+            const f = (typeof frac === 'number') ? Math.max(0.04, frac) : 0.04;
+            line.firstChild.style.width = (f * 100) + '%';
+        } else if (line) {
+            line.remove();
+        }
+    });
+}
+updateContentsMemory();
+
 initProgress();
 
 // === ОБРАБОТЧИКИ НАВИГАЦИИ ВНУТРИ ГЛАВЫ ===
@@ -251,6 +286,7 @@ document.querySelector('.nav-contents').addEventListener('click', () => {
     cleanupSwipeHandlers();
     chapterScreen.classList.remove('visible');
     if (menuTrigger) menuTrigger.classList.add('visible');
+    updateContentsMemory();
     setTimeout(() => {
         contentsScreen.classList.add('visible');
     }, 500);
@@ -291,6 +327,7 @@ if (e.key === 'Escape') {
     cleanupSwipeHandlers();
     chapterScreen.classList.remove('visible');
     if (menuTrigger) menuTrigger.classList.add('visible');
+    updateContentsMemory();
         setTimeout(() => contentsScreen.classList.add('visible'), 500);
     }
 
@@ -395,6 +432,7 @@ function startSequence() {
 }
 
 function showContents() {
+    updateContentsMemory();
     titleScreen.classList.remove('film-enter');
     // Буквы растают
     titleScreen.classList.add('melting');
@@ -443,6 +481,15 @@ function openChapter(index, opts = {}) {
     setBarHidden(false);
     if (index < 0 || index >= chapters.length) return;
 
+    // ушли «вперёд» из открытой главы — она считается прочитанной
+    if (chapterScreen.classList.contains('visible') && index === currentChapter + 1) {
+        const sFwd = loadState();
+        const posFwd = sFwd.readPos || {};
+        if ((posFwd[currentChapter] || 0) < 0.85) {
+            posFwd[currentChapter] = 1;
+            saveState({ readPos: posFwd });
+        }
+    }
 
     currentChapter = index;
     const chapter = chapters[index];
@@ -1073,6 +1120,7 @@ function initProgress() {
     titleScreen.style.opacity = '0';
     titleScreen.style.pointerEvents = 'none';
 
+    updateContentsMemory();
     contentsScreen.classList.add('visible');
     if (menuTrigger) menuTrigger.classList.add('visible');
 

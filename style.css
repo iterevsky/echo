@@ -860,6 +860,40 @@ html, body {
     background: #00A8E8;
 }
 
+/* прочитанные главы тускнеют */
+.contents-item { position: relative; }
+
+.contents-item.read { color: #4c4c4c; }
+.contents-item.read .dot { background: #2a2a2a; }
+.contents-item.read:hover { color: #8a8a8a; }
+
+/* текущая глава: циановая точка и тонкая линия прогресса */
+.contents-item.current .dot {
+    background: #00A8E8;
+    box-shadow: 0 0 6px rgba(0, 168, 232, 0.5);
+}
+
+.toc-line {
+    position: absolute;
+    left: 0;
+    bottom: 7px;
+    width: 72px;
+    height: 2px;
+    background: #1c1c1c;
+    border-radius: 1px;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.toc-line i {
+    display: block;
+    height: 100%;
+    width: 0%;
+    background: rgba(0, 168, 232, 0.55);
+    border-radius: 1px;
+    transition: width 0.4s ease;
+}
+
 @keyframes contents-item-reveal {
     0%   { opacity: 0; transform: translateY(4px); filter: blur(1px); }
     20%  { opacity: 0.3; transform: translateY(2px); filter: blur(0.5px); }
