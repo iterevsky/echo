@@ -24,8 +24,9 @@
 
 .install-trigger {
     position: fixed;
-    top: calc(24px + env(safe-area-inset-top));
-    right: 86px;
+    top: calc(28px + env(safe-area-inset-top));
+    right: 80px;
+    left: auto;
     z-index: 15;
     background: none;
     border: none;
@@ -38,7 +39,7 @@
 }
 .install-trigger:active .install-svg { transform: scale(0.92); }
 .install-trigger.visible { opacity: 1; pointer-events: all; }
-.install-svg { width: 42px; height: 42px; transition: filter 0.3s ease, transform 0.3s ease; }
+.install-svg { width: 34px; height: 34px; transition: filter 0.3s ease, transform 0.3s ease; }
 .install-trigger:hover .install-svg {
     filter: drop-shadow(0 0 10px rgba(0,168,232,0.55)) drop-shadow(0 0 24px rgba(0,168,232,0.3));
     transform: scale(1.06);
