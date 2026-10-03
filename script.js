@@ -1023,7 +1023,7 @@ document.querySelectorAll('.donate-copy').forEach(btn => {
 });
 
 /* === КНИГА НА РАБОЧИЙ СТОЛ === */
-const contentsInstall = document.getElementById('contents-install');
+const installTrigger = document.getElementById('install-trigger');
 const installOverlay = document.getElementById('install-overlay');
 const installClose = document.getElementById('install-close');
 const installCopy = document.getElementById('install-copy');
@@ -1064,7 +1064,12 @@ function closeInstall() {
     document.body.classList.remove('install-open');
 }
 
-if (contentsInstall) contentsInstall.addEventListener('click', openInstall);
+if (installTrigger) installTrigger.addEventListener('click', openInstall);
+if (installTrigger && typeof menuTrigger !== 'undefined' && menuTrigger) {
+    new MutationObserver(() => {
+        installTrigger.classList.toggle('visible', menuTrigger.classList.contains('visible'));
+    }).observe(menuTrigger, { attributes: true, attributeFilter: ['class'] });
+}
 if (installClose) installClose.addEventListener('click', closeInstall);
 if (installOverlay) installOverlay.addEventListener('click', (e) => {
     if (e.target === installOverlay) closeInstall();
