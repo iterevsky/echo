@@ -315,6 +315,7 @@ document.addEventListener('keydown', (e) => {
     }
 if (e.key === 'Escape') {
     e.preventDefault();
+    if (installOverlay && installOverlay.classList.contains('visible')) { closeInstall(); return; }
     if (photoOverlay && photoOverlay.classList.contains('active')) {
         closePhoto();
         return;
@@ -1020,6 +1021,55 @@ document.querySelectorAll('.donate-copy').forEach(btn => {
         if (target) copyCard(target, btn);
     });
 });
+
+/* === КНИГА НА РАБОЧИЙ СТОЛ === */
+const contentsInstall = document.getElementById('contents-install');
+const installOverlay = document.getElementById('install-overlay');
+const installClose = document.getElementById('install-close');
+const installCopy = document.getElementById('install-copy');
+
+function openInstall() {
+    const ua = navigator.userAgent.toLowerCase();
+    const isIOS = /iphone|ipad|ipod/.test(ua);
+    const isAndroid = /android/.test(ua);
+    const isStandalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true;
+
+    const blockAndroid = document.getElementById('install-android');
+    const blockIOS = document.getElementById('install-ios');
+    const doneEl = document.getElementById('install-done');
+
+    blockAndroid.style.display = 'none';
+    blockIOS.style.display = 'none';
+    doneEl.style.display = 'none';
+    installOverlay.classList.remove('show-both');
+
+    if (isStandalone) {
+        doneEl.style.display = 'block';
+    } else if (isIOS) {
+        blockIOS.style.display = 'block';
+    } else if (isAndroid) {
+        blockAndroid.style.display = 'block';
+    } else {
+        blockAndroid.style.display = 'block';
+        blockIOS.style.display = 'block';
+        installOverlay.classList.add('show-both');
+    }
+
+    installOverlay.classList.add('visible');
+    document.body.classList.add('install-open');
+}
+
+function closeInstall() {
+    installOverlay.classList.remove('visible');
+    document.body.classList.remove('install-open');
+}
+
+if (contentsInstall) contentsInstall.addEventListener('click', openInstall);
+if (installClose) installClose.addEventListener('click', closeInstall);
+if (installOverlay) installOverlay.addEventListener('click', (e) => {
+    if (e.target === installOverlay) closeInstall();
+});
+if (installCopy) installCopy.addEventListener('click', () => copyCard('install-url', installCopy));
 
 /* === АВТОДОПИСЫВАНИЕ ИСТОЧНИКА ПРИ КОПИРОВАНИИ === */
 document.addEventListener('copy', function(e) {

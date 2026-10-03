@@ -60,6 +60,7 @@
         <div class="crt-rolling"></div>
         <div class="contents-list">
         <div class="contents-header">Оглавление</div>
+        <div class="contents-install" id="contents-install">на рабочий стол — книга в один клик</div>
             <div class="contents-item" data-chapter="0">01 <span class="dot"></span> В начале была метель</div>
             <div class="contents-item" data-chapter="1">02 <span class="dot"></span> Разложив большую часть</div>
             <div class="contents-item" data-chapter="2">03 <span class="dot"></span> Воздух казался мне другим</div>
@@ -263,6 +264,36 @@
                 <div class="about-note">в процессе заполнения</div>
             </div>
         </div>
+    </div>
+
+<div id="install-overlay" class="install-overlay">
+      <div class="install-sheet">
+        <button class="install-close" id="install-close" aria-label="Закрыть">×</button>
+        <div class="install-title">Книга на рабочий стол</div>
+        <div class="install-lead">Открывается как приложение — во весь экран, без адресной строки.</div>
+
+        <div class="install-block" id="install-android">
+          <div class="install-platform">На Android</div>
+          <div class="install-step"><span class="n">01</span><span>Скопируйте адрес книги:</span></div>
+          <div class="install-url-row">
+            <span class="install-url" id="install-url">https://iterevsky.github.io/echo/</span>
+            <button class="install-copy" id="install-copy">Копировать</button>
+          </div>
+          <div class="install-step"><span class="n">02</span><span>Откройте браузер, которым обычно пользуетесь, и вставьте адрес в строку вверху экрана.</span></div>
+          <div class="install-step"><span class="n">03</span><span>Откройте меню браузера — значок <span class="install-dots">⋮</span> в углу экрана (у некоторых браузеров — три полосы).</span></div>
+          <div class="install-step"><span class="n">04</span><span>Найдите «Добавить на главный экран». Он может называться «Установить приложение» или «Добавить ярлык». Подтвердите.</span></div>
+        </div>
+
+        <div class="install-block" id="install-ios">
+          <div class="install-platform">На iPhone</div>
+          <div class="install-step"><span class="n">01</span><span>Скопируйте адрес книги (кнопка выше).</span></div>
+          <div class="install-step"><span class="n">02</span><span>Откройте штатный браузер айфона и вставьте адрес в строку вверху — ярлык на айфоне добавляет только он.</span></div>
+          <div class="install-step"><span class="n">03</span><span>Нажмите «Поделиться» — <svg class="install-ico" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V4"/><path d="M8 8l4-4 4 4"/><path d="M5 12v7a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-7"/></svg> внизу экрана.</span></div>
+          <div class="install-step"><span class="n">04</span><span>Пролистайте список вниз и выберите «На экран “Домой”» → «Добавить».</span></div>
+        </div>
+
+        <div class="install-done" id="install-done">Книга уже на вашем рабочем столе.</div>
+      </div>
     </div>
 
 <div id="progress-overlay"></div>
