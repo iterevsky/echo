@@ -19,6 +19,72 @@
     <link href="https://fonts.googleapis.com/css2?family=PT+Serif:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
+<style>
+.install-overlay.visible { opacity: 1 !important; pointer-events: auto !important; }
+
+.install-trigger {
+    position: fixed;
+    top: calc(24px + env(safe-area-inset-top));
+    left: 24px;
+    z-index: 15;
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.6s ease;
+    color: #9a9a9a;
+}
+.install-trigger.visible { opacity: 1; pointer-events: all; }
+.install-svg { width: 42px; height: 42px; transition: filter 0.3s ease, transform 0.3s ease; }
+.install-trigger:hover .install-svg {
+    filter: drop-shadow(0 0 10px rgba(0,168,232,0.55)) drop-shadow(0 0 24px rgba(0,168,232,0.3));
+    transform: scale(1.06);
+}
+
+.install-sheet {
+    position: relative;
+    width: min(430px, calc(100% - 48px));
+    max-height: calc(100% - 96px);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    background: #0c0c0c;
+    border: 1px solid #1c1c1c;
+    padding: 28px 24px calc(24px + env(safe-area-inset-bottom));
+    text-align: left;
+}
+.install-close {
+    position: absolute; top: 10px; right: 14px;
+    background: none; border: none; color: #5a5a5a;
+    font-size: 22px; line-height: 1; cursor: pointer; padding: 6px;
+    transition: color 0.3s ease;
+}
+.install-close:hover { color: #8a8a8a; }
+.install-title { color: #c8c8c8; font-size: 17px; letter-spacing: 0.05em; margin-bottom: 8px; }
+.install-lead { color: #8a8a8a; font-size: 13px; line-height: 1.5; margin-bottom: 22px; }
+.install-platform {
+    display: none; color: #5a5a5a; font-size: 12px;
+    letter-spacing: 0.08em; text-transform: uppercase; margin: 18px 0 12px;
+}
+.install-overlay.show-both .install-platform { display: block; }
+.install-step { display: flex; gap: 12px; margin-bottom: 12px; }
+.install-step .n { color: #3a3a3a; font-size: 12px; flex-shrink: 0; padding-top: 2px; }
+.install-step span:last-child { color: #9a9a9a; font-size: 14px; line-height: 1.55; }
+.install-url-row { display: flex; align-items: center; gap: 12px; margin: -4px 0 14px 26px; }
+.install-url { color: #8a8a8a; font-size: 13px; word-break: break-all; }
+.install-copy {
+    flex-shrink: 0; background: none; border: 1px solid #2a2a2a; color: #8a8a8a;
+    font-size: 12px; padding: 6px 12px; cursor: pointer;
+    transition: color 0.3s ease, border-color 0.3s ease;
+}
+.install-copy:hover { color: #c8c8c8; border-color: #4a4a4a; }
+.install-copy.copied { color: #00A8E8; border-color: #00A8E8; }
+.install-dots { letter-spacing: 0.1em; }
+.install-ico { vertical-align: -2px; color: #8a8a8a; }
+.install-done { display: none; color: #8a8a8a; font-size: 14px; line-height: 1.6; padding: 8px 0 4px; }
+body.install-open { overflow: hidden; }
+</style>
 </head>
 <body>
    
@@ -277,7 +343,7 @@
         </div>
     </div>
 
-<div id="install-overlay" class="install-overlay">
+<div id="install-overlay" class="install-overlay" style="position:fixed;inset:0;z-index:3000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.88);opacity:0;pointer-events:none;transition:opacity 0.4s ease;">
       <div class="install-sheet">
         <button class="install-close" id="install-close" aria-label="Закрыть">×</button>
         <div class="install-title">Книга на рабочий стол</div>
