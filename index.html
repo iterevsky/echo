@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#0c0c0c">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Эхо">
+    <link rel="manifest" href="icons/manifest.json">
+    <link rel="icon" type="image/svg+xml" href="icons/icon.svg">
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+    <link rel="preload" as="image" href="Zastavka.jpg">
+    <link rel="preload" as="font" type="font/woff2" href="fonts/pt-serif-400-cyrillic.woff2" crossorigin>
+    <link rel="preload" as="font" type="font/woff2" href="fonts/golos-text-cyrillic.woff2" crossorigin>
+    <meta name="description" content="ЭХО — иммерсивная книга Итеревского-Кочетова Ивана. Психологический хоррор / мистика.">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="ЭХО — Итеревский-Кочетов Иван">
+    <meta property="og:description" content="Иммерсивная книга. Психологический хоррор. Читать бесплатно, в браузере.">
+    <meta property="og:url" content="https://iterevsky.github.io/echo/">
+    <meta property="og:image" content="https://iterevsky.github.io/echo/Zastavka.jpg">
+    <meta name="twitter:card" content="summary_large_image">
+    <title>ЭХО</title>
+
+    <link rel="stylesheet" href="style.css">
+<style>
+.install-overlay.visible { opacity: 1 !important; visibility: visible !important; pointer-events: auto !important; transition: opacity 0.4s ease, visibility 0s !important; }
+
+.install-trigger {
+    position: fixed;
+    top: calc(28px + env(safe-area-inset-top));
+    right: 80px;
+    left: auto;
+    z-index: 15;
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.6s ease;
+    color: #7f7f7f;
+}
+.install-trigger:active .install-svg { transform: scale(0.92); }
+.install-trigger.visible { opacity: 1; pointer-events: all; }
+.install-svg { width: 34px; height: 34px; transition: filter 0.3s ease, transform 0.3s ease; }
+.install-trigger:hover .install-svg {
+    filter: drop-shadow(0 0 10px rgba(0,168,232,0.55)) drop-shadow(0 0 24px rgba(0,168,232,0.3));
+    transform: scale(1.06);
+}
+
+.install-sheet {
+    position: relative;
+    width: min(430px, calc(100% - 48px));
+    max-height: calc(100% - 96px);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    background: #0c0c0c;
+    border: 1px solid #1c1c1c;
+    padding: 28px 24px calc(24px + env(safe-area-inset-bottom));
+    text-align: left;
+}
+.install-close {
+    position: absolute; top: 10px; right: 14px;
+    background: none; border: none; color: #5a5a5a;
+    font-size: 22px; line-height: 1; cursor: pointer; padding: 6px;
+    transition: color 0.3s ease;
+}
+.install-close:hover { color: #8a8a8a; }
+.install-title { color: #c8c8c8; font-size: 17px; letter-spacing: 0.05em; margin-bottom: 8px; }
+.install-lead { color: #8a8a8a; font-size: 13px; line-height: 1.5; margin-bottom: 22px; }
+.install-platform {
+    display: none; color: #5a5a5a; font-size: 12px;
+    letter-spacing: 0.08em; text-transform: uppercase; margin: 18px 0 12px;
+}
+.install-overlay.show-both .install-platform { display: block; }
+.install-step { display: flex; gap: 12px; margin-bottom: 12px; }
+.install-step .n { color: #3a3a3a; font-size: 12px; flex-shrink: 0; padding-top: 2px; }
+.install-step span:last-child { color: #9a9a9a; font-size: 14px; line-height: 1.55; }
+.install-url-row { display: flex; align-items: center; gap: 12px; margin: -4px 0 14px 26px; }
+.install-url { color: #8a8a8a; font-size: 13px; word-break: break-all; }
+.install-copy {
+    flex-shrink: 0; background: none; border: 1px solid #2a2a2a; color: #8a8a8a;
+    font-size: 12px; padding: 6px 12px; cursor: pointer;
+    transition: color 0.3s ease, border-color 0.3s ease;
+}
+.install-copy:hover { color: #c8c8c8; border-color: #4a4a4a; }
+.install-copy.copied { color: #00A8E8; border-color: #00A8E8; }
+.install-dots { letter-spacing: 0.1em; }
+.install-ico { vertical-align: -2px; color: #8a8a8a; }
+.install-done { display: none; color: #8a8a8a; font-size: 14px; line-height: 1.6; padding: 8px 0 4px; }
+.install-native {
+    width: 100%;
+    margin: -6px 0 20px;
+    padding: 12px;
+    background: none;
+    border: 1px solid #00A8E8;
+    color: #00A8E8;
+    font-family: 'PT Serif', serif;
+    font-size: 0.95rem;
+    letter-spacing: 0.06em;
+    cursor: pointer;
+    transition: background 0.3s ease, color 0.3s ease;
+}
+.install-native:hover { background: rgba(0, 168, 232, 0.08); }
+body.install-open { overflow: hidden; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute;display:none" aria-hidden="true">
+<symbol id="heron" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="512" cy="512" r="470" fill="none" stroke="currentColor" stroke-width="16"/>
+    <g fill="currentColor">
+      <path d="M385.479,87.148c33.38-25.555,75.434-53.138,119.203-37.934c41.348,14.813,54.001,67.06,38.3,104.823
+        c-15.559,42.003-55.336,74.388-56.423,121.507c26.117-3.454,51.816,5.155,75.866,14.419
+        c57.679,23.474,113.316,54.028,160.46,95.023c-70.842-5.613-139.524-28.774-203.771-58.464
+        c-18.568-7.707-37.698-16.905-58.267-16.265c-8.244,0-14.171,6.673-16.486,14.053c-14.25-24.965-14.656-56.84-2.081-82.552
+        c15.151-33.17,45.757-55.873,62.309-88.127c10.507-20.373,9.421-49.383-10.297-63.868c-24.587-17.416-58.019-15.362-85.156-5.365
+        C401.678,87.788,393.421,86.978,385.479,87.148 M528.263,130.131c1.046,19.994-11.19,36.887-22.691,51.986
+        c-16.617,23.605-33.916,49.46-35.524,79.164c9.015-36.206,36.899-63.161,52.38-96.331
+        C527.148,154.103,531.049,142.025,528.263,130.131z"/>
+      <path d="M413.218,95.849c1.074-12.431,15.087-14.026,24.901-14.838C435.647,92.722,425.401,101.959,413.218,95.849z"/>
+      <path d="M167.026,152.847c71.377-23.003,143.66-43.717,215.312-66.04c19.51,8.073,40.026,13.53,60.243,19.51
+        c17.952,2.434,42.473,0.838,51.411,20.425c5.064,16.317-6.451,31.535-15.558,44.031c-25.568,31.888-58.712,60.138-70.673,100.675
+        c-12.678,44.697,6.413,91.961,33.943,127.027c-20.778-35.342-36.337-79.215-20.713-119.53
+        c-0.065,63.814,43.782,116.011,85.117,160.145c40.59,41.663,86.57,78.145,136.332,108.252c6.843,2.656,9.199,10.076,12.732,15.833
+        c-20.831-5.457-40.707-14.276-59.72-24.299c1.06,12.456-2.616,24.665-4.579,36.677c12.692,31.378,23.618,63.789,39.974,93.505
+        c7.406,10.664-2.198,21.42-3.965,32.123c-17.468,79.046-36.376,157.765-53.844,236.811c-2.905,9.002-2.487,20.177,6.817,25.306
+        c-1.544,1.479-3.075,3.01-4.619,4.515c-26.223-0.654-52.235,5.169-77.529,11.319c2.16-6.74,8.179-10.744,14.969-11.699
+        c-19.391,1.818-38.849,2.734-58.358,2.945c8.754-13.388,26.837-8.256,40.145-11.829c10.965-2.748,26.85-6.674,27.608-20.427
+        c7.433-74.452,13.949-149.011,19.065-223.647c1.936-39.058-5.248-77.737-9.513-116.415c-1.583-8.034-0.314-17.338-6.163-23.868
+        c-11.946-15.57-15.152-35.289-21.406-53.321c-28.2-58.266-81.311-99.785-110.922-157.306
+        c-17.036-30.501-21.511-69.664-4.92-101.304c20.308-37.318,59.38-58.961,82.762-93.872c8.296-12.796,16.069-33.955,1.766-45.352
+        c-18.736-10.938-41.649-12.574-62.885-11.749C328.86,124.779,248.166,140.232,167.026,152.847 M548.844,534.181
+        c0.771,14.367-3.272,28.328-7.824,41.648c5.338,34.662,7.354,70.606,18.737,103.882c13.19,16.16-3.808,33.195-3.704,50.547
+        c-6.737,66.223-12.94,132.511-18.789,198.826c-0.903,8.583-0.222,17.323,2.29,25.606c8.505-1.452,17.338-6.425,18.907-15.637
+        c15.637-67.099,29.441-134.604,42.763-202.201c4.645-28.225,14.707-58.319,3.44-86.243c-8.375-23.749-16.173-47.811-25.686-71.09
+        C565.292,567.286,555.019,551.452,548.844,534.181z"/>
+      <path d="M490.695,330.802c44.62,33.654,96.265,56.527,149.089,74.007c36.376,12.85,74.729,23.515,105.726,47.499
+        c29.938,22.859,48.859,56.578,64.078,90.312c20.844,47.813,34.596,98.529,43.532,149.85c4.829,31.835,8.271,67.439-9.892,95.951
+        c0.131-63.881-27.255-123.078-54.748-179.251c7.982,37.423,15.964,74.938,22.088,112.701
+        c-29.585-61.447-58.908-124.15-73.799-191.001c4.514,44.384,15.951,87.813,26.876,130.979
+        c-32.307-54.276-57.875-113.106-71.574-174.866c5.247,43.218,17.143,85.339,26.864,127.668
+        c-25.543-44.974-51.778-90.521-65.477-140.715c6.425,34.977,16.421,69.364,29.271,102.508
+        c-34.544-37.254-59.287-83.378-72.987-132.198c6.829,35.185,18.843,69.717,35.329,101.552
+        c-38.378-34.976-64.456-81.388-83.626-129.135c6.203,27.439,19.143,52.994,32.687,77.489
+        c-34.191-34.91-68.277-71.233-90.914-115.03C496.269,364.116,488.039,347.787,490.695,330.802z"/>
+    </g>
+</symbol>
+</svg>
+   
+    <!-- Экран с обложкой -->
+    <div id="cover-screen">
+        <img src="Zastavka.jpg" alt="ЭХО" draggable="false">
+    </div>
+
+    <!-- Экран с вопросом -->
+    <div id="text-screen">
+        <div id="glitch-text">Что страшнее – исчезнуть или быть забытым?</div>
+    </div>
+
+    <!-- Финальный тёмный экран -->
+    <div id="final-screen"></div>
+
+    <!-- Проекторная плёнка: серия кадров между вспышкой и названием -->
+    <div id="film-screen">
+      <div class="film-gate">
+        <div class="film-rail film-rail-left"></div>
+        <img class="film-image" src="" alt="" draggable="false">
+        <img class="film-halo" alt="" draggable="false" aria-hidden="true">
+        <div class="film-rail film-rail-right"></div>
+      </div>
+      <div class="film-grain"></div>
+    </div>
+
+    <!-- Экран с названием книги -->
+    <div id="title-screen">
+        <div class="author">Итеревский-Кочетов Иван</div>
+        <div class="book-title">Э<span class="h-char">Х</span>О</div>
+    </div>
+
+    <!-- Экран с оглавлением -->
+    <div id="contents-screen">
+        <div class="crt-vignette"></div>
+        <div class="crt-scanlines"></div>
+        <div class="crt-noise"></div>
+        <div class="crt-rolling"></div>
+        <div class="contents-list">
+        <div class="contents-header">Оглавление</div>
+            <a class="contents-item" data-chapter="0" href="?ch=0">01 <span class="dot"></span> В начале была метель</a>
+            <a class="contents-item" data-chapter="1" href="?ch=1">02 <span class="dot"></span> Разложив большую часть</a>
+            <a class="contents-item" data-chapter="2" href="?ch=2">03 <span class="dot"></span> Воздух казался мне другим</a>
+            <a class="contents-item" data-chapter="3" href="?ch=3">04 <span class="dot"></span> Ветер резко подул с реки</a>
+            <a class="contents-item" data-chapter="4" href="?ch=4">05 <span class="dot"></span> Я шёл по спальному району</a>
+            <a class="contents-item" data-chapter="5" href="?ch=5">06 <span class="dot"></span> Дома пахло едой</a>
+            <a class="contents-item" data-chapter="6" href="?ch=6">07 <span class="dot"></span> Ночью долго не мог уснуть</a>
+            <a class="contents-item" data-chapter="7" href="?ch=7">08 <span class="dot"></span> Мне снилось</a>
+            <a class="contents-item" data-chapter="8" href="?ch=8">09 <span class="dot"></span> Я вышел из своей комнаты</a>
+            <a class="contents-item" data-chapter="9" href="?ch=9">10 <span class="dot"></span> Мама вернулась из школы</a>
+            <a class="contents-item" data-chapter="10" href="?ch=10">11 <span class="dot"></span> Долго ворочался и не мог уснуть</a>
+            <a class="contents-item" data-chapter="11" href="?ch=11">12 <span class="dot"></span> Утром заверещал будильник</a>
+            <a class="contents-item" data-chapter="12" href="?ch=12">13 <span class="dot"></span> Улица встретила туманом</a>
+            <a class="contents-item" data-chapter="13" href="?ch=13">14 <span class="dot"></span> Ольга Васильевна зашла со мной в класс</a>
+            <a class="contents-item" data-chapter="14" href="?ch=14">15 <span class="dot"></span> Прозвенел звонок</a>
+            <a class="contents-item" data-chapter="15" href="?ch=15">16 <span class="dot"></span> Оставшийся день пролетел незаметно</a>
+            <a class="contents-item" data-chapter="16" href="?ch=16">17 <span class="dot"></span> Когда я пришёл домой</a>
+            <a class="contents-item" data-chapter="17" href="?ch=17">18 <span class="dot"></span> Я шёл в школу как на казнь</a>
+            <a class="contents-item" data-chapter="18" href="?ch=18">19 <span class="dot"></span> Монотонно звучал голос Елены Николаевны</a>
+            <a class="contents-item" data-chapter="19" href="?ch=19">20 <span class="dot"></span> Я вышел из школы, погружённый в свои мысли</a>
+            <a class="contents-item" data-chapter="20" href="?ch=20">21 <span class="dot"></span> Мне не хотелось домой</a>
+            <a class="contents-item" data-chapter="21" href="?ch=21">22 <span class="dot"></span> Я шёл в школу, вжимая плечи от ветра</a>
+            <a class="contents-item" data-chapter="22" href="?ch=22">23 <span class="dot"></span> В класс вошла </a>
+            <a class="contents-item" data-chapter="23" href="?ch=23">24 <span class="dot"></span> Закончился последний урок</a>
+            <a class="contents-item" data-chapter="24" href="?ch=24">25 <span class="dot"></span> Я стоял у раздевалки</a>
+            <a class="contents-item" data-chapter="25" href="?ch=25">26 <span class="dot"></span> Квартира Максима</a>
+            <a class="contents-item" data-chapter="26" href="?ch=26">27 <span class="dot"></span> Апрельский воздух</a>
+            <a class="contents-item" data-chapter="27" href="?ch=27">28 <span class="dot"></span> Вечером я сидел за столом в своей комнате</a>
+            <a class="contents-item" data-chapter="28" href="?ch=28">29 <span class="dot"></span> Перед последним уроком </a>
+            <a class="contents-item" data-chapter="29" href="?ch=29">30 <span class="dot"></span> Коридоры опустели быстрее, чем обычно</a>
+            <a class="contents-item" data-chapter="30" href="?ch=30">31 <span class="dot"></span> Шли молча</a>
+            <a class="contents-item" data-chapter="31" href="?ch=31">32 <span class="dot"></span> Мы зашли в лифт</a>
+            <a class="contents-item" data-chapter="32" href="?ch=32">33 <span class="dot"></span> На следующий день</a>
+            <a class="contents-item" data-chapter="33" href="?ch=33">34 <span class="dot"></span> Я направился к подъезду Максима</a>
+            <a class="contents-item" data-chapter="34" href="?ch=34">35 <span class="dot"></span> Он был подобен взрыву</a>
+            <a class="contents-item" data-chapter="35" href="?ch=35">36 <span class="dot"></span> Мы стояли на улице</a>
+            <a class="contents-item" data-chapter="36" href="?ch=36">37 <span class="dot"></span> Максим нажал на кнопку с номером квартиры </a>
+            <a class="contents-item" data-chapter="37" href="?ch=37">38 <span class="dot"></span> На улице пахло весной </a>
+            <a class="contents-item" data-chapter="38" href="?ch=38">39 <span class="dot"></span> На следующий день мы собрались у Максима </a>
+            <a class="contents-item" data-chapter="39" href="?ch=39">40 <span class="dot"></span> Чиркнула зажигалка </a>
+            <a class="contents-item" data-chapter="40" href="?ch=40">41 <span class="dot"></span> Максим первым нарушил молчание </a>
+            <a class="contents-item" data-chapter="41" href="?ch=41">42 <span class="dot"></span> Наступил понедельник </a>
+            <a class="contents-item" data-chapter="42" href="?ch=42">43 <span class="dot"></span> Мы вышли вместе с Варварой </a>
+            <a class="contents-item" data-chapter="43" href="?ch=43">44 <span class="dot"></span> Домофон издал характерный звук </a>
+            <a class="contents-item" data-chapter="44" href="?ch=44">45 <span class="dot"></span> Утром было пасмурно </a>
+            <a class="contents-item" data-chapter="45" href="?ch=45">46 <span class="dot"></span> После школы мы все вместе вышли со двора </a>
+            <a class="contents-item" data-chapter="46" href="?ch=46">47 <span class="dot"></span> Я сидел у окна троллейбуса </a>
+            <a class="contents-item" data-chapter="47" href="?ch=47">48 <span class="dot"></span> Обратно решил идти к Комсомольской </a>
+            <a class="contents-item" data-chapter="48" href="?ch=48">49 <span class="dot"></span> Обессиленный, я влетел в свою квартиру </a>
+            <a class="contents-item" data-chapter="49" href="?ch=49">50 <span class="dot"></span> Вечером скрип ключа в замке </a>
+            <a class="contents-item" data-chapter="50" href="?ch=50">51 <span class="dot"></span> Утром я стоял у подъезда </a>
+            <a class="contents-item" data-chapter="51" href="?ch=51">52 <span class="dot"></span> Когда прозвенел последний звонок </a>
+            <a class="contents-item" data-chapter="52" href="?ch=52">53 <span class="dot"></span> Первым не выдержал Максим </a>
+            <a class="contents-item" data-chapter="53" href="?ch=53">54 <span class="dot"></span> — Первый путь, — пробормотал Костя </a>
+            <a class="contents-item" data-chapter="54" href="?ch=54">55 <span class="dot"></span> Шли молча </a>
+            <a class="contents-item" data-chapter="55" href="?ch=55">56 <span class="dot"></span> Проснулся без будильника </a>
+            <a class="contents-item" data-chapter="56" href="?ch=56">57 <span class="dot"></span> Мы уже проходили железнодорожный мост </a>
+            <a class="contents-item" data-chapter="57" href="?ch=57">58 <span class="dot"></span> Толпа с Брода, как единый, но шумный организм </a>
+            <a class="contents-item" data-chapter="58" href="?ch=58">59 <span class="dot"></span> Утренний воздух не казался мне таким враждебным </a>
+            <a class="contents-item" data-chapter="59" href="?ch=59">60 <span class="dot"></span> День выдался насыщенным </a>
+            <a class="contents-item" data-chapter="60" href="?ch=60">61 <span class="dot"></span> Вечером я сидел в своей комнате</a>
+            <a class="contents-item" data-chapter="61" href="?ch=61">62 <span class="dot"></span> Погода на улице была по-весеннему свежей</a>
+            <a class="contents-item" data-chapter="62" href="?ch=62">63 <span class="dot"></span> Мы стояли на рыхлой и влажной земле</a>
+            <a class="contents-item" data-chapter="63" href="?ch=63">64 <span class="dot"></span> Вечер наступил незаметно</a>
+            <a class="contents-item" data-chapter="64" href="?ch=64">65 <span class="dot"></span> Утром я повернулся на бок</a>
+            <a class="contents-item" data-chapter="65" href="?ch=65">66 <span class="dot"></span> Я сходил в душ, позавтракал</a>
+            <a class="contents-item" data-chapter="66" href="?ch=66">67 <span class="dot"></span> Перед дверью близнецов</a>
+            <a class="contents-item" data-chapter="67" href="?ch=67">68 <span class="dot"></span> Дома меня встретили сдержанно</a>
+            <a class="contents-item" data-chapter="68" href="?ch=68">69 <span class="dot"></span> — Папку с документами не забудь</a>
+            <a class="contents-item" data-chapter="69" href="?ch=69">70 <span class="dot"></span> Выйдя со школьного двора</a>
+        </div>
+    </div>
+    <button class="menu-trigger" id="menu-trigger" aria-label="Меню">
+      <svg class="heron-svg"><use href="#heron"/></svg>
+    </button>
+
+    <button class="install-trigger" id="install-trigger" aria-label="Книга на рабочий стол">
+      <svg class="install-svg" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="512" cy="512" r="470" fill="none" stroke="currentColor" stroke-width="16"/>
+        <g fill="none" stroke="currentColor" stroke-width="46" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M512 286v336"/>
+          <path d="M392 502l120 120 120-120"/>
+          <path d="M306 692v58a30 30 0 0 0 30 30h352a30 30 0 0 0 30-30v-58"/>
+        </g>
+      </svg>
+    </button>
+
+    <!-- Экран главы -->
+    <div id="chapter-screen">
+    <div class="crt-vignette"></div>
+    <div class="crt-scanlines"></div>
+    <div class="crt-noise" id="crt-noise"></div>
+        <div class="chapter-number"></div>
+        <div class="chapter-title"></div>
+        <div class="chapter-text"></div>
+        <div id="chapter-bar">
+            <div id="chapter-progress">
+                <div class="progress-track"><div class="progress-fill"></div></div>
+            </div>
+            <div class="chapter-nav">
+                <button type="button" class="nav-prev">← назад</button>
+                <button type="button" class="nav-contents">оглавление</button>
+                <button type="button" class="nav-aa" aria-label="Настройки чтения">Aa</button>
+                <button type="button" class="nav-next">вперёд →</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="menu-overlay" class="menu-overlay">
+      <button class="menu-close" id="menu-close" aria-label="Закрыть меню">
+        <svg class="heron-svg"><use href="#heron"/></svg>
+      </button>
+
+        <div class="menu-content">
+            <div class="menu-item menu-contacts">
+                <div class="contacts-label">Контакты:</div>
+                <a href="https://t.me/iterevsky" target="_blank" rel="noopener" class="contacts-link">t.me/iterevsky</a>
+            </div>
+            
+            <div class="menu-item menu-donate">
+                <div class="donate-label">Поблагодарить автора:</div>
+                <div class="donate-block">
+                    <span class="donate-card" id="donate-card-1">2200 1546 7779 2417</span>
+                    <button class="donate-copy" data-target="donate-card-1">Копировать</button>
+                    <span class="donate-bank">альфа</span>
+                </div>
+                <div class="donate-block">
+                    <span class="donate-card" id="donate-card-2">2202 2004 4943 1194</span>
+                    <button class="donate-copy" data-target="donate-card-2">Копировать</button>
+                    <span class="donate-bank">сбер</span>
+                </div>
+            </div>
+            
+            <div class="menu-separator"></div>
+            
+            <div class="menu-item menu-about">
+                <div class="about-label">О проекте</div>
+                <div class="about-text">
+                    <p>«ЭХО» — книга Итеревского-Кочетова Ивана.</p>
+                    <p>Книга выходит по главам и живёт прямо здесь, в браузере: без регистрации и рекламы. Новые главы — по мере написания, примерно раз в две недели.</p>
+                    <p>Если книга отзывается, её можно поддержать — реквизиты выше.</p>
+                    <p>Написать автору: <a href="https://t.me/iterevsky" target="_blank" rel="noopener" class="contacts-link">t.me/iterevsky</a></p>
+                </div>
+            </div>
+
+            <div class="menu-item menu-contacts">
+                <div class="contacts-label">Другой проект автора:</div>
+                <a href="https://iterevsky.github.io/zettel/" target="_blank" rel="noopener" class="contacts-link">Цеттель — архив мыслей</a>
+            </div>
+
+            <div class="menu-copy">© Итеревский-Кочетов Иван. Все права защищены.</div>
+        </div>
+    </div>
+
+<div id="install-overlay" class="install-overlay" style="position:fixed;inset:0;z-index:3000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.88);opacity:0;visibility:hidden;pointer-events:none;transition:opacity 0.4s ease, visibility 0s linear 0.4s;">
+      <div class="install-sheet">
+        <button class="install-close" id="install-close" aria-label="Закрыть">×</button>
+        <div class="install-title">Книга на рабочий стол</div>
+        <div class="install-lead">Открывается как приложение — во весь экран, без адресной строки.</div>
+        <button class="install-native" id="install-native" type="button" style="display:none">Установить</button>
+
+        <div class="install-block" id="install-android">
+          <div class="install-platform">На Android</div>
+          <div class="install-step"><span class="n">01</span><span>Скопируйте адрес книги:</span></div>
+          <div class="install-url-row">
+            <span class="install-url" id="install-url">https://iterevsky.github.io/echo/</span>
+            <button class="install-copy" id="install-copy">Копировать</button>
+          </div>
+          <div class="install-step"><span class="n">02</span><span>Откройте браузер, которым обычно пользуетесь, и вставьте адрес в строку вверху экрана.</span></div>
+          <div class="install-step"><span class="n">03</span><span>Откройте меню браузера — значок <span class="install-dots">⋮</span> в углу экрана (у некоторых браузеров — три полосы).</span></div>
+          <div class="install-step"><span class="n">04</span><span>Найдите «Добавить на главный экран». Он может называться «Установить приложение» или «Добавить ярлык». Подтвердите.</span></div>
+        </div>
+
+        <div class="install-block" id="install-ios">
+          <div class="install-platform">На iPhone</div>
+          <div class="install-step"><span class="n">01</span><span>Скопируйте адрес книги (кнопка выше).</span></div>
+          <div class="install-step"><span class="n">02</span><span>Откройте штатный браузер айфона и вставьте адрес в строку вверху — ярлык на айфоне добавляет только он.</span></div>
+          <div class="install-step"><span class="n">03</span><span>Нажмите «Поделиться» — <svg class="install-ico" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V4"/><path d="M8 8l4-4 4 4"/><path d="M5 12v7a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-7"/></svg> внизу экрана.</span></div>
+          <div class="install-step"><span class="n">04</span><span>Пролистайте список вниз и выберите «На экран “Домой”» → «Добавить».</span></div>
+        </div>
+
+        <div class="install-done" id="install-done">Книга уже на вашем рабочем столе.</div>
+      </div>
+    </div>
+
+<div id="progress-overlay"></div>
+<div id="tear-overlay" style="position:fixed;inset:0;pointer-events:none;z-index:90;display:none;">
+  <div class="tear-top" style="position:absolute;top:0;left:0;width:100%;height:55%;background:transparent;pointer-events:none;"></div>
+  <div class="tear-bottom" style="position:absolute;bottom:0;left:0;width:100%;height:55%;background:transparent;pointer-events:none;"></div>
+  <div class="tear-line" style="position:absolute;top:0;left:0;width:100%;height:1px;background:rgba(232,230,227,0.3);box-shadow:0 0 8px rgba(232,230,227,0.2);opacity:0;"></div>
+</div>
+<!-- PHOTO overlay -->
+<div id="photo-overlay">
+  <div id="photo-backdrop"></div>
+  <div id="photo-container">
+    <img id="photo-image" src="" alt="">
+    <button id="photo-close" aria-label="Закрыть">×</button>
+  </div>
+</div>
+
+    <div id="swipe-hint"></div>
+
+    <!-- Шторка настроек чтения -->
+    <div id="reader-sheet-backdrop"></div>
+    <div id="reader-sheet">
+        <div class="rs-row">
+            <span class="rs-label">Размер</span>
+            <div class="rs-size">
+                <button class="rs-size-btn" data-dir="-1" aria-label="Меньше">−</button>
+                <div class="rs-size-dots">
+                    <span class="rs-dot"></span><span class="rs-dot"></span>
+                    <span class="rs-dot"></span><span class="rs-dot"></span>
+                </div>
+                <button class="rs-size-btn" data-dir="1" aria-label="Больше">+</button>
+            </div>
+        </div>
+        <div class="rs-row">
+            <span class="rs-label">Тон</span>
+            <div class="rs-tones">
+                <button class="rs-tone" data-tone="standard">Стандартный</button>
+                <button class="rs-tone" data-tone="soft">Мягкий</button>
+                <button class="rs-tone" data-tone="warm">Тёплый</button>
+            </div>
+        </div>
+        <div class="rs-row">
+            <span class="rs-label">Приглушение</span>
+            <input type="range" class="rs-dim" min="0" max="45" value="0" aria-label="Приглушение">
+        </div>
+    </div>
+    <div id="reader-dim"></div>
+
+    <script src="chapters.js"></script>
+<script src="script.js"></script>
+
+</body>
+</html>
