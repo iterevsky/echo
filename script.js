@@ -52,8 +52,6 @@ let readPosTimer = null;
 const STORAGE_KEY = 'echo_state';
 
 /* === СВАЙП ВВЕРХ: ПЕРЕХОД К СЛЕДУЮЩЕЙ ГЛАВЕ === */
-let swipeHintState = 'idle'; // 'idle' | 'hint-shown'
-let swipeHintTimer = null;
 let swipeStartY = 0;
 let swipeStartX = 0;
 let swipeAnchorY = 0;
@@ -61,10 +59,9 @@ let swipeReachedBottom = false;
 let swipeMaxPull = 0;
 let swipeIsTracking = false;
 
-const SWIPE_RESISTANCE = 0.25;   // тугость: палец 100px → контент 5px
-const SWIPE_HINT_THRESHOLD = 5;  // смещение контента для подсказки
-const SWIPE_LONG_THRESHOLD = 35; // смещение контента для перехода
-const SWIPE_HINT_TIMEOUT = 2000;
+const SWIPE_RESISTANCE = 0.25;   // тугость: палец 100px → контент 25px
+const SWIPE_HINT_THRESHOLD = 10; // смещение контента, с которого видна подсказка во время тяги
+const SWIPE_LONG_THRESHOLD = 26; // смещение контента для перехода (≈104px пальцем после упора)
 const MAX_PULL_OFFSET = 40;
 
 const swipeHintEl = document.getElementById('swipe-hint');
@@ -76,9 +73,7 @@ function isAtBottom() {
 }
 
 function showSwipeHint() {
-    if (!swipeHintEl) return;
-    swipeHintEl.classList.remove('visible');
-    void swipeHintEl.offsetWidth;
+    if (!swipeHintEl || swipeHintEl.classList.contains('visible')) return;
     swipeHintEl.classList.add('visible');
 }
 
@@ -95,15 +90,10 @@ function resetSwipePull() {
 }
 
 function resetSwipeHint() {
-    swipeHintState = 'idle';
     swipeIsTracking = false;
     swipeReachedBottom = false;
     swipeAnchorY = 0;
     swipeMaxPull = 0;
-    if (swipeHintTimer) {
-        clearTimeout(swipeHintTimer);
-        swipeHintTimer = null;
-    }
     hideSwipeHint();
     resetSwipePull();
 }
@@ -176,6 +166,10 @@ function handleChapterTouchMove(e) {
     const pullOffset = Math.min(dy * SWIPE_RESISTANCE, MAX_PULL_OFFSET);
     swipeMaxPull = Math.max(swipeMaxPull, pullOffset);
 
+    // живая подсказка: видна, пока тянешь; гаснет при ослаблении/отпускании
+    if (pullOffset >= SWIPE_HINT_THRESHOLD) showSwipeHint();
+    else hideSwipeHint();
+
     chapterScreen.classList.add('swipe-pulling');
     chapterScreen.style.setProperty('--swipe-pull-offset', (-pullOffset) + 'px');
 }
@@ -183,27 +177,11 @@ function handleChapterTouchMove(e) {
 function handleChapterTouchEnd(e) {
     if (!swipeIsTracking) return;
     swipeIsTracking = false;
-    resetSwipePull();
 
-    // Действуем только если достигли конца во время жеста
-    if (!swipeReachedBottom) return;
-
-    // Длинное давление — сразу переход
-    if (swipeMaxPull >= SWIPE_LONG_THRESHOLD) {
-        goNextChapter();
-        return;
-    }
-
-    // Короткое давление — подсказка или переход
-    if (swipeMaxPull >= SWIPE_HINT_THRESHOLD) {
-        if (swipeHintState === 'hint-shown') {
-            goNextChapter();
-        } else {
-            swipeHintState = 'hint-shown';
-            showSwipeHint();
-            swipeHintTimer = setTimeout(() => resetSwipeHint(), SWIPE_HINT_TIMEOUT);
-        }
-    }
+    // переход только если во время жеста упёрлись в низ и продавили порог
+    const navigate = swipeReachedBottom && swipeMaxPull >= SWIPE_LONG_THRESHOLD;
+    resetSwipeHint();
+    if (navigate) goNextChapter();
 }
 
 function handleChapterTouchCancel(e) {
