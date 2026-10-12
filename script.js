@@ -580,9 +580,10 @@ function openChapter(index, opts = {}) {
         saveState({ seenNew: seen });
     }
 
-    // точка «назад» системной кнопки Android (в ответ на popstate не пушим)
+    // точка «назад» системной кнопки Android (в ответ на popstate не пушим);
+    // в адресе всегда ссылка на открытую главу — можно скопировать вручную
     if (!opts.fromPop) {
-        try { history.pushState({ echoChapter: index }, ''); } catch (e) {}
+        try { history.pushState({ echoChapter: index }, '', '#ch-' + chapters[index].number); } catch (e) {}
     }
 
     currentChapter = index;
@@ -2130,35 +2131,121 @@ if ('serviceWorker' in navigator) {
 
     function renderCard(quote) {
         return new Promise((resolve) => {
+            const W = 1200, H = 630, M = 90;
+            const CYAN = '#00A8E8';
             const cv = document.createElement('canvas');
-            cv.width = 1200; cv.height = 630;
+            cv.width = W; cv.height = H;
             const ctx = cv.getContext('2d');
-            ctx.fillStyle = '#0c0c0c';
-            ctx.fillRect(0, 0, 1200, 630);
-            ctx.fillStyle = 'rgba(0,168,232,0.5)';
-            ctx.fillRect(90, 96, 72, 3);
-            ctx.fillStyle = '#d8d5d0';
-            ctx.font = '44px "PT Serif", serif';
             ctx.textBaseline = 'top';
-            const words = quote.split(' ');
-            const lines = [];
-            let line = '';
-            words.forEach((w) => {
-                const t = line ? line + ' ' + w : w;
-                if (ctx.measureText(t).width > 1020 && line) { lines.push(line); line = w; }
-                else line = t;
-            });
-            if (line) lines.push(line);
-            lines.slice(0, 8).forEach((l, i) => ctx.fillText(l, 90, 140 + i * 68));
-            if (lines.length > 8) ctx.fillText('…', 90, 140 + 8 * 68);
+
+            /* разряженный текст (letterSpacing в canvas поддержан не везде — вручную) */
+            function tracked(text, x, y, font, color, tr, alignRight) {
+                ctx.font = font;
+                ctx.fillStyle = color;
+                const chars = [...text];
+                const widths = chars.map((ch) => ctx.measureText(ch).width);
+                const total = widths.reduce((a, b) => a + b, 0) + tr * (chars.length - 1);
+                let cx = alignRight ? x - total : x;
+                chars.forEach((ch, i) => { ctx.fillText(ch, cx, y); cx += widths[i] + tr; });
+                return total;
+            }
+
+            /* фон */
+            ctx.fillStyle = '#0c0c0c';
+            ctx.fillRect(0, 0, W, H);
+
+            /* верх: циановая риска + ЭХО слева, номер главы справа */
+            const chNum = chapters[currentChapter] ? chapters[currentChapter].number : '';
+            ctx.fillStyle = CYAN;
+            ctx.fillRect(M, 84, 72, 3);
+            tracked('ЭХО', M + 88, 74, '700 24px "Golos Text", sans-serif', '#c8c8c8', 6);
+            tracked('ГЛАВА ' + chNum, W - M, 76, '500 22px "Golos Text", sans-serif', '#8a8a8a', 5, true);
+
+            /* гигантская кавычка с циановым свечением */
+            ctx.font = '700 210px "PT Serif", serif';
+            ctx.shadowColor = 'rgba(0,168,232,0.85)';
+            ctx.shadowBlur = 24;
+            ctx.fillStyle = 'rgba(0,168,232,0.45)';
+            ctx.fillText('“', M - 14, 108);
+            ctx.shadowBlur = 0;
+
+            /* текст цитаты: адаптивный размер, максимум 4 строки с многоточием */
+            function wrapAt(px) {
+                ctx.font = px + 'px "PT Serif", serif';
+                const lines = [];
+                let line = '';
+                quote.split(' ').forEach((w) => {
+                    const t = line ? line + ' ' + w : w;
+                    if (ctx.measureText(t).width > W - 2 * M && line) { lines.push(line); line = w; }
+                    else line = t;
+                });
+                if (line) lines.push(line);
+                return lines;
+            }
+            let size = 46, lh = 70, y0 = 300;
+            let lines = wrapAt(size);
+            if (lines.length > 3) { size = 40; lh = 62; y0 = 272; lines = wrapAt(size); }
+            if (lines.length > 4) {
+                lines = lines.slice(0, 4);
+                let lastLine = lines[3];
+                while (lastLine.length && ctx.measureText(lastLine + ' …').width > W - 2 * M) {
+                    lastLine = lastLine.slice(0, -1);
+                }
+                lines[3] = lastLine.trim() + ' …';
+            }
+            ctx.fillStyle = '#e8e5e0';
+            lines.forEach((l, i) => ctx.fillText(l, M, y0 + i * lh));
+
+            /* низ: волосяная линия, глитч-лого, автор, ссылка */
+            ctx.fillStyle = '#222222';
+            ctx.fillRect(M, H - 96, W - 2 * M, 1);
+            ctx.font = '700 30px "Golos Text", sans-serif';
+            ctx.fillStyle = 'rgba(0,168,232,0.6)';
+            ctx.fillText('ЭХО', M - 2, H - 76);
+            ctx.fillStyle = 'rgba(232,60,60,0.45)';
+            ctx.fillText('ЭХО', M + 2, H - 76);
+            const markW = tracked('ЭХО', M, H - 76, '700 30px "Golos Text", sans-serif', '#ebebeb', 4);
+            ctx.font = '500 22px "Golos Text", sans-serif';
             ctx.fillStyle = '#6b6b6b';
-            ctx.font = '26px "PT Serif", serif';
-            const tag = 'ЭХО · глава ' + (chapters[currentChapter] ? chapters[currentChapter].number : '');
-            ctx.fillText(tag, 90, 560);
+            ctx.fillText('· Итеревский-Кочетов', M + markW + 24, H - 70);
             ctx.fillStyle = '#8a8a8a';
-            ctx.fillText('iterevsky.github.io/echo', 90 + ctx.measureText(tag).width + 28, 560);
+            const url = 'iterevsky.github.io/echo';
+            ctx.fillText(url, W - M - ctx.measureText(url).width, H - 70);
+
+            /* виньетка поверх всего */
+            const vg = ctx.createRadialGradient(W / 2, H / 2, 200, W / 2, H / 2, 760);
+            vg.addColorStop(0, 'rgba(0,0,0,0)');
+            vg.addColorStop(1, 'rgba(0,0,0,0.42)');
+            ctx.fillStyle = vg;
+            ctx.fillRect(0, 0, W, H);
+
+            /* сканлайны */
+            ctx.fillStyle = 'rgba(0,0,0,0.14)';
+            for (let yy = 0; yy < H; yy += 3) ctx.fillRect(0, yy, W, 1);
+
+            /* зерно */
+            for (let i = 0; i < 2600; i++) {
+                ctx.fillStyle = Math.random() > 0.5 ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.05)';
+                ctx.fillRect(Math.random() * W, Math.random() * H, 1, 1);
+            }
+
             cv.toBlob((blob) => resolve(blob), 'image/png');
         });
+    }
+
+    function chapterLink() {
+        const ch = chapters[currentChapter];
+        return 'https://iterevsky.github.io/echo/#ch-' + (ch ? ch.number : '');
+    }
+
+    function shareCaption(text) {
+        let teaser = text;
+        if (teaser.length > 140) {
+            teaser = teaser.slice(0, 140);
+            teaser = teaser.slice(0, teaser.lastIndexOf(' ')) + '…';
+        }
+        const num = chapters[currentChapter] ? chapters[currentChapter].number : '';
+        return '«' + teaser + '»\n— ЭХО, глава ' + num + '. Читать целиком: ' + chapterLink();
     }
 
     async function share() {
@@ -2168,16 +2255,23 @@ if ('serviceWorker' in navigator) {
         if (!q) return;
         sharing = true;
         try {
+            await document.fonts.ready; /* шрифты карточки точно загружены */
             const blob = await renderCard(q.text);
             const file = new File([blob], 'echo-quote.png', { type: 'image/png' });
             if (navigator.canShare && navigator.canShare({ files: [file] })) {
-                await navigator.share({ files: [file], title: 'ЭХО' });
+                try {
+                    await navigator.share({ files: [file], text: shareCaption(q.text), title: 'ЭХО' });
+                } catch (err) {
+                    if (err && err.name === 'AbortError') throw err; /* пользователь отменил — молчим */
+                    await navigator.share({ files: [file], title: 'ЭХО' }); /* комбо не поддержано — только файл */
+                }
             } else {
                 const a = document.createElement('a');
                 a.href = URL.createObjectURL(blob);
                 a.download = 'echo-quote.png';
                 a.click();
                 setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+                try { await navigator.clipboard.writeText(shareCaption(q.text)); } catch (e) {}
             }
         } catch (err) {}
         sharing = false;
@@ -2203,3 +2297,13 @@ if ('serviceWorker' in navigator) {
         }
     }, true);
 })();
+
+/* ссылка вида #ch-12 открывает сразу нужную главу */
+window.addEventListener('load', () => {
+    const m = (location.hash || '').match(/^#ch-(\d+)$/);
+    if (!m) return;
+    const idx = chapters.findIndex((c) => String(c.number) === m[1]);
+    if (idx < 0 || chapters[idx].empty) return; /* пустые главы («в работе») не открываем */
+    hideIntroScreens(); /* новый читатель по ссылке — без заставки */
+    openChapter(idx);
+});
