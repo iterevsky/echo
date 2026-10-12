@@ -2082,14 +2082,16 @@ if ('serviceWorker' in navigator) {
 }
 
 /* ============================================================
-   ПОДЕЛИТЬСЯ ЦИТАТОЙ: плашка над выделением -> canvas 1200x630
+   ПОДЕЛИТЬСЯ ЦИТАТОЙ: плавающая кнопка у правого края -> canvas 1200x630
    ============================================================ */
 (function shareQuote() {
     const chScreen = document.getElementById('chapter-screen');
     if (!chScreen) return;
 
-    let pill = null;
+    let fab = null;
     let selTimer = null;
+
+    const FAB_ICON = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V4"/><path d="M8 8l4-4 4 4"/><path d="M5 12v7a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-7"/></svg>';
 
     function getQuote() {
         const sel = window.getSelection();
@@ -2099,24 +2101,27 @@ if ('serviceWorker' in navigator) {
         const node = sel.anchorNode;
         const el = node && (node.nodeType === 3 ? node.parentElement : node);
         if (!el || !el.closest('.chapter-text')) return null;
-        return { text, rect: sel.getRangeAt(0).getBoundingClientRect() };
+        return { text };
     }
 
-    function hidePill() {
-        if (pill) { pill.remove(); pill = null; }
+    function hideFab() {
+        if (fab) { fab.remove(); fab = null; }
     }
 
-    function showPill() {
-        if (!pill) {
-            pill = document.createElement('button');
-            pill.type = 'button';
-            pill.className = 'share-pill';
-            pill.textContent = 'Поделиться';
-            pill.addEventListener('mousedown', (e) => e.preventDefault());
-            pill.addEventListener('click', share);
-            document.body.appendChild(pill);
+    function showFab() {
+        if (!fab) {
+            fab = document.createElement('div');
+            fab.className = 'share-fab-wrap share-fab-in';
+            fab.setAttribute('role', 'group');
+            fab.setAttribute('aria-label', 'Поделиться цитатой');
+            fab.innerHTML = '<span class="share-fab-label">Поделиться</span>' +
+                '<button type="button" class="share-fab">' + FAB_ICON + '</button>';
+            /* тап не сбрасывает выделение до генерации карточки */
+            fab.addEventListener('mousedown', (e) => e.preventDefault());
+            fab.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
+            fab.addEventListener('click', share);
+            document.body.appendChild(fab);
         }
-        // позиция фиксированная сверху (CSS) — под нативным меню выделения не прячется
     }
 
     function renderCard(quote) {
@@ -2154,7 +2159,7 @@ if ('serviceWorker' in navigator) {
 
     async function share() {
         const q = getQuote();
-        hidePill();
+        hideFab();
         if (!q) return;
         try {
             const blob = await renderCard(q.text);
@@ -2174,12 +2179,20 @@ if ('serviceWorker' in navigator) {
     document.addEventListener('selectionchange', () => {
         clearTimeout(selTimer);
         selTimer = setTimeout(() => {
-            if (!chScreen.classList.contains('visible')) { hidePill(); return; }
+            if (!chScreen.classList.contains('visible')) { hideFab(); return; }
             const q = getQuote();
-            if (q) showPill(); else hidePill();
+            if (q) showFab(); else hideFab();
         }, 350);
     });
 
-    chScreen.addEventListener('scroll', hidePill, { passive: true });
-    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') hidePill(); });
+    chScreen.addEventListener('scroll', hideFab, { passive: true });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') hideFab(); });
+
+    /* открытие любого оверлея прячет кнопку явно */
+    document.addEventListener('click', (e) => {
+        if (!fab) return;
+        if (e.target.closest('#menu-trigger, #menu-overlay, .photo-link, #photo-overlay, .nav-aa, #reader-sheet, #reader-sheet-backdrop, #install-trigger, #install-overlay')) {
+            hideFab();
+        }
+    }, true);
 })();
