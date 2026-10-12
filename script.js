@@ -2090,6 +2090,7 @@ if ('serviceWorker' in navigator) {
 
     let fab = null;
     let selTimer = null;
+    let sharing = false;
 
     const FAB_ICON = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V4"/><path d="M8 8l4-4 4 4"/><path d="M5 12v7a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-7"/></svg>';
 
@@ -2116,9 +2117,12 @@ if ('serviceWorker' in navigator) {
             fab.setAttribute('aria-label', 'Поделиться цитатой');
             fab.innerHTML = '<span class="share-fab-label">Поделиться</span>' +
                 '<button type="button" class="share-fab">' + FAB_ICON + '</button>';
-            /* тап не сбрасывает выделение до генерации карточки */
+            /* тап не сбрасывает выделение до генерации карточки;
+               preventDefault на touchstart гасит синтезированный click,
+               поэтому на тач-устройствах действие вызываем из touchend */
             fab.addEventListener('mousedown', (e) => e.preventDefault());
             fab.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
+            fab.addEventListener('touchend', (e) => { e.preventDefault(); share(); }, { passive: false });
             fab.addEventListener('click', share);
             document.body.appendChild(fab);
         }
@@ -2158,9 +2162,11 @@ if ('serviceWorker' in navigator) {
     }
 
     async function share() {
+        if (sharing) return;
         const q = getQuote();
         hideFab();
         if (!q) return;
+        sharing = true;
         try {
             const blob = await renderCard(q.text);
             const file = new File([blob], 'echo-quote.png', { type: 'image/png' });
@@ -2174,6 +2180,7 @@ if ('serviceWorker' in navigator) {
                 setTimeout(() => URL.revokeObjectURL(a.href), 5000);
             }
         } catch (err) {}
+        sharing = false;
     }
 
     document.addEventListener('selectionchange', () => {
