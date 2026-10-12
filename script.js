@@ -2067,6 +2067,15 @@ document.addEventListener('visibilitychange', () => {
 
 /* === SERVICE WORKER: офлайн === */
 if ('serviceWorker' in navigator) {
+    /* когда активировался новый service worker — перезагрузить страницу один раз,
+       чтобы читатель сразу получил свежие файлы */
+    let swReloaded = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (swReloaded) return;
+        swReloaded = true;
+        location.reload();
+    });
+
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('sw.js').catch(() => {});
     });
