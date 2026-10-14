@@ -502,16 +502,7 @@ function showContents() {
             contentsScreen.classList.add('visible');
             if (menuTrigger) menuTrigger.classList.add('visible');
             scrollContentsToCurrent();
-
-
-            // Поочерёдно проявляем пункты
-            const items = document.querySelectorAll('.contents-item');
-            items.forEach((item, index) => {
-                setTimeout(() => {
-                    item.classList.add('revealed');
-                }, 200 + index * 80);
-            });
-
+            revealContentsItems();
         }, 300);
 
     }, 1200);
@@ -1331,6 +1322,11 @@ function handleHashLink() {
 function openContentsFresh() {
     contentsScreen.classList.add('visible');
     if (menuTrigger) menuTrigger.classList.add('visible');
+    revealContentsItems();
+}
+
+/* проявление пунктов оглавления — идемпотентно, из любой точки показа */
+function revealContentsItems() {
     document.querySelectorAll('.contents-item').forEach((item, i) => {
         setTimeout(() => item.classList.add('revealed'), 200 + i * 80);
     });
@@ -1976,8 +1972,10 @@ function doExitChapterToContents() {
     cleanupSwipeHandlers();
     chapterScreen.classList.remove('visible');
     if (menuTrigger) menuTrigger.classList.add('visible');
+    try { history.replaceState(history.state, '', location.pathname + location.search); } catch (e) {} /* уходим в оглавление — хэш главы снимаем */
     setTimeout(() => {
         contentsScreen.classList.add('visible');
+        revealContentsItems();
         scrollContentsToCurrent();
     }, 500);
 }
