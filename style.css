@@ -109,6 +109,7 @@ html, body {
     align-items: center;
     background: #000;
     z-index: 5;
+    overflow: hidden;
     transition: transform 1s cubic-bezier(0.7, 0, 0.3, 1), opacity 1s ease;
 }
 
@@ -2263,4 +2264,87 @@ html, body {
     .share-fab,
     .share-fab-wrap.share-fab-in,
     .share-fab-wrap.share-fab-in .share-fab { animation: none; }
+}
+
+/* === ЗАСТАВКА: ЗОВ БЕЗДЕЙСТВИЯ (нарастающий) === */
+/* ступень 1 (~1.2с): обложка чуть дышит */
+#cover-screen.beckon-1 img {
+  animation: beckon-breath 5s ease-in-out infinite;
+}
+
+/* ступень 2 (~5с): дыхание чаще + едва заметная дрожь */
+#cover-screen.beckon-2 img {
+  animation: beckon-breath 3.6s ease-in-out infinite,
+             beckon-jitter-soft 0.7s steps(2) infinite;
+}
+
+/* ступень 3 (~10.5с): дрожь заметнее + круги на воде из центра */
+#cover-screen.beckon-3 img {
+  animation: beckon-breath 2.6s ease-in-out infinite,
+             beckon-jitter-hard 0.45s steps(2) infinite;
+}
+#cover-screen.beckon-3 .cover-ripples i {
+  animation: beckon-ripple 3.2s cubic-bezier(0.2, 0.5, 0.3, 1) infinite;
+}
+#cover-screen.beckon-3 .cover-ripples i:last-child {
+  animation-delay: 1.6s;
+}
+
+.cover-ripples {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.cover-ripples i {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 42vmin;
+  height: 42vmin;
+  margin: -21vmin 0 0 -21vmin;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 168, 232, 0.3);
+  opacity: 0;
+}
+
+/* дыхание сохраняет базовую степень картинки (contrast/brightness обложки),
+   чтобы включение зова не давало скачка яркости */
+@keyframes beckon-breath {
+  0%, 100% { transform: scale(1); filter: contrast(1.05) brightness(0.95); }
+  50%      { transform: scale(1.015); filter: contrast(1.05) brightness(1.01); }
+}
+
+/* дрожь — отдельным свойством translate, чтобы не конфликтовать
+   ни с transform дыхания, ни с анимацией ухода обложки (hide-up) */
+@keyframes beckon-jitter-soft {
+  0%   { translate: 0 0; }
+  25%  { translate: 0.8px -0.5px; }
+  50%  { translate: -0.7px 0.5px; }
+  75%  { translate: 0.4px 0.8px; }
+  100% { translate: 0 0; }
+}
+
+@keyframes beckon-jitter-hard {
+  0%   { translate: 0 0; }
+  20%  { translate: 2px -1.2px; }
+  40%  { translate: -1.8px 1px; }
+  60%  { translate: 1px 1.8px; }
+  80%  { translate: -1px -1.6px; }
+  100% { translate: 0 0; }
+}
+
+@keyframes beckon-ripple {
+  0%   { transform: scale(0.25); opacity: 0; }
+  15%  { opacity: 0.5; }
+  100% { transform: scale(2); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #cover-screen.beckon-1 img,
+  #cover-screen.beckon-2 img,
+  #cover-screen.beckon-3 img,
+  #cover-screen.beckon-3 .cover-ripples i {
+    animation: none !important;
+  }
 }

@@ -1307,11 +1307,13 @@ function handleDeepLink() {
     return true;
 }
 
-/* ссылка вида #ch-12 — открывает сразу нужную главу (в т.ч. при обычной
-   перезагрузке во время чтения: без прогресс-оверлея поверх открытой главы) */
+/* ссылка вида #ch-12: внешний переход (history.state пуст) — открыть главу сразу.
+   Перезагрузка внутри сессии (history.state уже наш) — НЕ перехватываем:
+   отдаём ход initProgress(), чтобы показать «Продолжить / Начать сначала» */
 function handleHashLink() {
     const m = (location.hash || '').match(/^#ch-(\d+)$/);
     if (!m) return false;
+    if (history.state && history.state.echoChapter !== undefined) return false;
     const idx = chapters.findIndex((c) => String(c.number) === m[1]);
     if (idx < 0 || chapters[idx].empty) return false; /* пустые главы («в работе») не открываем */
     hideIntroScreens(); /* новый читатель по ссылке — без заставки */
@@ -2290,3 +2292,23 @@ if ('serviceWorker' in navigator) {
     }, true);
 })();
 
+
+/* === ЗАСТАВКА: ЗОВ БЕЗДЕЙСТВИЯ ===
+   Нет тапа ~1с — обложка дышит, ~5с — подрагивает, ~10.5с — круги.
+   Любое касание снимает зов навсегда. Если интро пропущено
+   (дип-линк/прогресс: isStarted уже true) — таймеры срабатывают вхолостую. */
+(function coverBeckon() {
+    if (!coverScreen) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const timers = [];
+    const add = (cls) => { if (!isStarted) coverScreen.classList.add(cls); };
+    timers.push(setTimeout(() => add('beckon-1'), 1200));
+    timers.push(setTimeout(() => add('beckon-2'), 5200));
+    timers.push(setTimeout(() => add('beckon-3'), 10500));
+    ['touchstart', 'mousedown', 'keydown'].forEach((ev) => {
+        document.addEventListener(ev, () => {
+            timers.forEach(clearTimeout);
+            coverScreen.classList.remove('beckon-1', 'beckon-2', 'beckon-3');
+        }, { once: true, passive: true });
+    });
+})();
