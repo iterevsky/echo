@@ -320,7 +320,7 @@ function updateContentsMemory() {
 }
 updateContentsMemory();
 
-if (!handleDeepLink()) initProgress();
+if (!handleDeepLink() && !handleHashLink()) initProgress();
 
 // === ОБРАБОТЧИКИ НАВИГАЦИИ ВНУТРИ ГЛАВЫ ===
 document.querySelector('.nav-prev').addEventListener('click', () => {
@@ -1309,15 +1309,31 @@ function handleDeepLink() {
     updateContentsMemory();
 
     if (isNaN(idx) || idx < 0 || idx >= chapters.length || chapters[idx].empty) {
-        contentsScreen.classList.add('visible');
-        if (menuTrigger) menuTrigger.classList.add('visible');
-        document.querySelectorAll('.contents-item').forEach((item, i) => {
-            setTimeout(() => item.classList.add('revealed'), 200 + i * 80);
-        });
+        openContentsFresh();
         return true;
     }
     openChapter(idx);
     return true;
+}
+
+/* ссылка вида #ch-12 — открывает сразу нужную главу (в т.ч. при обычной
+   перезагрузке во время чтения: без прогресс-оверлея поверх открытой главы) */
+function handleHashLink() {
+    const m = (location.hash || '').match(/^#ch-(\d+)$/);
+    if (!m) return false;
+    const idx = chapters.findIndex((c) => String(c.number) === m[1]);
+    if (idx < 0 || chapters[idx].empty) return false; /* пустые главы («в работе») не открываем */
+    hideIntroScreens(); /* новый читатель по ссылке — без заставки */
+    openChapter(idx);
+    return true;
+}
+
+function openContentsFresh() {
+    contentsScreen.classList.add('visible');
+    if (menuTrigger) menuTrigger.classList.add('visible');
+    document.querySelectorAll('.contents-item').forEach((item, i) => {
+        setTimeout(() => item.classList.add('revealed'), 200 + i * 80);
+    });
 }
 
 function initProgress() {
@@ -2276,12 +2292,3 @@ if ('serviceWorker' in navigator) {
     }, true);
 })();
 
-/* ссылка вида #ch-12 открывает сразу нужную главу */
-window.addEventListener('load', () => {
-    const m = (location.hash || '').match(/^#ch-(\d+)$/);
-    if (!m) return;
-    const idx = chapters.findIndex((c) => String(c.number) === m[1]);
-    if (idx < 0 || chapters[idx].empty) return; /* пустые главы («в работе») не открываем */
-    hideIntroScreens(); /* новый читатель по ссылке — без заставки */
-    openChapter(idx);
-});
