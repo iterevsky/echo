@@ -1064,6 +1064,24 @@ html, body {
     100% { opacity: 0; transform: translateY(100vh); }
 }
 
+/* символьный статик-шум: вспышка ~110мс в момент разрыва главы */
+#ascii-noise {
+    position: fixed;
+    inset: 0;
+    z-index: 91;
+    margin: 0;
+    display: none;
+    overflow: hidden;
+    pointer-events: none;
+    font-family: monospace;
+    font-size: 14px;
+    line-height: 1.35;
+    color: rgba(210, 225, 232, 0.16);
+    background: rgba(0, 0, 0, 0.35);
+    white-space: pre;
+    user-select: none;
+}
+
 .tear-top,
 .tear-bottom {
     backdrop-filter: blur(0.3px) brightness(1.02);
@@ -2338,6 +2356,17 @@ html, body {
   0%   { transform: scale(0.25); opacity: 0; }
   15%  { opacity: 0.5; }
   100% { transform: scale(2); opacity: 0; }
+}
+
+/* ASCII-двойник обложки: невидим, проскакивает вспышками */
+.cover-ascii {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  pointer-events: none;
+  mix-blend-mode: screen;
 }
 
 @media (prefers-reduced-motion: reduce) {

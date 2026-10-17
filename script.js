@@ -508,6 +508,26 @@ function showContents() {
     }, 1200);
 }
 
+/* символьный статик-шум на момент разрыва главы (~110 мс) */
+const asciiNoise = document.getElementById('ascii-noise');
+
+function flashAsciiNoise() {
+    if (!asciiNoise) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const cols = Math.ceil(window.innerWidth / 8.4);
+    const rows = Math.ceil(window.innerHeight / 19);
+    const POOL = ' .:-=+*#%@█▓▒░<>/\\|';
+    let out = '';
+    for (let r = 0; r < rows; r++) {
+        let line = '';
+        for (let c = 0; c < cols; c++) line += POOL[Math.floor(Math.random() * POOL.length)];
+        out += line + '\n';
+    }
+    asciiNoise.textContent = out;
+    asciiNoise.style.display = 'block';
+    setTimeout(() => { asciiNoise.style.display = 'none'; }, 110);
+}
+
 function openChapter(index, opts = {}) {
     if (index < 0 || index >= chapters.length) return;
     if (chapters[index].empty) return;
@@ -515,6 +535,7 @@ function openChapter(index, opts = {}) {
     const chScreen = document.getElementById('chapter-screen');
     if (tearOverlay && chScreen) {
         tearOverlay.style.display = 'block';
+        flashAsciiNoise();
         tearOverlay.querySelector('.tear-top').style.animation = 'tear-top-shift 0.12s steps(1) forwards';
         tearOverlay.querySelector('.tear-bottom').style.animation = 'tear-bottom-shift 0.12s steps(1) forwards';
         tearOverlay.querySelector('.tear-line').style.animation = 'tear-line-fly 0.1s linear forwards';
@@ -777,6 +798,40 @@ function prepareVoiceElement(el) {
     return text;
 }
 
+/* символьный мусор для дешифровок (голос, титул) */
+const SCRAMBLE_CHARS = '█▓▒░<>/\\|#%@*+=~—';
+
+/* дешифровка: текст ~0.7с идёт случайными символами и застывает
+   слева направо; после — обычная глитч-анимация голоса.
+   Исходный текст фиксируем в dataset заранее, чтобы prepareVoiceElement
+   подхватил его, а не мусор скрембла. */
+function scrambleVoice(el, done) {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        done();
+        return;
+    }
+    if (!el.dataset.voiceText) el.dataset.voiceText = el.textContent.trim();
+    const text = el.dataset.voiceText;
+    const start = Date.now();
+    const duration = 700;
+    const iv = setInterval(() => {
+        const p = Math.min(1, (Date.now() - start) / duration);
+        const settled = Math.floor(p * text.length);
+        let out = '';
+        for (let i = 0; i < text.length; i++) {
+            const ch = text[i];
+            if (i < settled || ch === ' ' || ch === '\n') out += ch;
+            else out += SCRAMBLE_CHARS[Math.floor(Math.random() * SCRAMBLE_CHARS.length)];
+        }
+        el.textContent = out;
+        if (p >= 1) {
+            clearInterval(iv);
+            el.textContent = text;
+            done();
+        }
+    }, 40);
+}
+
 function generateAggressiveGlitch(el) {
     const chapterScreen = document.getElementById('chapter-screen');
 
@@ -1012,7 +1067,7 @@ function initVoiceObserver() {
         entries.forEach(entry => {
             if (entry.isIntersecting && !entry.target.dataset.voiceTriggered) {
                 entry.target.dataset.voiceTriggered = 'true';
-                generateGlitchAnimation(entry.target);
+                scrambleVoice(entry.target, () => generateGlitchAnimation(entry.target));
             }
         });
     }, options);
@@ -2311,4 +2366,147 @@ if ('serviceWorker' in navigator) {
             coverScreen.classList.remove('beckon-1', 'beckon-2', 'beckon-3');
         }, { once: true, passive: true });
     });
+})();
+
+/* === ЗАСТАВКА: ASCII-ПРОСКОКИ ===
+   Обложка один раз переводится в символьную сетку (яркость → рампа).
+   Первая вспышка — через ~2–3с после загрузки, её видят все.
+   Дальше проскоки идут сами и учащаются вместе со ступенями зова:
+   в покое редко, при дрожи и кругах — чаще и шумнее. Касание
+   останавливает всё навсегда (isStarted). */
+(function coverAsciiFlicker() {
+    if (!coverScreen) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const cv = coverScreen.querySelector('.cover-ascii');
+    const img = coverScreen.querySelector('img');
+    if (!cv || !img) return;
+
+    const RAMP = ' .:-=+*#%@';
+    const NOISE = '█▓▒░<>/\\|#%@*+=~—';
+    const COLS = 120;
+    let grid = null;
+    let built = false;
+
+    function build() {
+        if (built || !img.complete || !img.naturalWidth) return;
+        built = true;
+        try {
+            const rows = Math.max(1, Math.round(COLS * (img.naturalHeight / img.naturalWidth) * 0.5));
+            const off = document.createElement('canvas');
+            off.width = COLS;
+            off.height = rows;
+            const octx = off.getContext('2d', { willReadFrequently: true });
+            octx.drawImage(img, 0, 0, COLS, rows);
+            const data = octx.getImageData(0, 0, COLS, rows).data;
+            grid = [];
+            for (let y = 0; y < rows; y++) {
+                let row = '';
+                for (let x = 0; x < COLS; x++) {
+                    const i = (y * COLS + x) * 4;
+                    const lum = (data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114) / 255;
+                    row += RAMP[Math.min(RAMP.length - 1, Math.floor(lum * RAMP.length))];
+                }
+                grid.push(row);
+            }
+            fit();
+        } catch (err) {
+            grid = null; /* cross-origin/file:// — проскоки недоступны, тихо выключаемся */
+        }
+    }
+
+    function fit() {
+        if (!grid) return;
+        cv.width = coverScreen.clientWidth;
+        cv.height = coverScreen.clientHeight;
+    }
+
+    function paint(jitter) {
+        if (!grid) return;
+        const ctx = cv.getContext('2d');
+        ctx.clearRect(0, 0, cv.width, cv.height);
+        const cellH = cv.height / grid.length;
+        ctx.font = Math.floor(cellH) + 'px monospace';
+        ctx.textBaseline = 'top';
+        ctx.fillStyle = 'rgba(0, 168, 232, 0.5)';
+        for (let y = 0; y < grid.length; y++) {
+            let row = grid[y];
+            if (jitter > 0) {
+                const chars = row.split('');
+                for (let x = 0; x < chars.length; x++) {
+                    if (Math.random() < jitter) chars[x] = NOISE[Math.floor(Math.random() * NOISE.length)];
+                }
+                row = chars.join('');
+            }
+            ctx.fillText(row, 0, y * cellH);
+        }
+    }
+
+    function flash(jitter) {
+        paint(jitter);
+        cv.style.opacity = '0.85';
+        setTimeout(() => { cv.style.opacity = '0'; }, 100 + Math.random() * 50);
+    }
+
+    function schedule(ms) {
+        setTimeout(() => {
+            if (isStarted) return; // касание — конец проскокам навсегда
+            const stage3 = coverScreen.classList.contains('beckon-3');
+            const stage2 = coverScreen.classList.contains('beckon-2');
+            flash(stage3 ? 0.25 : 0.15);
+            const next = stage3 ? 1200 + Math.random() * 1600
+                      : stage2 ? 2500 + Math.random() * 2500
+                      : 4000 + Math.random() * 3000;
+            schedule(next);
+        }, ms);
+    }
+
+    if (img.complete && img.naturalWidth) build();
+    else img.addEventListener('load', build, { once: true });
+    window.addEventListener('resize', fit);
+    schedule(1800 + Math.random() * 1200); // первая вспышка: ~2–3 секунды
+})();
+
+/* === ТИТУЛЬНЫЙ ЭКРАН: СБОРКА ИЗ СИМВОЛОВ ===
+   Автор и название декодируются из символьного мусора слева направо
+   (~0.9с и ~1.1с). Разметка названия (светящаяся Х) на время
+   дешифровки снимается и возвращается с финальным текстом. */
+(function titleScramble() {
+    if (!titleScreen) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const authorEl = titleScreen.querySelector('.author');
+    const titleEl = titleScreen.querySelector('.book-title');
+    if (!authorEl || !titleEl) return;
+
+    const authorText = authorEl.textContent;
+    const titleText = titleEl.textContent;
+    const titleHTML = titleEl.innerHTML;
+    let played = false;
+
+    function decode(el, finalText, restoreHTML, duration) {
+        const start = Date.now();
+        const iv = setInterval(() => {
+            const p = Math.min(1, (Date.now() - start) / duration);
+            const settled = Math.floor(p * finalText.length);
+            let out = '';
+            for (let i = 0; i < finalText.length; i++) {
+                const ch = finalText[i];
+                if (i < settled || ch === ' ') out += ch;
+                else out += SCRAMBLE_CHARS[Math.floor(Math.random() * SCRAMBLE_CHARS.length)];
+            }
+            el.textContent = out;
+            if (p >= 1) {
+                clearInterval(iv);
+                if (restoreHTML) el.innerHTML = restoreHTML; // вернулась светящаяся Х
+                else el.textContent = finalText;
+            }
+        }, 40);
+    }
+
+    new MutationObserver(() => {
+        if (played || !titleScreen.classList.contains('visible')) return;
+        played = true;
+        const filmPath = titleScreen.classList.contains('film-enter');
+        setTimeout(() => decode(authorEl, authorText, null, 900), filmPath ? 500 : 250);
+        setTimeout(() => decode(titleEl, titleText, titleHTML, 1100), filmPath ? 750 : 500);
+    }).observe(titleScreen, { attributes: true, attributeFilter: ['class'] });
 })();

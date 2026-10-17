@@ -152,6 +152,7 @@ body.install-open { overflow: hidden; }
     <!-- Экран с обложкой -->
     <div id="cover-screen">
         <img src="Zastavka.jpg" alt="ЭХО" draggable="false">
+        <canvas class="cover-ascii" aria-hidden="true"></canvas>
         <div class="cover-ripples" aria-hidden="true"><i></i><i></i></div>
     </div>
 
@@ -381,6 +382,7 @@ body.install-open { overflow: hidden; }
   <div class="tear-bottom" style="position:absolute;bottom:0;left:0;width:100%;height:55%;background:transparent;pointer-events:none;"></div>
   <div class="tear-line" style="position:absolute;top:0;left:0;width:100%;height:1px;background:rgba(232,230,227,0.3);box-shadow:0 0 8px rgba(232,230,227,0.2);opacity:0;"></div>
 </div>
+<pre id="ascii-noise" aria-hidden="true"></pre>
 <!-- PHOTO overlay -->
 <div id="photo-overlay">
   <div id="photo-backdrop"></div>
