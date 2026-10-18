@@ -119,6 +119,7 @@ html, body {
     object-fit: contain;
     -webkit-user-drag: none;
     user-select: none;
+    transform: translate(var(--px, 0px), var(--py, 0px));
     filter: contrast(1.05) brightness(0.95);
     -webkit-mask-image: linear-gradient(to bottom,
         transparent 0%, black 10%, black 90%, transparent 100%);
@@ -1242,6 +1243,18 @@ html, body {
     z-index: 8;
 }
 
+/* вход заголовков из фокуса — микро-версия film-enter с титула */
+@keyframes chapter-focus {
+    0%   { opacity: 0; filter: blur(8px); transform: translateY(4px); }
+    100% { opacity: 1; filter: blur(0); transform: translateY(0); }
+}
+#chapter-screen.visible .chapter-number {
+    animation: chapter-focus 0.55s ease 0.25s both;
+}
+#chapter-screen.visible .chapter-title {
+    animation: chapter-focus 0.7s ease 0.35s both;
+}
+
 .chapter-text {
     font-family: 'PT Serif', serif;
     font-size: 1.05rem;
@@ -1551,6 +1564,29 @@ html, body {
   transform: scale(1.06);
 }
 
+
+/* живая цапля: наклон головы и зов при новых главах */
+@keyframes heron-blink {
+    0%, 100% { transform: rotate(0); filter: none; }
+    30%      { transform: rotate(-7deg); filter: drop-shadow(0 0 10px rgba(0, 168, 232, 0.6)) drop-shadow(0 0 22px rgba(0, 168, 232, 0.3)); }
+    60%      { transform: rotate(3deg); filter: drop-shadow(0 0 6px rgba(0, 168, 232, 0.35)); }
+}
+.menu-trigger.heron-blink .heron-svg {
+    animation: heron-blink 0.9s ease;
+}
+
+@keyframes heron-call {
+    0%, 100% { filter: drop-shadow(0 0 4px rgba(0, 168, 232, 0.2)); }
+    50%      { filter: drop-shadow(0 0 12px rgba(0, 168, 232, 0.55)) drop-shadow(0 0 26px rgba(0, 168, 232, 0.25)); }
+}
+.menu-trigger.heron-call .heron-svg {
+    animation: heron-call 2.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .menu-trigger.heron-blink .heron-svg,
+    .menu-trigger.heron-call .heron-svg { animation: none; }
+}
 
 /* === МЕНЮ ОВЕРЛЕЙ === */
 .menu-overlay {
@@ -1957,6 +1993,35 @@ html, body {
     transition: opacity 0.5s ease, filter 0.5s ease;
 }
 
+/* метка «вы остановились здесь» */
+.resume-scan {
+    position: fixed;
+    left: 0;
+    right: 0;
+    top: 0;
+    height: 2px;
+    z-index: 26;
+    background: linear-gradient(to right, transparent, rgba(0, 168, 232, 0.8) 20%, rgba(0, 168, 232, 0.8) 80%, transparent);
+    box-shadow: 0 0 12px rgba(0, 168, 232, 0.5);
+    transform: translateY(0);
+    transition: transform 0.6s cubic-bezier(0.3, 0.8, 0.3, 1);
+    pointer-events: none;
+}
+.resume-tick {
+    position: fixed;
+    left: 12px;
+    width: 3px;
+    height: 22px;
+    margin-top: -2px;
+    background: rgba(0, 168, 232, 0.9);
+    border-radius: 2px;
+    box-shadow: 0 0 8px rgba(0, 168, 232, 0.5);
+    z-index: 26;
+    pointer-events: none;
+    transition: opacity 0.8s ease;
+}
+.resume-tick.fade { opacity: 0; }
+
 /* === СВАЙП ВВЕРХ: ПОДСКАЗКА === */
 #swipe-hint {
     position: fixed;
@@ -2006,6 +2071,50 @@ html, body {
     transform: translateY(var(--swipe-pull-offset, 0px));
 }
 
+/* тяга «рвёт» край страницы: зубчатая трещина с просветом над панелью */
+#pull-tear {
+    --tear: 0;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: calc(62px + env(safe-area-inset-bottom));
+    height: 90px;
+    z-index: 9;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.12s ease;
+}
+#pull-tear.active { opacity: 1; }
+
+/* зубцы трещины */
+#pull-tear::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    bottom: 0;
+    width: calc(40px + var(--tear) * 72vw);
+    height: calc(3px + var(--tear) * 14px);
+    transform: translateX(-50%);
+    background: linear-gradient(to top,
+        rgba(0, 168, 232, calc(0.15 + var(--tear) * 0.35)),
+        transparent);
+    clip-path: polygon(0 100%, 8% 45%, 16% 80%, 26% 30%, 34% 70%, 45% 20%, 55% 65%, 66% 25%, 76% 75%, 86% 40%, 100% 100%);
+}
+
+/* просвет-свечение за трещиной */
+#pull-tear::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    bottom: -20px;
+    width: calc(30px + var(--tear) * 60vw);
+    height: 60px;
+    transform: translateX(-50%);
+    background: radial-gradient(ellipse at 50% 100%,
+        rgba(0, 168, 232, calc(var(--tear) * 0.22)),
+        transparent 70%);
+}
+
 @media (prefers-reduced-motion: reduce) {
     #swipe-hint.visible {
         animation: none;
@@ -2018,6 +2127,8 @@ html, body {
     #title-screen.film-enter .author,
     #title-screen.film-enter .book-title { filter: none; }
     .book-title .h-char { animation: none; }
+    #chapter-screen.visible .chapter-number,
+    #chapter-screen.visible .chapter-title { animation: none; }
 }
 
 /* ============================================================
@@ -2094,6 +2205,21 @@ html, body {
     opacity: 0;
 }
 
+
+/* «свеча гаснет»: авто-приглушение главы в паузе чтения */
+#candle-dim {
+    position: fixed;
+    inset: 0;
+    z-index: 9;
+    background: #000;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 3.2s ease;
+}
+#candle-dim.lit-off {
+    opacity: 0.4;
+    transition: opacity 3.2s ease;
+}
 /* тоны чтения: переменные на экране главы */
 #chapter-screen.reader-tone-soft {
     --rd-bg: #070a07;
@@ -2201,6 +2327,63 @@ html, body {
     margin-left: 2px;
 }
 
+/* превью главы по долгому нажатию */
+.peek-card {
+    position: fixed;
+    z-index: 30;
+    width: min(320px, calc(100vw - 24px));
+    background: #0c0c0c;
+    border: 1px solid #2a2a2a;
+    padding: 18px 20px;
+    transform: translate(-50%, calc(-100% - 18px));
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.2s ease, visibility 0s linear 0.2s;
+    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.7);
+}
+.peek-card.open {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: all;
+    transition: opacity 0.2s ease, visibility 0s;
+}
+.peek-card.below {
+    transform: translate(-50%, 24px);
+}
+.peek-num {
+    font-family: 'PT Serif', serif;
+    font-size: 0.72rem;
+    color: #00A8E8;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+}
+.peek-title {
+    font-family: 'PT Serif', serif;
+    font-size: 1.05rem;
+    color: #e8e6e3;
+    margin-bottom: 10px;
+    line-height: 1.35;
+}
+.peek-text {
+    font-family: 'PT Serif', serif;
+    font-size: 0.88rem;
+    color: #9a9a9a;
+    line-height: 1.6;
+    font-style: italic;
+    margin-bottom: 12px;
+}
+.peek-status {
+    font-family: 'PT Serif', serif;
+    font-size: 0.75rem;
+    color: #5a5a5a;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+.peek-card .peek-status { transition: color 0.3s ease; }
+.peek-card:hover .peek-status { color: #00A8E8; }
+
 /* === БЕЙДЖ «НОВОЕ» НА ГЛАВАХ === */
 .contents-item.new .dot {
     background: #00A8E8;
@@ -2278,6 +2461,71 @@ html, body {
 .share-fab-wrap.share-fab-in { animation: share-fab-in 0.6s ease-out; }
 .share-fab-wrap.share-fab-in .share-fab { animation: share-fab-glow 0.6s ease-out; }
 
+/* превью карточки перед отправкой */
+.share-preview {
+    position: fixed;
+    inset: 0;
+    z-index: 2500;
+    background: rgba(0, 0, 0, 0.9);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+}
+.share-preview-card {
+    position: relative;
+    max-width: min(640px, 100%);
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+.share-preview-card img {
+    width: 100%;
+    height: auto;
+    display: block;
+    border: 1px solid #1c1c1c;
+}
+.share-preview-actions {
+    display: flex;
+    gap: 12px;
+}
+.share-preview-actions button {
+    flex: 1;
+    padding: 12px;
+    background: none;
+    font-family: 'PT Serif', serif;
+    font-size: 0.95rem;
+    letter-spacing: 0.06em;
+    cursor: pointer;
+    transition: background 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+.sp-send {
+    border: 1px solid #00A8E8;
+    color: #00A8E8;
+}
+.sp-send:hover { background: rgba(0, 168, 232, 0.08); }
+.sp-save {
+    border: 1px solid #2a2a2a;
+    color: #8a8a8a;
+}
+.sp-save:hover { border-color: #4a4a4a; color: #c8c8c8; }
+.sp-close {
+    position: absolute;
+    top: -14px;
+    right: -14px;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: #0c0c0c;
+    border: 1px solid #2a2a2a;
+    color: #8a8a8a;
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    transition: color 0.3s ease, border-color 0.3s ease;
+}
+.sp-close:hover { color: #e8e6e3; border-color: #4a4a4a; }
+
 @media (prefers-reduced-motion: reduce) {
     .share-fab,
     .share-fab-wrap.share-fab-in,
@@ -2329,8 +2577,8 @@ html, body {
 /* дыхание сохраняет базовую степень картинки (contrast/brightness обложки),
    чтобы включение зова не давало скачка яркости */
 @keyframes beckon-breath {
-  0%, 100% { transform: scale(1); filter: contrast(1.05) brightness(0.95); }
-  50%      { transform: scale(1.015); filter: contrast(1.05) brightness(1.01); }
+  0%, 100% { transform: translate(var(--px, 0px), var(--py, 0px)) scale(1); filter: contrast(1.05) brightness(0.95); }
+  50%      { transform: translate(var(--px, 0px), var(--py, 0px)) scale(1.015); filter: contrast(1.05) brightness(1.01); }
 }
 
 /* дрожь — отдельным свойством translate, чтобы не конфликтовать

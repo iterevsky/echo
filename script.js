@@ -87,6 +87,7 @@ function resetSwipePull() {
         chapterScreen.style.setProperty('--swipe-pull-offset', '0px');
         chapterScreen.classList.remove('swipe-pulling');
     }
+    updatePullTear(0);
 }
 
 function resetSwipeHint() {
@@ -96,6 +97,16 @@ function resetSwipeHint() {
     swipeMaxPull = 0;
     hideSwipeHint();
     resetSwipePull();
+}
+
+/* тяга внизу страницы «рвёт» край: трещина растёт с силой жеста */
+const pullTearEl = document.getElementById('pull-tear');
+
+function updatePullTear(pull) {
+    if (!pullTearEl) return;
+    const f = Math.min(1, pull / MAX_PULL_OFFSET);
+    pullTearEl.style.setProperty('--tear', f.toFixed(3));
+    pullTearEl.classList.toggle('active', f > 0.02);
 }
 
 function goNextChapter() {
@@ -172,6 +183,7 @@ function handleChapterTouchMove(e) {
 
     chapterScreen.classList.add('swipe-pulling');
     chapterScreen.style.setProperty('--swipe-pull-offset', (-pullOffset) + 'px');
+    updatePullTear(pullOffset);
 }
 
 function handleChapterTouchEnd(e) {
@@ -353,6 +365,8 @@ document.addEventListener('keydown', (e) => {
     // сначала — закрытие оверлеев в порядке приоритета, независимо от видимого экрана
     if (e.key === 'Escape') {
         e.preventDefault();
+        const sharePreviewEl = document.querySelector('.share-preview');
+        if (sharePreviewEl) { sharePreviewEl.remove(); return; }
         if (installOverlay && installOverlay.classList.contains('visible')) { closeInstall(); return; }
         if (photoOverlay && photoOverlay.classList.contains('active')) { closePhoto(); return; }
         if (isMenuOpen) { closeMenu(); return; }
@@ -365,6 +379,7 @@ document.addEventListener('keydown', (e) => {
     const overlayOpen = isMenuOpen ||
         (photoOverlay && photoOverlay.classList.contains('active')) ||
         isReaderSheetOpen() ||
+        !!document.querySelector('.share-preview') ||
         (installOverlay && installOverlay.classList.contains('visible'));
     if (overlayOpen) return;
 
@@ -528,6 +543,43 @@ function flashAsciiNoise() {
     setTimeout(() => { asciiNoise.style.display = 'none'; }, 110);
 }
 
+/* метка «вы остановились здесь»: линия-сканер к первому видимому абзацу,
+   затем циановая риска у левого края на ~3 секунды */
+function showResumeMark() {
+    const textEl = chapterScreen.querySelector('.chapter-text');
+    if (!textEl) return;
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const screenTop = chapterScreen.getBoundingClientRect().top;
+    let anchor = null;
+    textEl.querySelectorAll('p').forEach((p) => {
+        if (anchor) return;
+        const r = p.getBoundingClientRect();
+        if (r.bottom > screenTop + 40) anchor = p;
+    });
+    const targetY = anchor ? anchor.getBoundingClientRect().top + 6 : window.innerHeight * 0.3;
+
+    const showTick = () => {
+        if (!anchor) return;
+        const tick = document.createElement('div');
+        tick.className = 'resume-tick';
+        tick.style.top = targetY + 'px';
+        document.body.appendChild(tick);
+        setTimeout(() => tick.classList.add('fade'), 2600);
+        setTimeout(() => tick.remove(), 3500);
+    };
+
+    if (reduced) { showTick(); return; }
+
+    const scan = document.createElement('div');
+    scan.className = 'resume-scan';
+    document.body.appendChild(scan);
+    requestAnimationFrame(() => {
+        scan.style.transform = 'translateY(' + targetY + 'px)';
+    });
+    setTimeout(() => { scan.remove(); showTick(); }, 650);
+}
+
 function openChapter(index, opts = {}) {
     if (index < 0 || index >= chapters.length) return;
     if (chapters[index].empty) return;
@@ -624,6 +676,7 @@ function openChapter(index, opts = {}) {
                 if (frac) {
                     const total = chapterScreen.scrollHeight - chapterScreen.clientHeight;
                     chapterScreen.scrollTop = frac * total;
+                    showResumeMark();
                 }
             };
             if (document.fonts && document.fonts.ready) {
@@ -2297,6 +2350,58 @@ if ('serviceWorker' in navigator) {
         return '«' + teaser + '»\n— ЭХО, глава ' + num + '. Читать целиком: ' + chapterLink();
     }
 
+    let previewEl = null;
+
+    function closePreview() {
+        if (previewEl) { previewEl.remove(); previewEl = null; }
+    }
+
+    function downloadCard(blob) {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'echo-quote.png';
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    }
+
+    async function sendCard(blob, caption) {
+        const file = new File([blob], 'echo-quote.png', { type: 'image/png' });
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            try {
+                await navigator.share({ files: [file], text: caption, title: 'ЭХО' });
+            } catch (err) {
+                if (err && err.name === 'AbortError') return; /* пользователь отменил — молчим */
+                try { await navigator.share({ files: [file], title: 'ЭХО' }); } catch (e) {} /* комбо не поддержано — только файл */
+            }
+        } else {
+            downloadCard(blob);
+            try { await navigator.clipboard.writeText(caption); } catch (e) {}
+        }
+    }
+
+    function showPreview(blob, caption) {
+        closePreview();
+        previewEl = document.createElement('div');
+        previewEl.className = 'share-preview';
+        const url = URL.createObjectURL(blob);
+        previewEl.innerHTML =
+            '<div class="share-preview-card">' +
+                '<img src="' + url + '" alt="Карточка цитаты">' +
+                '<div class="share-preview-actions">' +
+                    '<button type="button" class="sp-send">Отправить</button>' +
+                    '<button type="button" class="sp-save">Сохранить</button>' +
+                '</div>' +
+                '<button type="button" class="sp-close" aria-label="Закрыть">×</button>' +
+            '</div>';
+        previewEl.addEventListener('click', (e) => {
+            if (e.target.closest('.sp-send')) { closePreview(); sendCard(blob, caption); return; }
+            if (e.target.closest('.sp-save')) { downloadCard(blob); closePreview(); return; }
+            if (e.target === previewEl || e.target.closest('.sp-close')) closePreview();
+        });
+        document.body.appendChild(previewEl);
+        setTimeout(() => URL.revokeObjectURL(url), 30000);
+    }
+
     async function share() {
         if (sharing) return;
         const q = getQuote();
@@ -2306,22 +2411,7 @@ if ('serviceWorker' in navigator) {
         try {
             await document.fonts.ready; /* шрифты карточки точно загружены */
             const blob = await renderCard(q.text);
-            const file = new File([blob], 'echo-quote.png', { type: 'image/png' });
-            if (navigator.canShare && navigator.canShare({ files: [file] })) {
-                try {
-                    await navigator.share({ files: [file], text: shareCaption(q.text), title: 'ЭХО' });
-                } catch (err) {
-                    if (err && err.name === 'AbortError') throw err; /* пользователь отменил — молчим */
-                    await navigator.share({ files: [file], title: 'ЭХО' }); /* комбо не поддержано — только файл */
-                }
-            } else {
-                const a = document.createElement('a');
-                a.href = URL.createObjectURL(blob);
-                a.download = 'echo-quote.png';
-                a.click();
-                setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-                try { await navigator.clipboard.writeText(shareCaption(q.text)); } catch (e) {}
-            }
+            showPreview(blob, shareCaption(q.text)); /* сначала превью, потом шаринг */
         } catch (err) {}
         sharing = false;
     }
@@ -2509,4 +2599,208 @@ if ('serviceWorker' in navigator) {
         setTimeout(() => decode(authorEl, authorText, null, 900), filmPath ? 500 : 250);
         setTimeout(() => decode(titleEl, titleText, titleHTML, 1100), filmPath ? 750 : 500);
     }).observe(titleScreen, { attributes: true, attributeFilter: ['class'] });
+})();
+
+/* === ЗАСТАВКА: ПАРАЛЛАКС ===
+   Обложка следует за наклоном телефона (Android) или курсором (десктоп),
+   максимум ±10px, с инерцией. iOS без жеста-подтверждения гироскоп не
+   отдаёт — не запрашиваем разрешение, чтобы не портить старт книги.
+   После старта (isStarted) отключается молча. */
+(function coverParallax() {
+    if (!coverScreen) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const img = coverScreen.querySelector('img');
+    if (!img) return;
+    const MAX = 10;
+    let tx = 0, ty = 0, cx = 0, cy = 0, raf = null;
+
+    function loop() {
+        cx += (tx - cx) * 0.07;
+        cy += (ty - cy) * 0.07;
+        img.style.setProperty('--px', cx.toFixed(2) + 'px');
+        img.style.setProperty('--py', cy.toFixed(2) + 'px');
+        if (Math.abs(tx - cx) > 0.05 || Math.abs(ty - cy) > 0.05) {
+            raf = requestAnimationFrame(loop);
+        } else {
+            raf = null;
+        }
+    }
+    function kick() { if (!raf) raf = requestAnimationFrame(loop); }
+
+    if (window.matchMedia('(pointer: fine)').matches) {
+        window.addEventListener('mousemove', (e) => {
+            if (isStarted) return;
+            tx = ((e.clientX / window.innerWidth) - 0.5) * 2 * MAX;
+            ty = ((e.clientY / window.innerHeight) - 0.5) * 2 * MAX;
+            kick();
+        }, { passive: true });
+    } else {
+        window.addEventListener('deviceorientation', (e) => {
+            if (isStarted || e.gamma === null || e.beta === null) return;
+            tx = Math.max(-1, Math.min(1, e.gamma / 25)) * MAX;
+            ty = Math.max(-1, Math.min(1, (e.beta - 45) / 25)) * MAX; // типичный хват ~45°
+            kick();
+        }, { passive: true });
+    }
+})();
+
+/* === СВЕЧА: ГЛАВА ПРИГАСАЕТ В ПАУЗЕ ===
+   25с без касаний — текст медленно темнеет; любое действие возвращает
+   свет. Живёт только пока открыта глава. */
+(function candleIdle() {
+    const dim = document.getElementById('candle-dim');
+    if (!dim || !chapterScreen) return;
+    const IDLE_MS = 25000;
+    let timer = null;
+
+    function extinguish() {
+        if (chapterScreen.classList.contains('visible')) dim.classList.add('lit-off');
+    }
+    function relight() {
+        dim.classList.remove('lit-off');
+        clearTimeout(timer);
+        timer = setTimeout(extinguish, IDLE_MS);
+    }
+
+    ['scroll', 'touchstart', 'mousemove', 'keydown'].forEach((ev) => {
+        chapterScreen.addEventListener(ev, relight, { passive: true });
+    });
+
+    new MutationObserver(() => {
+        if (chapterScreen.classList.contains('visible')) relight();
+        else { clearTimeout(timer); dim.classList.remove('lit-off'); }
+    }).observe(chapterScreen, { attributes: true, attributeFilter: ['class'] });
+})();
+
+/* === ОГЛАВЛЕНИЕ: ПРЕВЬЮ ГЛАВЫ ПО ДОЛГОМУ НАЖАТИЮ ===
+   Карточка: номер, название, первая фраза, статус чтения.
+   Долгое нажатие (тач, 450мс) или правая кнопка (десктоп). */
+(function chapterPeek() {
+    if (!contentsScreen) return;
+    const card = document.createElement('div');
+    card.className = 'peek-card';
+    card.setAttribute('role', 'tooltip');
+    document.body.appendChild(card);
+
+    let pressTimer = null;
+    let peekWasOpen = false;
+
+    function firstSentence(idx) {
+        let t = chapters[idx].text
+            .replace(/\{\{PHOTO:[^:]+:[^}]+\}\}/g, '')
+            .replace(/\{\{\/?VOICE(?::\w+)?\}\}/g, '')
+            .replace(/<[^>]+>/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+        const m = t.match(/^.*?[.!?…](?=\s|$)/);
+        if (m) t = m[0];
+        if (t.length > 140) t = t.slice(0, 140).trim() + '…';
+        return t;
+    }
+
+    function statusText(idx, item) {
+        const s = loadState();
+        const frac = s.readPos && s.readPos[idx];
+        if (typeof frac === 'number' && frac >= 0.85) return 'Прочитана';
+        if (typeof frac === 'number' && frac > 0.02) return 'Остановились на ' + Math.round(frac * 100) + '%';
+        if (item.classList.contains('new')) return 'Новая';
+        return 'Не начата';
+    }
+
+    function showPeek(idx, item, x, y) {
+        const ch = chapters[idx];
+        if (!ch || ch.empty) return;
+        card.innerHTML =
+            '<div class="peek-num">Глава ' + ch.number + '</div>' +
+            '<div class="peek-title">' + ch.title + '</div>' +
+            '<div class="peek-text">' + firstSentence(idx) + '</div>' +
+            '<div class="peek-status">' + statusText(idx, item) + '</div>';
+        card.classList.add('open');
+        peekWasOpen = true;
+
+        /* позиция: над пальцем; если места нет — под ним; у краёв — прижать */
+        const w = card.offsetWidth;
+        const cx = Math.max(w / 2 + 12, Math.min(window.innerWidth - w / 2 - 12, x));
+        card.style.left = cx + 'px';
+        card.style.top = y + 'px';
+        card.classList.toggle('below', y < card.offsetHeight + 90);
+        card.dataset.chapter = String(idx);
+    }
+
+    function hidePeek() {
+        card.classList.remove('open');
+    }
+
+    contentsScreen.addEventListener('touchstart', (e) => {
+        const item = e.target.closest('.contents-item');
+        if (!item || item.classList.contains('empty')) return;
+        const t = e.touches[0];
+        const idx = parseInt(item.dataset.chapter, 10);
+        if (isNaN(idx)) return;
+        pressTimer = setTimeout(() => showPeek(idx, item, t.clientX, t.clientY), 450);
+    }, { passive: true });
+
+    ['touchmove', 'touchcancel'].forEach((ev) => {
+        contentsScreen.addEventListener(ev, () => {
+            clearTimeout(pressTimer);
+            pressTimer = null;
+        }, { passive: true });
+    });
+
+    /* десктоп: правая кнопка */
+    contentsScreen.addEventListener('contextmenu', (e) => {
+        const item = e.target.closest('.contents-item');
+        if (!item || item.classList.contains('empty')) return;
+        e.preventDefault();
+        const idx = parseInt(item.dataset.chapter, 10);
+        if (!isNaN(idx)) showPeek(idx, item, e.clientX, e.clientY);
+    });
+
+    /* долгое нажатие не должно сработать как переход: гасим клик в capture */
+    contentsScreen.addEventListener('click', (e) => {
+        if (peekWasOpen) {
+            e.preventDefault();
+            e.stopPropagation();
+            peekWasOpen = false;
+        }
+    }, true);
+
+    /* тап по карточке — открыть главу; мимо — закрыть; скролл — закрыть */
+    card.addEventListener('click', () => {
+        const idx = parseInt(card.dataset.chapter, 10);
+        hidePeek();
+        if (!isNaN(idx) && chapters[idx] && !chapters[idx].empty) openChapter(idx);
+    });
+    document.addEventListener('touchstart', (e) => {
+        if (!card.classList.contains('open')) return;
+        if (!e.target.closest('.peek-card')) hidePeek();
+    }, { passive: true });
+    document.addEventListener('click', (e) => {
+        if (!card.classList.contains('open')) return;
+        if (!e.target.closest('.peek-card')) hidePeek();
+    });
+    contentsScreen.addEventListener('scroll', hidePeek, { passive: true });
+})();
+
+/* === ЖИВАЯ ЦАПЛЯ ===
+   Раз в 20–40с — наклон головы с проблеском. Если есть новые главы —
+   постоянная тихая пульсация-зов, пока их не откроют. */
+(function heronAlive() {
+    const btn = document.getElementById('menu-trigger');
+    if (!btn) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+    function blink() {
+        if (btn.classList.contains('visible') && !btn.classList.contains('heron-call')) {
+            btn.classList.add('heron-blink');
+            setTimeout(() => btn.classList.remove('heron-blink'), 900);
+        }
+        setTimeout(blink, 20000 + Math.random() * 20000);
+    }
+    setTimeout(blink, 20000 + Math.random() * 20000);
+
+    /* зов при новых главах: проверяем раз в 5с */
+    setInterval(() => {
+        btn.classList.toggle('heron-call', !!document.querySelector('.contents-item.new'));
+    }, 5000);
 })();
