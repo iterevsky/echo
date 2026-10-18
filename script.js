@@ -2267,26 +2267,10 @@ document.addEventListener('visibilitychange', () => {
 
 /* === SERVICE WORKER: офлайн === */
 if ('serviceWorker' in navigator) {
-    /* когда активировался НОВЫЙ service worker — перезагрузить страницу один раз,
-       чтобы читатель сразу получил свежие файлы.
-       ВАЖНО: controllerchange срабатывает и при ПЕРВОЙ установке SW (новый
-       читатель, очищенные данные сайта). Это не обновление — страницу не трогаем,
-       иначе перезагрузка прерывает интро и на слабой сети выглядит как
-       бесконечный чёрный экран. Признак первой установки: на момент загрузки
-       скрипта navigator.serviceWorker.controller был пуст. */
-    const hadSwController = !!navigator.serviceWorker.controller;
-    let swReloaded = false;
-    navigator.serviceWorker.addEventListener('controllerchange', () => {
-        if (swReloaded || !hadSwController) return;
-        swReloaded = true;
-        /* не дёргаем читателя посреди интро или главы: перезагружаем,
-           когда страница уйдёт в фон; не уйдёт — новая версия подхватится
-           при следующем заходе сама */
-        const onHide = () => { if (document.hidden) location.reload(); };
-        if (document.hidden) location.reload();
-        else document.addEventListener('visibilitychange', onHide);
-    });
-
+    /* service worker: регистрируем и забываем. Перезагрузок по
+       controllerchange БОЛЬШЕ НЕТ: свежий код теперь подхватывается сам
+       через network-first в sw.js, а принудительный reload посреди интро
+       уже однажды давал читателям чёрный экран. */
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('sw.js').catch(() => {});
     });

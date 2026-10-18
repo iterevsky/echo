@@ -1,16 +1,20 @@
 /* ============================================================
-   SERVICE WORKER «ЭХО» — офлайн-кэш
+   SERVICE WORKER «ЭХО» — офлайн-кэш, v17
 
-   ПЕРЕД ЛЮБЫМ КОММИТОМ, который меняет хоть один файл сайта
-   (включая chapters.js с новой главой), подними CACHE_VERSION
-   ниже на +1. Не поднял — читатели не увидят изменений:
-   браузер продолжит отдавать старый кэш, а новый sw.js,
-   чьи байты не изменились, он не подхватит.
-   Старые кэши удалятся сами при активации.
+   Два принципа:
+   1) Установка НЕ атомарная: каждый файл кэшируется отдельно.
+      Если сеть душится и часть файлов не скачалась — SW всё равно
+      активируется, а недостающее докэшируется при первых запросах.
+      Хуже «частично офлайн», чем «вообще не работает», не бывает.
+   2) Код книги (HTML/JS/CSS) — network-first: свежая версия при
+      любом живом соединении, кэш — запасной вариант при обрыве.
+      Картинки и шрифты — cache-first: они не меняются.
+
+   ПЕРЕД ЛЮБЫМ КОММИТОМ, который меняет хоть один файл сайта,
+   подними CACHE_VERSION на +1 — старые кэши удалятся при активации.
    ============================================================ */
-const CACHE_VERSION = 'echo-v16';
+const CACHE_VERSION = 'echo-v17';
 
-/* app-shell: всё, что нужно для запуска книги без сети */
 const PRECACHE = [
     './',
     './index.html',
@@ -32,10 +36,16 @@ const PRECACHE = [
     './fonts/golos-text-latin.woff2'
 ];
 
+/* файлы, которые всегда сначала спрашивают у сети */
+const CODE_FILES = ['index.html', 'style.css', 'script.js', 'chapters.js'];
+
+/* ждём сеть не дольше 6 секунд — потом отдаём кэш */
+const NETWORK_TIMEOUT = 6000;
+
 self.addEventListener('install', (e) => {
     e.waitUntil(
         caches.open(CACHE_VERSION)
-            .then((cache) => cache.addAll(PRECACHE))
+            .then((cache) => Promise.allSettled(PRECACHE.map((f) => cache.add(f))))
             .then(() => self.skipWaiting())
     );
 });
@@ -50,24 +60,47 @@ self.addEventListener('activate', (e) => {
     );
 });
 
-/* cache-first с догрузкой: кадры плёнки, картинки и вся статика
-   попадают в кэш при первом запросе и дальше идут из него */
+function isCodeRequest(req, url) {
+    if (req.mode === 'navigate') return true;
+    return CODE_FILES.some((f) => url.pathname.endsWith('/' + f));
+}
+
+/* сеть с таймаутом; успех — в кэш; таймаут/обрыв — кэш */
+function networkFirst(req) {
+    const fetchAndCache = fetch(req).then((res) => {
+        if (res && res.ok) {
+            const copy = res.clone();
+            caches.open(CACHE_VERSION).then((cache) => cache.put(req, copy));
+        }
+        return res;
+    });
+    const timeout = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('network-timeout')), NETWORK_TIMEOUT)
+    );
+    return Promise.race([fetchAndCache, timeout]).catch(() =>
+        caches.match(req, { ignoreSearch: true }).then((hit) => hit || fetch(req))
+    );
+}
+
+/* кэш с догрузкой: картинки, шрифты, кадры плёнки */
+function cacheFirst(req) {
+    return caches.match(req, { ignoreSearch: true }).then((hit) => {
+        if (hit) return hit;
+        return fetch(req).then((res) => {
+            if (res && res.ok) {
+                const copy = res.clone();
+                caches.open(CACHE_VERSION).then((cache) => cache.put(req, copy));
+            }
+            return res;
+        });
+    });
+}
+
 self.addEventListener('fetch', (e) => {
     const req = e.request;
     if (req.method !== 'GET') return;
     const url = new URL(req.url);
     if (url.origin !== self.location.origin) return;
 
-    e.respondWith(
-        caches.match(req, { ignoreSearch: true }).then((hit) => {
-            if (hit) return hit;
-            return fetch(req).then((res) => {
-                if (res && res.ok) {
-                    const copy = res.clone();
-                    caches.open(CACHE_VERSION).then((cache) => cache.put(req, copy));
-                }
-                return res;
-            });
-        })
-    );
+    e.respondWith(isCodeRequest(req, url) ? networkFirst(req) : cacheFirst(req));
 });
