@@ -434,11 +434,61 @@ document.addEventListener('click', () => {
     if (!isStarted) startSequence();
 });
 
+/* тап пришёл раньше, чем догрузился script.js — запускаем интро сейчас */
+if (window.__echoEarlyTap) {
+    window.__echoEarlyTap = false;
+    startSequence();
+}
+
 // === ФУНКЦИИ ===
+
+/* СТРАХОВКА ИНТРО (fail-open).
+   Если после старта за 14 секунд не показался ни название, ни оглавление,
+   ни глава, ни плёнка — что-то сломалось на устройстве читателя.
+   Не оставляем его на чёрном экране: открываем оглавление напрямую. */
+let introWatchdog = null;
+
+function introInProgress() {
+    return isStarted
+        && !titleScreen.classList.contains('visible')
+        && !contentsScreen.classList.contains('visible')
+        && !chapterScreen.classList.contains('visible')
+        && !(filmScreen && filmScreen.classList.contains('visible'));
+}
+
+function failOpenToContents(reason) {
+    if (!introInProgress()) return;
+    if (introWatchdog) { clearTimeout(introWatchdog); introWatchdog = null; }
+    try {
+        coverScreen.classList.remove('visible');
+        textScreen.classList.remove('visible');
+        finalScreen.classList.remove('visible');
+        if (filmScreen) filmScreen.classList.remove('visible', 'film-live', 'reduced');
+        titleScreen.classList.remove('visible');
+        updateContentsMemory();
+        contentsScreen.classList.add('visible');
+        if (menuTrigger) menuTrigger.classList.add('visible');
+        scrollContentsToCurrent();
+        revealContentsItems();
+    } catch (e) { /* уже ничем не помочь — остаётся перезагрузка читателем */ }
+}
+
+function armIntroWatchdog() {
+    if (introWatchdog) clearTimeout(introWatchdog);
+    introWatchdog = setTimeout(() => {
+        introWatchdog = null;
+        failOpenToContents('timeout');
+    }, 14000);
+}
+
+/* любая ошибка JS, пока интро не завершилось, — тоже повод открыть книгу */
+window.addEventListener('error', () => { if (introInProgress()) failOpenToContents('error'); });
+window.addEventListener('unhandledrejection', () => { if (introInProgress()) failOpenToContents('error'); });
 
 function startSequence() {
     if (isStarted) return;
     isStarted = true;
+    armIntroWatchdog();
     startFilmPreload();
 
     // 1. Убираем картинку
@@ -503,6 +553,7 @@ function startSequence() {
 }
 
 function showContents() {
+    if (introWatchdog) { clearTimeout(introWatchdog); introWatchdog = null; }
     updateContentsMemory();
     titleScreen.classList.remove('film-enter');
     // Буквы растают
@@ -526,7 +577,7 @@ function showContents() {
 /* символьный статик-шум на момент разрыва главы (~110 мс) */
 const asciiNoise = document.getElementById('ascii-noise');
 
-function flashAsciiNoise() {
+function flashAsciiNoise(duration = 110) {
     if (!asciiNoise) return;
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     const cols = Math.ceil(window.innerWidth / 8.4);
@@ -540,7 +591,7 @@ function flashAsciiNoise() {
     }
     asciiNoise.textContent = out;
     asciiNoise.style.display = 'block';
-    setTimeout(() => { asciiNoise.style.display = 'none'; }, 110);
+    setTimeout(() => { asciiNoise.style.display = 'none'; }, duration);
 }
 
 /* метка «вы остановились здесь»: линия-сканер к первому видимому абзацу,
@@ -639,6 +690,18 @@ function openChapter(index, opts = {}) {
 
     numberEl.textContent = 'Глава ' + chapter.number;
     titleEl.textContent = chapter.title;
+
+    /* заголовок главы собирается из символов */
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        if (numberEl.textContent.trim()) {
+            const t = numberEl.textContent;
+            scrambleDecode(numberEl, t, null, 350);
+        }
+        if (titleEl.textContent.trim()) {
+            const t = titleEl.textContent;
+            setTimeout(() => scrambleDecode(titleEl, t, null, 550), 100);
+        }
+    }
         // Парсим {{PHOTO:слово:файл}} и {{VOICE}}
     let processedText = chapter.text
       .replace(
@@ -853,6 +916,29 @@ function prepareVoiceElement(el) {
 
 /* символьный мусор для дешифровок (голос, титул) */
 const SCRAMBLE_CHARS = '█▓▒░<>/\\|#%@*+=~—';
+
+/* общая дешифровка: текст идёт случайными символами и застывает
+   слева направо; restoreHTML — вернуть разметку (светящаяся Х титула,
+   точки оглавления), иначе — чистый текст */
+function scrambleDecode(el, finalText, restoreHTML, duration) {
+    const start = Date.now();
+    const iv = setInterval(() => {
+        const p = Math.min(1, (Date.now() - start) / duration);
+        const settled = Math.floor(p * finalText.length);
+        let out = '';
+        for (let i = 0; i < finalText.length; i++) {
+            const ch = finalText[i];
+            if (i < settled || ch === ' ') out += ch;
+            else out += SCRAMBLE_CHARS[Math.floor(Math.random() * SCRAMBLE_CHARS.length)];
+        }
+        el.textContent = out;
+        if (p >= 1) {
+            clearInterval(iv);
+            if (restoreHTML) el.innerHTML = restoreHTML;
+            else el.textContent = finalText;
+        }
+    }, 40);
+}
 
 /* дешифровка: текст ~0.7с идёт случайными символами и застывает
    слева направо; после — обычная глитч-анимация голоса.
@@ -1435,10 +1521,19 @@ function openContentsFresh() {
     revealContentsItems();
 }
 
-/* проявление пунктов оглавления — идемпотентно, из любой точки показа */
+/* проявление пунктов оглавления — идемпотентно, из любой точки показа;
+   каждый пункт один раз за сессию декодируется из символов */
 function revealContentsItems() {
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     document.querySelectorAll('.contents-item').forEach((item, i) => {
-        setTimeout(() => item.classList.add('revealed'), 200 + i * 80);
+        setTimeout(() => {
+            item.classList.add('revealed');
+            if (reduced || item.dataset.scrambled) return;
+            item.dataset.scrambled = '1';
+            const html = item.innerHTML;   /* внутри есть <span class="dot"> */
+            const text = item.textContent;
+            scrambleDecode(item, text, html, 420);
+        }, 200 + i * 80);
     });
 }
 
@@ -1455,11 +1550,7 @@ function initProgress() {
     contentsScreen.classList.add('visible');
     if (menuTrigger) menuTrigger.classList.add('visible');
     scrollContentsToCurrent();
-
-    const items = document.querySelectorAll('.contents-item');
-    items.forEach((item, index) => {
-        setTimeout(() => item.classList.add('revealed'), 200 + index * 80);
-    });
+    revealContentsItems();
 
     contentsScreen.classList.add('progress-dimmed');
 
@@ -1575,14 +1666,19 @@ let filmPreloadStarted = false;
 function preloadFilmFrames() {
     return Promise.all(FILM_FRAMES.map((src) => new Promise((resolve) => {
         const img = new Image();
+        let done = false;
+        const finish = (ok) => { if (!done) { done = true; resolve(ok); } };
+        const timer = setTimeout(() => finish(false), 8000);
         img.onload = () => {
             if (img.decode) {
-                img.decode().then(() => resolve(true)).catch(() => resolve(false));
+                img.decode().then(() => { clearTimeout(timer); finish(true); })
+                          .catch(() => { clearTimeout(timer); finish(false); });
             } else {
-                resolve(true);
+                clearTimeout(timer);
+                finish(true);
             }
         };
-        img.onerror = () => resolve(false);
+        img.onerror = () => { clearTimeout(timer); finish(false); };
         img.src = src;
     }))).then((results) => {
         filmLoaded = results;
@@ -1903,6 +1999,7 @@ function runFilmSequence() {
 
         later(() => {
             setFrame(nextFrame);
+            flashAsciiNoise(70); /* символьный треск кинопроектора на смену кадра */
             filmGate.classList.remove('film-gap');
             startBreathe(VISIBLE[nextFrame]);
             flick();
@@ -2170,13 +2267,24 @@ document.addEventListener('visibilitychange', () => {
 
 /* === SERVICE WORKER: офлайн === */
 if ('serviceWorker' in navigator) {
-    /* когда активировался новый service worker — перезагрузить страницу один раз,
-       чтобы читатель сразу получил свежие файлы */
+    /* когда активировался НОВЫЙ service worker — перезагрузить страницу один раз,
+       чтобы читатель сразу получил свежие файлы.
+       ВАЖНО: controllerchange срабатывает и при ПЕРВОЙ установке SW (новый
+       читатель, очищенные данные сайта). Это не обновление — страницу не трогаем,
+       иначе перезагрузка прерывает интро и на слабой сети выглядит как
+       бесконечный чёрный экран. Признак первой установки: на момент загрузки
+       скрипта navigator.serviceWorker.controller был пуст. */
+    const hadSwController = !!navigator.serviceWorker.controller;
     let swReloaded = false;
     navigator.serviceWorker.addEventListener('controllerchange', () => {
-        if (swReloaded) return;
+        if (swReloaded || !hadSwController) return;
         swReloaded = true;
-        location.reload();
+        /* не дёргаем читателя посреди интро или главы: перезагружаем,
+           когда страница уйдёт в фон; не уйдёт — новая версия подхватится
+           при следующем заходе сама */
+        const onHide = () => { if (document.hidden) location.reload(); };
+        if (document.hidden) location.reload();
+        else document.addEventListener('visibilitychange', onHide);
     });
 
     window.addEventListener('load', () => {
@@ -2554,6 +2662,60 @@ if ('serviceWorker' in navigator) {
     else img.addEventListener('load', build, { once: true });
     window.addEventListener('resize', fit);
     schedule(1800 + Math.random() * 1200); // первая вспышка: ~2–3 секунды
+
+    /* радиальный всплеск символов из точки касания:
+       кольцо радиуса r расширяется ~320 мс, внутри кольца сетка обложки
+       с сильным джиттером, снаружи — пусто; затем канвас гаснет */
+    function burst(x, y) {
+        if (!grid) return;
+        const ctx = cv.getContext('2d');
+        const cellW = cv.width / COLS;
+        const cellH = cv.height / grid.length;
+        const maxR = Math.hypot(cv.width, cv.height) * 0.75;
+        const start = performance.now();
+        const DUR = 320;
+
+        function frame(now) {
+            const p = Math.min(1, (now - start) / DUR);
+            const r = p * maxR;
+            ctx.clearRect(0, 0, cv.width, cv.height);
+            ctx.font = Math.floor(cellH) + 'px monospace';
+            ctx.textBaseline = 'top';
+            ctx.fillStyle = 'rgba(0, 168, 232, 0.55)';
+            for (let gy = 0; gy < grid.length; gy++) {
+                const cy = gy * cellH + cellH / 2;
+                let row = '';
+                for (let gx = 0; gx < COLS; gx++) {
+                    const cx = gx * cellW + cellW / 2;
+                    const d = Math.hypot(cx - x, cy - y);
+                    if (d > r) { row += ' '; continue; }
+                    /* чем ближе к фронту кольца — тем плотнее мусор */
+                    const edge = 1 - Math.min(1, Math.abs(d - r) / (cellW * 8));
+                    if (Math.random() < 0.25 + edge * 0.55) {
+                        row += NOISE[Math.floor(Math.random() * NOISE.length)];
+                    } else {
+                        row += grid[gy][gx];
+                    }
+                }
+                ctx.fillText(row, 0, gy * cellH);
+            }
+            if (p < 1) requestAnimationFrame(frame);
+            else {
+                cv.style.opacity = '0.9';
+                setTimeout(() => { cv.style.opacity = '0'; }, 90);
+            }
+        }
+        cv.style.opacity = '0.9';
+        requestAnimationFrame(frame);
+    }
+
+    /* «прощальный салют»: тап ставит isStarted — schedule/flash глушатся,
+       но burst ему не мешает */
+    coverScreen.addEventListener('pointerdown', (e) => {
+        if (!grid) return;
+        const rect = cv.getBoundingClientRect();
+        burst(e.clientX - rect.left, e.clientY - rect.top);
+    });
 })();
 
 /* === ТИТУЛЬНЫЙ ЭКРАН: СБОРКА ИЗ СИМВОЛОВ ===
@@ -2572,32 +2734,12 @@ if ('serviceWorker' in navigator) {
     const titleHTML = titleEl.innerHTML;
     let played = false;
 
-    function decode(el, finalText, restoreHTML, duration) {
-        const start = Date.now();
-        const iv = setInterval(() => {
-            const p = Math.min(1, (Date.now() - start) / duration);
-            const settled = Math.floor(p * finalText.length);
-            let out = '';
-            for (let i = 0; i < finalText.length; i++) {
-                const ch = finalText[i];
-                if (i < settled || ch === ' ') out += ch;
-                else out += SCRAMBLE_CHARS[Math.floor(Math.random() * SCRAMBLE_CHARS.length)];
-            }
-            el.textContent = out;
-            if (p >= 1) {
-                clearInterval(iv);
-                if (restoreHTML) el.innerHTML = restoreHTML; // вернулась светящаяся Х
-                else el.textContent = finalText;
-            }
-        }, 40);
-    }
-
     new MutationObserver(() => {
         if (played || !titleScreen.classList.contains('visible')) return;
         played = true;
         const filmPath = titleScreen.classList.contains('film-enter');
-        setTimeout(() => decode(authorEl, authorText, null, 900), filmPath ? 500 : 250);
-        setTimeout(() => decode(titleEl, titleText, titleHTML, 1100), filmPath ? 750 : 500);
+        setTimeout(() => scrambleDecode(authorEl, authorText, null, 900), filmPath ? 500 : 250);
+        setTimeout(() => scrambleDecode(titleEl, titleText, titleHTML, 1100), filmPath ? 750 : 500);
     }).observe(titleScreen, { attributes: true, attributeFilter: ['class'] });
 })();
 
