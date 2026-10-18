@@ -23,6 +23,43 @@
     <title>ЭХО</title>
 
 <script>
+/* АВАРИЙНЫЙ ЛЮК ?nosw=1: снимаем service worker и все кэши,
+   переходим на чистый URL. Первым в head — работает даже если
+   весь остальной код сайта сломан. */
+if (/[?&]nosw=1/.test(location.search)) {
+    var __echoClean = location.pathname + location.hash;
+    Promise.all([
+        ('serviceWorker' in navigator)
+            ? navigator.serviceWorker.getRegistrations().then(function (rs) {
+                return Promise.all(rs.map(function (r) { return r.unregister(); }));
+              })
+            : Promise.resolve(),
+        ('caches' in window)
+            ? caches.keys().then(function (ks) {
+                return Promise.all(ks.map(function (k) { return caches.delete(k); }));
+              })
+            : Promise.resolve()
+    ]).then(function () { location.replace(__echoClean); },
+            function () { location.replace(__echoClean); });
+}
+</script>
+<script>
+/* BOOT-WATCHDOG: если script.js за 12с не выставил __echoBoot
+   (не загрузился или упал) — показываем аварийный экран с действиями,
+   а не оставляем читателя на чёрном. */
+window.__echoBootTimer = setTimeout(function () {
+    if (window.__echoBoot || window.__echoStarted) return;
+    var d = document.createElement('div');
+    d.id = 'boot-fallback';
+    d.style.cssText = 'position:fixed;inset:0;z-index:99999;background:#0c0c0c;color:#8a8a8a;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;font-family:Georgia,serif;text-align:center;padding:24px;box-sizing:border-box';
+    d.innerHTML = '<div style="color:#e8e6e3;font-size:1.6rem;letter-spacing:0.3em">ЭХО</div>' +
+        '<div>Что-то пошло не так при загрузке.</div>' +
+        '<a href="?nosw=1" style="color:#00A8E8;border:1px solid #00A8E8;padding:10px 24px;text-decoration:none">Открыть оглавление</a>' +
+        '<button onclick="location.reload()" style="background:none;border:1px solid #2a2a2a;color:#8a8a8a;font:inherit;padding:10px 24px;cursor:pointer">Перезагрузить</button>';
+    document.body.appendChild(d);
+}, 12000);
+</script>
+<script>
 /* ранний перехват первого касания: script.js может грузиться долго
    (после chapters.js ~800КБ), и тап нетерпеливого читателя не должен
    пропадать. script.js проверит этот флаг при старте. */

@@ -488,6 +488,9 @@ window.addEventListener('unhandledrejection', () => { if (introInProgress()) fai
 function startSequence() {
     if (isStarted) return;
     isStarted = true;
+    window.__echoStarted = true;
+    var __bf = document.getElementById('boot-fallback');
+    if (__bf) __bf.remove();
     armIntroWatchdog();
     startFilmPreload();
 
@@ -1744,7 +1747,7 @@ function buildFilmGrain() {
     filmGrain.style.backgroundImage = `url(${canvas.toDataURL('image/png')})`;
 }
 
-buildFilmGrain();
+try { buildFilmGrain(); } catch (e) { /* canvas недоступен — зерна не будет, книга работает */ }
 
 if ('requestIdleCallback' in window) {
     requestIdleCallback(startFilmPreload, { timeout: 8000 });
@@ -2279,7 +2282,7 @@ if ('serviceWorker' in navigator) {
 /* ============================================================
    ПОДЕЛИТЬСЯ ЦИТАТОЙ: плавающая кнопка у правого края -> canvas 1200x630
    ============================================================ */
-(function shareQuote() {
+try { (function shareQuote() {
     const chScreen = document.getElementById('chapter-screen');
     if (!chScreen) return;
 
@@ -2527,14 +2530,14 @@ if ('serviceWorker' in navigator) {
             hideFab();
         }
     }, true);
-})();
+})(); } catch (e) {}
 
 
 /* === ЗАСТАВКА: ЗОВ БЕЗДЕЙСТВИЯ ===
    Нет тапа ~1с — обложка дышит, ~5с — подрагивает, ~10.5с — круги.
    Любое касание снимает зов навсегда. Если интро пропущено
    (дип-линк/прогресс: isStarted уже true) — таймеры срабатывают вхолостую. */
-(function coverBeckon() {
+try { (function coverBeckon() {
     if (!coverScreen) return;
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     const timers = [];
@@ -2548,7 +2551,7 @@ if ('serviceWorker' in navigator) {
             coverScreen.classList.remove('beckon-1', 'beckon-2', 'beckon-3');
         }, { once: true, passive: true });
     });
-})();
+})(); } catch (e) {}
 
 /* === ЗАСТАВКА: ASCII-ПРОСКОКИ ===
    Обложка один раз переводится в символьную сетку (яркость → рампа).
@@ -2556,7 +2559,7 @@ if ('serviceWorker' in navigator) {
    Дальше проскоки идут сами и учащаются вместе со ступенями зова:
    в покое редко, при дрожи и кругах — чаще и шумнее. Касание
    останавливает всё навсегда (isStarted). */
-(function coverAsciiFlicker() {
+try { (function coverAsciiFlicker() {
     if (!coverScreen) return;
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     const cv = coverScreen.querySelector('.cover-ascii');
@@ -2700,13 +2703,13 @@ if ('serviceWorker' in navigator) {
         const rect = cv.getBoundingClientRect();
         burst(e.clientX - rect.left, e.clientY - rect.top);
     });
-})();
+})(); } catch (e) {}
 
 /* === ТИТУЛЬНЫЙ ЭКРАН: СБОРКА ИЗ СИМВОЛОВ ===
    Автор и название декодируются из символьного мусора слева направо
    (~0.9с и ~1.1с). Разметка названия (светящаяся Х) на время
    дешифровки снимается и возвращается с финальным текстом. */
-(function titleScramble() {
+try { (function titleScramble() {
     if (!titleScreen) return;
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     const authorEl = titleScreen.querySelector('.author');
@@ -2725,14 +2728,14 @@ if ('serviceWorker' in navigator) {
         setTimeout(() => scrambleDecode(authorEl, authorText, null, 900), filmPath ? 500 : 250);
         setTimeout(() => scrambleDecode(titleEl, titleText, titleHTML, 1100), filmPath ? 750 : 500);
     }).observe(titleScreen, { attributes: true, attributeFilter: ['class'] });
-})();
+})(); } catch (e) {}
 
 /* === ЗАСТАВКА: ПАРАЛЛАКС ===
    Обложка следует за наклоном телефона (Android) или курсором (десктоп),
    максимум ±10px, с инерцией. iOS без жеста-подтверждения гироскоп не
    отдаёт — не запрашиваем разрешение, чтобы не портить старт книги.
    После старта (isStarted) отключается молча. */
-(function coverParallax() {
+try { (function coverParallax() {
     if (!coverScreen) return;
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     const img = coverScreen.querySelector('img');
@@ -2768,12 +2771,12 @@ if ('serviceWorker' in navigator) {
             kick();
         }, { passive: true });
     }
-})();
+})(); } catch (e) {}
 
 /* === СВЕЧА: ГЛАВА ПРИГАСАЕТ В ПАУЗЕ ===
    25с без касаний — текст медленно темнеет; любое действие возвращает
    свет. Живёт только пока открыта глава. */
-(function candleIdle() {
+try { (function candleIdle() {
     const dim = document.getElementById('candle-dim');
     if (!dim || !chapterScreen) return;
     const IDLE_MS = 25000;
@@ -2796,12 +2799,12 @@ if ('serviceWorker' in navigator) {
         if (chapterScreen.classList.contains('visible')) relight();
         else { clearTimeout(timer); dim.classList.remove('lit-off'); }
     }).observe(chapterScreen, { attributes: true, attributeFilter: ['class'] });
-})();
+})(); } catch (e) {}
 
 /* === ОГЛАВЛЕНИЕ: ПРЕВЬЮ ГЛАВЫ ПО ДОЛГОМУ НАЖАТИЮ ===
    Карточка: номер, название, первая фраза, статус чтения.
    Долгое нажатие (тач, 450мс) или правая кнопка (десктоп). */
-(function chapterPeek() {
+try { (function chapterPeek() {
     if (!contentsScreen) return;
     const card = document.createElement('div');
     card.className = 'peek-card';
@@ -2906,12 +2909,12 @@ if ('serviceWorker' in navigator) {
         if (!e.target.closest('.peek-card')) hidePeek();
     });
     contentsScreen.addEventListener('scroll', hidePeek, { passive: true });
-})();
+})(); } catch (e) {}
 
 /* === ЖИВАЯ ЦАПЛЯ ===
    Раз в 20–40с — наклон головы с проблеском. Если есть новые главы —
    постоянная тихая пульсация-зов, пока их не откроют. */
-(function heronAlive() {
+try { (function heronAlive() {
     const btn = document.getElementById('menu-trigger');
     if (!btn) return;
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
@@ -2929,4 +2932,95 @@ if ('serviceWorker' in navigator) {
     setInterval(() => {
         btn.classList.toggle('heron-call', !!document.querySelector('.contents-item.new'));
     }, 5000);
-})();
+})(); } catch (e) {}
+
+/* === ЗАСТАВКА: ОТКАЗОУСТОЙЧИВОСТЬ КАРТИНКИ ===
+   mask-image + filter на части Android-GPU дают чёрный рендер:
+   если картинка не встала — снимаем эффекты, показываем как есть. */
+try { (function coverFallback() {
+    const img = coverScreen && coverScreen.querySelector('img');
+    if (!img) return;
+    const fail = () => coverScreen.classList.add('cover-img-fallback');
+    img.addEventListener('error', fail);
+    const check = () => { if (!img.naturalWidth) fail(); };
+    if (img.complete) check();
+    else img.addEventListener('load', check, { once: true });
+})(); } catch (e) {}
+
+/* === ДИАГНОСТИКА ?debug=1: плашка-приглашение прислать скриншот === */
+try { (function echoDebugPanel() {
+    if (!/[?&]debug=1/.test(location.search)) return;
+    const errors = [];
+    const stages = {
+        css: (document.styleSheets || []).length > 0 ? 'ok' : 'нет стилей',
+        chapters: typeof chapterTexts !== 'undefined' ? 'ok' : 'НЕ ЗАГРУЖЕН',
+        script: 'ok',
+        cover: 'проверка…'
+    };
+    const coverImg = document.getElementById('cover-screen')
+        ? document.getElementById('cover-screen').querySelector('img') : null;
+    const checkCover = () => {
+        stages.cover = (coverImg && coverImg.complete && coverImg.naturalWidth)
+            ? 'ok (' + coverImg.naturalWidth + 'x' + coverImg.naturalHeight + ')'
+            : 'НЕ ВСТАЛА';
+        render();
+    };
+
+    const panel = document.createElement('div');
+    panel.style.cssText = 'position:fixed;left:8px;top:8px;z-index:999999;background:rgba(0,0,0,0.88);color:#9a9a9a;font:11px/1.5 monospace;padding:10px 12px;border:1px solid #2a2a2a;max-width:92vw;white-space:pre-wrap;word-break:break-all;user-select:text';
+    document.documentElement.appendChild(panel);
+    /* проверка заставки — только после создания панели: render() пишет в неё */
+    if (coverImg) {
+        if (coverImg.complete) checkCover();
+        else coverImg.addEventListener('load', checkCover, { once: true });
+    }
+    window.addEventListener('error', (e) => {
+        errors.push(String(e.message || e.error || 'error').slice(0, 120));
+        while (errors.length > 5) errors.shift();
+        render();
+    });
+    window.addEventListener('unhandledrejection', (e) => {
+        errors.push('rejection: ' + String(e.reason).slice(0, 100));
+        while (errors.length > 5) errors.shift();
+        render();
+    });
+
+    let cacheList = 'недоступно';
+    try {
+        if ('caches' in window && window.caches && caches.keys) {
+            caches.keys().then((ks) => { cacheList = ks.join(', ') || 'пусто'; render(); })
+                         .catch(() => { cacheList = 'ошибка доступа'; render(); });
+        }
+    } catch (e) { cacheList = 'недоступно (ограниченный контекст)'; }
+
+    function render() {
+        try {
+            let sw = 'нет';
+            try {
+                sw = 'serviceWorker' in navigator
+                    ? (navigator.serviceWorker.controller ? 'есть (контроллер)' : 'есть (без контроллера)')
+                    : 'нет';
+            } catch (e) { sw = 'ошибка доступа'; }
+            panel.textContent =
+                'ЭХО · диагностика (?debug=1)\n' +
+                'UA: ' + navigator.userAgent + '\n' +
+                'SW: ' + sw + '\n' +
+                'кэши: ' + cacheList + '\n' +
+                'css: ' + stages.css + ' · chapters.js: ' + stages.chapters +
+                ' · script.js: ' + stages.script + ' · заставка: ' + stages.cover + '\n' +
+                (errors.length ? 'ошибки:\n' + errors.map((e2) => '  · ' + e2).join('\n') : 'ошибок нет');
+        } catch (err) {
+            panel.textContent = 'render error: ' + (err && err.message);
+        }
+    }
+    render();
+})(); } catch (e) {}
+
+/* конец инициализации: гасим boot-сторож, снимаем аварийный экран,
+   если он успел появиться на медленной сети */
+try {
+    window.__echoBoot = true;
+    if (window.__echoBootTimer) { clearTimeout(window.__echoBootTimer); window.__echoBootTimer = null; }
+    const __bf = document.getElementById('boot-fallback');
+    if (__bf) __bf.remove();
+} catch (e) {}

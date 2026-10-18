@@ -127,6 +127,14 @@ html, body {
         transparent 0%, black 10%, black 90%, transparent 100%);
 }
 
+/* часть Android-GPU рендерит mask+filter в чистый чёрный:
+   фолбэк показывает картинку без эффектов */
+#cover-screen.cover-img-fallback img {
+    -webkit-mask-image: none !important;
+    mask-image: none !important;
+    filter: none !important;
+}
+
 /* дыхание разлома: тихая пульсация свечения в верхней трети по центру */
 #cover-screen::after {
     content: '';
