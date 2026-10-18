@@ -580,16 +580,21 @@ function showContents() {
 /* символьный статик-шум на момент разрыва главы (~110 мс) */
 const asciiNoise = document.getElementById('ascii-noise');
 
+/* узкая горизонтальная полоса «выпадения сигнала» в момент разрыва:
+   несколько строк шума, 80-120 мс; редкие красные вкрапления */
 function flashAsciiNoise(duration = 110) {
     if (!asciiNoise) return;
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     const cols = Math.ceil(window.innerWidth / 8.4);
-    const rows = Math.ceil(window.innerHeight / 19);
+    const rows = 6;
     const POOL = ' .:-=+*#%@█▓▒░<>/\\|';
     let out = '';
     for (let r = 0; r < rows; r++) {
         let line = '';
-        for (let c = 0; c < cols; c++) line += POOL[Math.floor(Math.random() * POOL.length)];
+        for (let c = 0; c < cols; c++) {
+            const ch = POOL[(Math.random() * POOL.length) | 0];
+            line += (Math.random() < 0.015) ? '▓' : ch; /* красные редки — красятся CSS-градиентом слоя */
+        }
         out += line + '\n';
     }
     asciiNoise.textContent = out;
@@ -917,34 +922,66 @@ function prepareVoiceElement(el) {
     return text;
 }
 
-/* символьный мусор для дешифровок (голос, титул) */
-const SCRAMBLE_CHARS = '█▓▒░<>/\\|#%@*+=~—';
+/* символьный мусор для дешифровок: тонкие глифы чаще, плотные реже */
 
-/* общая дешифровка: текст идёт случайными символами и застывает
-   слева направо; restoreHTML — вернуть разметку (светящаяся Х титула,
-   точки оглавления), иначе — чистый текст */
+/* символьный мусор: тонкие глифы чаще, плотные реже */
+const SCRAMBLE_WEIGHTED = (() => {
+    const groups = [[' .·:∙', 6], ['-–=+', 3], ['<>/\\|', 2], ['*#%@', 2], ['█▓▒░', 1]];
+    let pool = '';
+    groups.forEach(([chars, w]) => { for (let i = 0; i < w; i++) pool += chars; });
+    return pool;
+})();
+
+/* общая дешифровка: у каждого символа свой момент застывания
+   (линейный фронт ±220 мс), частота смены глифа затухает перед
+   остановкой, цифры дешифруются цифровым мусором.
+   duration по умолчанию: 280 + 18 мс/символ, потолок 1100 мс. */
 function scrambleDecode(el, finalText, restoreHTML, duration) {
-    const start = Date.now();
+    const n = finalText.length;
+    const dur = Math.min(duration || (280 + 18 * n), 1100);
+    const disp = finalText.split('');
+    const settle = [];
+    for (let i = 0; i < n; i++) {
+        const front = (i / Math.max(1, n)) * Math.max(0, dur - 200);
+        settle.push(Math.max(0, front + (Math.random() * 2 - 1) * 220));
+    }
+    const start = performance.now();
     const iv = setInterval(() => {
-        const p = Math.min(1, (Date.now() - start) / duration);
-        const settled = Math.floor(p * finalText.length);
-        let out = '';
-        for (let i = 0; i < finalText.length; i++) {
+        const t = performance.now() - start;
+        let all = true;
+        for (let i = 0; i < n; i++) {
             const ch = finalText[i];
-            if (i < settled || ch === ' ') out += ch;
-            else out += SCRAMBLE_CHARS[Math.floor(Math.random() * SCRAMBLE_CHARS.length)];
+            if (ch === ' ' || ch === '\n' || ch === '\t') continue;
+            if (t >= settle[i]) {
+                disp[i] = ch; /* застыл */
+                continue;
+            }
+            all = false;
+            const remain = settle[i] - t;
+            const prob = remain > 400 ? 0.95 : remain > 150 ? 0.5 : 0.2;
+            if (Math.random() < prob) {
+                disp[i] = /\d/.test(ch)
+                    ? '0123456789'[(Math.random() * 10) | 0]
+                    : SCRAMBLE_WEIGHTED[(Math.random() * SCRAMBLE_WEIGHTED.length) | 0];
+            }
         }
-        el.textContent = out;
-        if (p >= 1) {
+        el.textContent = disp.join('');
+        if (all || t > dur + 400) {
             clearInterval(iv);
             if (restoreHTML) el.innerHTML = restoreHTML;
             else el.textContent = finalText;
+            /* микровспышка яркости в момент полной сборки */
+            if (!el.closest('#chapter-screen')) {
+                el.classList.add('scramble-flash');
+                setTimeout(() => el.classList.remove('scramble-flash'), 130);
+            }
         }
     }, 40);
 }
 
-/* дешифровка: текст ~0.7с идёт случайными символами и застывает
-   слева направо; после — обычная глитч-анимация голоса.
+/* дешифровка голоса: органический скрембл через общий scrambleDecode
+   (взвешенный мусор, разброс застывания, длительность от длины строки),
+   затем — обычная глитч-анимация голоса.
    Исходный текст фиксируем в dataset заранее, чтобы prepareVoiceElement
    подхватил его, а не мусор скрембла. */
 function scrambleVoice(el, done) {
@@ -954,24 +991,8 @@ function scrambleVoice(el, done) {
     }
     if (!el.dataset.voiceText) el.dataset.voiceText = el.textContent.trim();
     const text = el.dataset.voiceText;
-    const start = Date.now();
-    const duration = 700;
-    const iv = setInterval(() => {
-        const p = Math.min(1, (Date.now() - start) / duration);
-        const settled = Math.floor(p * text.length);
-        let out = '';
-        for (let i = 0; i < text.length; i++) {
-            const ch = text[i];
-            if (i < settled || ch === ' ' || ch === '\n') out += ch;
-            else out += SCRAMBLE_CHARS[Math.floor(Math.random() * SCRAMBLE_CHARS.length)];
-        }
-        el.textContent = out;
-        if (p >= 1) {
-            clearInterval(iv);
-            el.textContent = text;
-            done();
-        }
-    }, 40);
+    scrambleDecode(el, text, null, 0 /* посчитается: 280 + 18/символ, до 1100 */);
+    setTimeout(done, Math.min(280 + 18 * text.length, 1100) + 60);
 }
 
 function generateAggressiveGlitch(el) {
@@ -2567,77 +2588,165 @@ try { (function coverAsciiFlicker() {
     if (!cv || !img) return;
 
     const RAMP = ' .:-=+*#%@';
-    const NOISE = '█▓▒░<>/\\|#%@*+=~—';
-    const COLS = 120;
-    let grid = null;
+    const SPARK = '#00A8E8';
+    const INK = '190, 186, 178'; /* тёплый серый, в палитре книги */
+    const COLS = window.innerWidth < 600 ? 90 : 120;
+    const SPARK_P = 0.03; /* 3% ячеек — циановые искры */
+    let cells = null;   /* cells[y][x] = {ch, lum, spark} */
+    let rows = 0;
     let built = false;
+    let breathing = true;
 
     function build() {
         if (built || !img.complete || !img.naturalWidth) return;
         built = true;
         try {
-            const rows = Math.max(1, Math.round(COLS * (img.naturalHeight / img.naturalWidth) * 0.5));
+            rows = Math.max(1, Math.round(COLS * (img.naturalHeight / img.naturalWidth) * 0.5));
             const off = document.createElement('canvas');
             off.width = COLS;
             off.height = rows;
             const octx = off.getContext('2d', { willReadFrequently: true });
             octx.drawImage(img, 0, 0, COLS, rows);
             const data = octx.getImageData(0, 0, COLS, rows).data;
-            grid = [];
+            cells = [];
             for (let y = 0; y < rows; y++) {
-                let row = '';
+                const row = [];
                 for (let x = 0; x < COLS; x++) {
                     const i = (y * COLS + x) * 4;
                     const lum = (data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114) / 255;
-                    row += RAMP[Math.min(RAMP.length - 1, Math.floor(lum * RAMP.length))];
+                    row.push({
+                        ch: RAMP[Math.min(RAMP.length - 1, Math.floor(lum * RAMP.length))],
+                        lum: lum,
+                        spark: Math.random() < SPARK_P
+                    });
                 }
-                grid.push(row);
+                cells.push(row);
             }
             fit();
+            paintStatic();
+            breathe();
         } catch (err) {
-            grid = null; /* cross-origin/file:// — проскоки недоступны, тихо выключаемся */
+            cells = null; /* tainted canvas и пр. — слой тихо выключен */
         }
     }
 
     function fit() {
-        if (!grid) return;
+        if (!cells) return;
         cv.width = coverScreen.clientWidth;
         cv.height = coverScreen.clientHeight;
+        paintStatic();
     }
 
-    function paint(jitter) {
-        if (!grid) return;
+    /* альфа ячейки от яркости: образ проступает из темноты */
+    function alphaOf(lum) {
+        if (lum < 0.08) return 0.04;
+        if (lum < 0.25) return 0.10;
+        if (lum < 0.5) return 0.22;
+        if (lum < 0.75) return 0.42;
+        return 0.7;
+    }
+
+    function paintStatic() {
+        if (!cells) return;
         const ctx = cv.getContext('2d');
         ctx.clearRect(0, 0, cv.width, cv.height);
-        const cellH = cv.height / grid.length;
+        const cellH = cv.height / rows;
+        const cellW = cv.width / COLS;
         ctx.font = Math.floor(cellH) + 'px monospace';
         ctx.textBaseline = 'top';
-        ctx.fillStyle = 'rgba(0, 168, 232, 0.5)';
-        for (let y = 0; y < grid.length; y++) {
-            let row = grid[y];
-            if (jitter > 0) {
-                const chars = row.split('');
-                for (let x = 0; x < chars.length; x++) {
-                    if (Math.random() < jitter) chars[x] = NOISE[Math.floor(Math.random() * NOISE.length)];
+        /* непрерывные сегменты одной альфа-ступени — 3-5 fillText на строку */
+        for (let y = 0; y < rows; y++) {
+            let segStart = 0;
+            let segAlpha = alphaOf(cells[y][0].lum);
+            for (let x = 1; x <= COLS; x++) {
+                const a = x < COLS ? alphaOf(cells[y][x].lum) : -1;
+                if (a !== segAlpha) {
+                    drawSeg(ctx, y, segStart, x, segAlpha, cellW, false);
+                    segStart = x;
+                    segAlpha = a;
                 }
-                row = chars.join('');
             }
-            ctx.fillText(row, 0, y * cellH);
         }
     }
 
+    function drawSeg(ctx, y, x0, x1, alpha, cellW, noisy) {
+        let str = '';
+        for (let x = x0; x < x1; x++) {
+            const c = cells[y][x];
+            if (noisy && Math.random() < 0.3) {
+                str += '█▓▒░<>/\\|#%@*+=~—'[(Math.random() * 19) | 0];
+            } else {
+                str += c.ch;
+            }
+        }
+        ctx.fillStyle = 'rgba(' + INK + ',' + alpha.toFixed(2) + ')';
+        ctx.fillText(str, x0 * cellW, y * (cv.height / rows));
+        /* редкие циановые искры поверх сегмента */
+        for (let x = x0; x < x1; x++) {
+            const c = cells[y][x];
+            if (c.spark && c.lum > 0.2) {
+                ctx.fillStyle = 'rgba(0,168,232,' + Math.min(0.6, alpha + 0.15).toFixed(2) + ')';
+                ctx.fillText(c.ch, x * cellW, y * (cv.height / rows));
+            }
+        }
+    }
+
+    /* дыхание яркости 8с + дрейф сканлайнов ±1px; всё через стили,
+       без перерисовки канваса; во время скрытой вкладки — пауза */
+    let breatheT = 0;
+    function breathe() {
+        if (!breathing || !cells) return;
+        if (!document.hidden) {
+            breatheT += 0.25;
+            const s = Math.sin((breatheT / 8) * Math.PI * 2);
+            cv.style.opacity = (0.2 + s * 0.07).toFixed(3);
+            cv.style.transform = 'translateY(' + (Math.sin((breatheT / 8) * Math.PI * 2 + 1.3) * 1).toFixed(2) + 'px)';
+        }
+        setTimeout(breathe, 250);
+    }
+
+    /* вспышка: 100-150 мс джиттера поверх статичного слоя, затем возврат */
     function flash(jitter) {
-        paint(jitter);
-        cv.style.opacity = '0.85';
-        setTimeout(() => { cv.style.opacity = '0'; }, 100 + Math.random() * 50);
+        if (!cells) return;
+        const ctx = cv.getContext('2d');
+        ctx.clearRect(0, 0, cv.width, cv.height);
+        const cellH = cv.height / rows;
+        const cellW = cv.width / COLS;
+        ctx.font = Math.floor(cellH) + 'px monospace';
+        ctx.textBaseline = 'top';
+        for (let y = 0; y < rows; y++) {
+            let segStart = 0;
+            let segAlpha = alphaOf(cells[y][0].lum);
+            for (let x = 1; x <= COLS; x++) {
+                const a = x < COLS ? alphaOf(cells[y][x].lum) : -1;
+                if (a !== segAlpha) {
+                    drawSeg(ctx, y, segStart, x, Math.min(0.85, segAlpha + jitter), cellW, true);
+                    segStart = x;
+                    segAlpha = a;
+                }
+            }
+        }
+        /* редкий вертикальный разрыв — одна колонка мусором */
+        if (Math.random() < 0.35) {
+            const cx = (Math.random() * COLS) | 0;
+            ctx.fillStyle = 'rgba(0,168,232,0.5)';
+            let col = '';
+            for (let y = 0; y < rows; y++) col += '█▓▒░<>/\\|'[(Math.random() * 9) | 0] + '\n';
+            ctx.fillText(col, cx * cellW, 0);
+        }
+        cv.style.opacity = '0.9';
+        setTimeout(() => {
+            cv.style.opacity = '';
+            paintStatic();
+        }, 100 + Math.random() * 50);
     }
 
     function schedule(ms) {
         setTimeout(() => {
-            if (isStarted) return; // касание — конец проскокам навсегда
+            if (isStarted) return; /* касание — конец проскокам навсегда */
             const stage3 = coverScreen.classList.contains('beckon-3');
             const stage2 = coverScreen.classList.contains('beckon-2');
-            flash(stage3 ? 0.25 : 0.15);
+            flash(stage3 ? 0.3 : 0.18);
             const next = stage3 ? 1200 + Math.random() * 1600
                       : stage2 ? 2500 + Math.random() * 2500
                       : 4000 + Math.random() * 3000;
@@ -2645,22 +2754,18 @@ try { (function coverAsciiFlicker() {
         }, ms);
     }
 
-    if (img.complete && img.naturalWidth) build();
-    else img.addEventListener('load', build, { once: true });
-    window.addEventListener('resize', fit);
-    schedule(1800 + Math.random() * 1200); // первая вспышка: ~2–3 секунды
-
-    /* радиальный всплеск символов из точки касания:
-       кольцо радиуса r расширяется ~320 мс, внутри кольца сетка обложки
-       с сильным джиттером, снаружи — пусто; затем канвас гаснет */
+    /* радиальный всплеск из точки касания: кромка кольца — циановая,
+       тело — серое, плотность затухает от фронта внутрь; послесвечение 200 мс */
     function burst(x, y) {
-        if (!grid) return;
+        if (!cells) return;
+        breathing = false;
         const ctx = cv.getContext('2d');
         const cellW = cv.width / COLS;
-        const cellH = cv.height / grid.length;
+        const cellH = cv.height / rows;
         const maxR = Math.hypot(cv.width, cv.height) * 0.75;
         const start = performance.now();
         const DUR = 320;
+        const NOISE = '█▓▒░<>/\\|#%@*+=~—';
 
         function frame(now) {
             const p = Math.min(1, (now - start) / DUR);
@@ -2668,38 +2773,51 @@ try { (function coverAsciiFlicker() {
             ctx.clearRect(0, 0, cv.width, cv.height);
             ctx.font = Math.floor(cellH) + 'px monospace';
             ctx.textBaseline = 'top';
-            ctx.fillStyle = 'rgba(0, 168, 232, 0.55)';
-            for (let gy = 0; gy < grid.length; gy++) {
+            for (let gy = 0; gy < rows; gy++) {
                 const cy = gy * cellH + cellH / 2;
                 let row = '';
                 for (let gx = 0; gx < COLS; gx++) {
                     const cx = gx * cellW + cellW / 2;
                     const d = Math.hypot(cx - x, cy - y);
                     if (d > r) { row += ' '; continue; }
-                    /* чем ближе к фронту кольца — тем плотнее мусор */
-                    const edge = 1 - Math.min(1, Math.abs(d - r) / (cellW * 8));
-                    if (Math.random() < 0.25 + edge * 0.55) {
-                        row += NOISE[Math.floor(Math.random() * NOISE.length)];
+                    const edge = d / Math.max(1, r); /* 0 в центре — 1 у фронта */
+                    if (Math.random() < 0.15 + edge * 0.7) {
+                        row += NOISE[(Math.random() * NOISE.length) | 0];
                     } else {
-                        row += grid[gy][gx];
+                        row += cells[gy][gx].ch;
                     }
                 }
+                /* серое тело + циановая кромка у фронта */
+                ctx.fillStyle = 'rgba(' + INK + ',0.55)';
                 ctx.fillText(row, 0, gy * cellH);
+                ctx.fillStyle = 'rgba(0,168,232,0.5)';
+                ctx.fillText(row.replace(/[^ ]/g, function (m2, idx) {
+                    const cx = idx * cellW + cellW / 2;
+                    const d = Math.abs(Math.hypot(cx - x, cy - y) - r);
+                    return d < cellW * 2 ? m2 : ' ';
+                }), 0, gy * cellH);
             }
             if (p < 1) requestAnimationFrame(frame);
             else {
                 cv.style.opacity = '0.9';
-                setTimeout(() => { cv.style.opacity = '0'; }, 90);
+                setTimeout(() => {
+                    cv.style.opacity = '';
+                    paintStatic();
+                    breathing = true;
+                    breathe();
+                }, 200);
             }
         }
-        cv.style.opacity = '0.9';
         requestAnimationFrame(frame);
     }
 
-    /* «прощальный салют»: тап ставит isStarted — schedule/flash глушатся,
-       но burst ему не мешает */
+    if (img.complete && img.naturalWidth) build();
+    else img.addEventListener('load', build, { once: true });
+    window.addEventListener('resize', fit);
+    schedule(1800 + Math.random() * 1200); /* первая вспышка: ~2–3 с */
+
     coverScreen.addEventListener('pointerdown', (e) => {
-        if (!grid) return;
+        if (!cells) return;
         const rect = cv.getBoundingClientRect();
         burst(e.clientX - rect.left, e.clientY - rect.top);
     });

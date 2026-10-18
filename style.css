@@ -1073,10 +1073,13 @@ html, body {
     100% { opacity: 0; transform: translateY(100vh); }
 }
 
-/* символьный статик-шум: вспышка ~110мс в момент разрыва главы */
+/* символьный статик-шум: узкая полоса «выпадения сигнала» (~110мс) */
 #ascii-noise {
     position: fixed;
-    inset: 0;
+    left: 0;
+    right: 0;
+    top: 34%;
+    height: 96px;
     z-index: 91;
     margin: 0;
     display: none;
@@ -1085,8 +1088,8 @@ html, body {
     font-family: monospace;
     font-size: 14px;
     line-height: 1.35;
-    color: rgba(210, 225, 232, 0.16);
-    background: rgba(0, 0, 0, 0.35);
+    color: rgba(210, 225, 232, 0.18);
+    background: linear-gradient(to bottom, transparent, rgba(0, 0, 0, 0.4) 30%, rgba(0, 0, 0, 0.4) 70%, transparent);
     white-space: pre;
     user-select: none;
 }
@@ -2632,4 +2635,15 @@ html, body {
   #cover-screen.beckon-3 .cover-ripples i {
     animation: none !important;
   }
+}
+
+/* микровспышка яркости в момент полной сборки скрембла */
+@keyframes scramble-flash {
+    0%   { filter: brightness(1.6); }
+    100% { filter: brightness(1); }
+}
+.scramble-flash { animation: scramble-flash 0.13s ease-out; }
+
+@media (prefers-reduced-motion: reduce) {
+    .scramble-flash { animation: none; }
 }
