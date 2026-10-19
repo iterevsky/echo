@@ -3376,12 +3376,16 @@ try { (function coverFallback() {
    Тап/палец/курсор — источник волн; на beckon-3 капли падают сами.
    Любой сбой WebGL — удаляем canvas, остаётся текущая реализация. */
 try { (function coverWater() {
+    /* причина состояния ряби — читается панелью ?debug=1.
+       Маркер ставим в самом начале: любой сбой ниже оставит след. */
+    const setStatus = (s) => { try { window.__echoCoverGl = s; } catch (e) {} };
+    setStatus('boot');
     /* file:// таинтит canvas — рябь только на http(s); локально остаётся CSS-реализация */
-    if (location.protocol === 'file:') { try { window.__echoCoverGl = "skip:file"; } catch (e) {} return; }
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { try { window.__echoCoverGl = "skip:reduce"; } catch (e) {} return; }
-    if (!coverScreen) { try { window.__echoCoverGl = "skip:no-cover"; } catch (e) {} return; }
+    if (location.protocol === 'file:') { setStatus('skip:file'); return; }
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { setStatus('skip:reduce'); return; }
+    if (!coverScreen) { setStatus('skip:no-cover'); return; }
     const img = coverScreen.querySelector('img');
-    if (!img) { try { window.__echoCoverGl = "skip:no-img"; } catch (e) {} return; }
+    if (!img) { setStatus('skip:no-img'); return; }
 
     const GW = 96, GH = 128;          /* сетка heightfield */
     const DAMP = 0.985;
@@ -3393,13 +3397,20 @@ try { (function coverWater() {
     const canvas = document.createElement('canvas');
     canvas.className = 'cover-gl';
     canvas.setAttribute('aria-hidden', 'true');
-    const gl = canvas.getContext('webgl', { antialias: false, depth: false, stencil: false, alpha: false });
-    if (!gl) { try { window.__echoCoverGl = "no-webgl"; } catch (e) {} canvas.remove(); return; }
+    /* getContext умеет не только возвращать null, но и бросать
+       (блокировки GPU/WebGL в части браузеров) — ловим оба варианта */
+    let gl = null;
+    try {
+        gl = canvas.getContext('webgl', { antialias: false, depth: false, stencil: false, alpha: false });
+    } catch (e) {
+        setStatus('fail:context:' + String(e && e.message).slice(0, 40));
+        canvas.remove();
+        return;
+    }
+    if (!gl) { setStatus('no-webgl'); canvas.remove(); return; }
 
     let raf = null;
     let dead = false;
-    /* причина состояния ряби — читается панелью ?debug=1 */
-    const setStatus = (s) => { try { window.__echoCoverGl = s; } catch (e) {} };
     /* полный откат к обычной картинке; идемпотентна, глушит цикл */
     const fail = (why) => {
         setStatus('fail:' + why);
@@ -3635,7 +3646,14 @@ try { (function coverWater() {
         if (dead || !coverScreen.classList.contains('cover-gl-on')) return;
         try { fit(); } catch (e) { fail('resize'); }
     });
-})(); } catch (e) {}
+})(); } catch (e) {
+    /* непойманный сбой ряби — оставляем след для ?debug=1 */
+    try {
+        if (!window.__echoCoverGl || window.__echoCoverGl === 'boot') {
+            window.__echoCoverGl = 'fail:boot:' + String(e && e.message).slice(0, 40);
+        }
+    } catch (e2) {}
+}
 
 /* === ДИАГНОСТИКА ?debug=1: плашка-приглашение прислать скриншот === */
 try { (function echoDebugPanel() {
