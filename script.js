@@ -113,8 +113,58 @@ function goNextChapter() {
     resetSwipeHint();
     const next = nextReadableIndex(currentChapter);
     if (next !== -1) {
-        openChapter(next);
+        transitionToChapter(next, 1, { skipTear: true });
     }
+}
+
+/* единый жест перехода: свайп, кнопки навигации и плашка конца главы
+   идут через один путь — сжатый разрыв + уходящий текст.
+   dir >= 0 — движение «вперёд», уходит вверх; иначе — вниз. */
+function transitionToChapter(index, dir, opts = {}) {
+    if (index < 0 || index >= chapters.length) return;
+    if (chapters[index].empty) return;
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduced) { openChapter(index, { skipTear: true }); return; }
+
+    const chScreen = document.getElementById('chapter-screen');
+    const textEl = chScreen ? chScreen.querySelector('.chapter-text') : null;
+
+    if (!opts.skipTear) {
+        const tearOverlay = document.getElementById('tear-overlay');
+        if (tearOverlay && chScreen) {
+            tearOverlay.style.display = 'block';
+            tearOverlay.querySelector('.tear-top').style.animation = 'tear-top-shift 0.12s steps(1) forwards';
+            tearOverlay.querySelector('.tear-bottom').style.animation = 'tear-bottom-shift 0.12s steps(1) forwards';
+            tearOverlay.querySelector('.tear-line').style.animation = 'tear-line-fly 0.1s linear forwards';
+            chScreen.classList.add('tear-flash');
+            setTimeout(() => {
+                chScreen.classList.remove('tear-flash');
+                tearOverlay.style.display = 'none';
+                tearOverlay.querySelectorAll('*').forEach(el => { el.style.animation = ''; });
+            }, 150);
+        }
+    }
+    flashAsciiNoise(90);
+
+    const titleEl = chScreen ? chScreen.querySelector('.chapter-title') : null;
+    if (typeof echoBurst === 'function' && titleEl) echoBurst(titleEl);
+
+    if (textEl) {
+        textEl.style.transition = 'transform 250ms var(--ease-hard), opacity 250ms var(--ease-hard)';
+        textEl.style.transform = 'translateY(' + (dir >= 0 ? '-12px' : '12px') + ')';
+        textEl.style.opacity = '0';
+    }
+
+    setTimeout(() => {
+        openChapter(index, { skipTear: true });
+        if (textEl) {
+            setTimeout(() => {
+                textEl.style.transition = '';
+                textEl.style.transform = '';
+                textEl.style.opacity = '';
+            }, 300);
+        }
+    }, 350);
 }
 
 function canSwipe() {
@@ -337,11 +387,11 @@ if (!handleDeepLink() && !handleHashLink()) initProgress();
 // === ОБРАБОТЧИКИ НАВИГАЦИИ ВНУТРИ ГЛАВЫ ===
 document.querySelector('.nav-prev').addEventListener('click', () => {
     const prev = prevReadableIndex(currentChapter);
-    if (prev !== -1) openChapter(prev);
+    if (prev !== -1) transitionToChapter(prev, -1);
 });
 document.querySelector('.nav-next').addEventListener('click', () => {
     const next = nextReadableIndex(currentChapter);
-    if (next !== -1) openChapter(next);
+    if (next !== -1) transitionToChapter(next, 1);
 });
 document.querySelector('.nav-contents').addEventListener('click', () => {
     exitChapterToContents();
@@ -512,14 +562,24 @@ function startSequence() {
                 // 4. Глитч с затуханием в тьму — 3.8 секунды
                 glitchText.classList.add('glitching');
 
-                // Затухаем text-screen параллельно с глитчем
+                // Финал: «умирающий кинескоп» — растр схлопывается,
+                // циановая линия сжимается в точку и гаснет
                 setTimeout(() => {
-                    textScreen.style.opacity = '0';
-                }, 3000);
+                    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                        textScreen.style.opacity = '0';
+                    } else {
+                        textScreen.classList.add('raster-collapse');
+                        const cl = document.createElement('div');
+                        cl.className = 'collapse-line';
+                        textScreen.appendChild(cl);
+                        setTimeout(() => cl.remove(), 700);
+                    }
+                }, 2900);
 
                 // После окончания глитча — чёрный экран
                 setTimeout(() => {
                     textScreen.classList.remove('visible');
+                    textScreen.classList.remove('raster-collapse');
                     textScreen.style.opacity = '';
 
                     // Показываем финальный чёрный экран
@@ -602,6 +662,38 @@ function flashAsciiNoise(duration = 110) {
     setTimeout(() => { asciiNoise.style.display = 'none'; }, duration);
 }
 
+/* послесвечение «эхо»: призрачные копии улетают за словом в сильные моменты.
+   Две копии (JS-клоны, не псевдоэлементы — у голосовых спанов вложенная
+   структура), lifetime < 1.2 с, не более 2 пар на элемент одновременно. */
+function echoBurst(target) {
+    if (!target || !target.isConnected) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const live = Number(target.dataset.echoLive || 0);
+    if (live >= 2) return;
+    target.dataset.echoLive = String(live + 1);
+
+    const r = target.getBoundingClientRect();
+    if (r.width < 2 || r.height < 2) { target.dataset.echoLive = String(live); return; }
+
+    const done = () => {
+        target.dataset.echoLive = String(Math.max(0, Number(target.dataset.echoLive || 1) - 1));
+    };
+
+    [1, 2].forEach((n) => {
+        const ghost = target.cloneNode(true);
+        ghost.className = (ghost.className ? ghost.className + ' ' : '') + 'echo-ghost';
+        if (n === 2) ghost.classList.add('echo-ghost-2');
+        ghost.style.top = r.top + 'px';
+        ghost.style.left = r.left + 'px';
+        ghost.style.width = r.width + 'px';
+        ghost.style.height = r.height + 'px';
+        ghost.addEventListener('animationend', () => { ghost.remove(); done(); }, { once: true });
+        document.body.appendChild(ghost);
+        /* страховка: если animationend не сработал (вкладка скрыта) — убрать по таймеру */
+        setTimeout(() => { if (ghost.isConnected) { ghost.remove(); done(); } }, 1300);
+    });
+}
+
 /* метка «вы остановились здесь»: линия-сканер к первому видимому абзацу,
    затем циановая риска у левого края на ~3 секунды */
 function showResumeMark() {
@@ -644,7 +736,7 @@ function openChapter(index, opts = {}) {
     if (chapters[index].empty) return;
     const tearOverlay = document.getElementById('tear-overlay');
     const chScreen = document.getElementById('chapter-screen');
-    if (tearOverlay && chScreen) {
+    if (!opts.skipTear && tearOverlay && chScreen) {
         tearOverlay.style.display = 'block';
         flashAsciiNoise();
         tearOverlay.querySelector('.tear-top').style.animation = 'tear-top-shift 0.12s steps(1) forwards';
@@ -819,11 +911,18 @@ if (photoOverlay) {
 /* === ЭЛЕКТРИЧЕСКИЙ ДРЕБЕЗГ В ОГЛАВЛЕНИИ === */
 (function() {
     const GROUP_SIZE = 15;          // Каждые 15 глав = одна группа
-    const INTERVAL_MS = 15000;      // Раз в 15 секунд
     const GLITCH_DURATION = 1200;   // Длительность дребезга одной главы
 
     const contentsScreen = document.getElementById('contents-screen');
     if (!contentsScreen) return;
+
+    /* пункт под курсором — кандидат на дребезг */
+    let hoveredItem = null;
+    contentsScreen.addEventListener('pointerover', (e) => {
+        const it = e.target.closest('.contents-item');
+        if (it) hoveredItem = it;
+    }, { passive: true });
+    contentsScreen.addEventListener('pointerleave', () => { hoveredItem = null; }, { passive: true });
 
     function triggerGlitch() {
         // Работает только когда оглавление открыто
@@ -839,9 +938,15 @@ if (photoOverlay) {
             const end = Math.min(start + GROUP_SIZE, items.length);
             const group = items.slice(start, end);
 
-            // Случайная глава из группы
-            const randomIndex = Math.floor(Math.random() * group.length);
-            const item = group[randomIndex];
+            /* ~30% — пункт под курсором (если есть и в этой группе),
+               иначе случайный из группы */
+            let item = null;
+            if (hoveredItem && group.indexOf(hoveredItem) !== -1 && Math.random() < 0.3) {
+                item = hoveredItem;
+            } else {
+                const randomIndex = Math.floor(Math.random() * group.length);
+                item = group[randomIndex];
+            }
 
             // Если уже дребезжит — пропускаем, чтобы не наложилось
             if (item.classList.contains('electric-glitch')) continue;
@@ -858,7 +963,9 @@ if (photoOverlay) {
         }
     }
 
-    // Запускаем цикл только пока оглавление на экране
+    // Запускаем цикл только пока оглавление на экране.
+    // Реактивность вместо автономности: редкие случайные проскоки
+    // (9-16с), ~30% — пункт под курсором; просад — не чаще раза в 25с.
     let glitchTimer = null;
     let dropTimer = null;
 
@@ -875,20 +982,26 @@ if (photoOverlay) {
         dropTimer = setTimeout(() => {
             triggerAnalogDrop();
             scheduleAnalogDrop();
-        }, 25000 + Math.random() * 15000);
+        }, 25000 + Math.random() * 15000); /* 25-40с: не чаще раза в 25с */
+    }
+
+    function scheduleGlitch() {
+        clearTimeout(glitchTimer);
+        glitchTimer = setTimeout(() => {
+            triggerGlitch();
+            scheduleGlitch();
+        }, 9000 + Math.random() * 7000); /* 9-16с */
     }
 
     function startGlitches() {
         if (glitchTimer) return;
-        glitchTimer = setInterval(triggerGlitch, INTERVAL_MS);
+        scheduleGlitch();
         scheduleAnalogDrop();
     }
 
     function stopGlitches() {
-        if (glitchTimer) {
-            clearInterval(glitchTimer);
-            glitchTimer = null;
-        }
+        clearTimeout(glitchTimer);
+        glitchTimer = null;
         clearTimeout(dropTimer);
         dropTimer = null;
     }
@@ -995,6 +1108,15 @@ function scrambleVoice(el, done) {
     setTimeout(done, Math.min(280 + 18 * text.length, 1100) + 60);
 }
 
+/* унифицированная палитра и диапазоны амплитуд глитча (задача 8):
+   цвета и пределы сдвигов/скосов/срезов задаются здесь, генерация не меняется */
+const G_C1 = '#c41e3a';   /* красный канал */
+const G_C2 = '#00A8E8';   /* циановый канал */
+const G_INK = '#e8e6e3';  /* основной текст */
+const G_SKEW_MAX = 4;     /* максимальный skewX двойников, градусы */
+const G_CLIP_MAX = 70;    /* максимальная глубина вертикального среза, % */
+const G_SHIFT_X = 5;      /* максимальный горизонтальный сдвиг двойников, px */
+
 function generateAggressiveGlitch(el) {
     const chapterScreen = document.getElementById('chapter-screen');
 
@@ -1027,8 +1149,8 @@ function generateAggressiveGlitch(el) {
         el.appendChild(slice1);
         el.appendChild(slice2);
 
-        const c1 = '#c41e3a';
-        const c2 = '#00A8E8';
+        const c1 = G_C1;
+        const c2 = G_C2;
         let baseFrames = '';
         let redFrames = '';
         let cyanFrames = '';
@@ -1040,7 +1162,7 @@ function generateAggressiveGlitch(el) {
 
             const tx = (Math.random() > 0.5 ? 1 : -1) * Math.floor(Math.random() * 3 + 1);
             const ty = (Math.random() > 0.5 ? 1 : -1) * Math.floor(Math.random() * 2);
-            const sk = (Math.random() > 0.5 ? 1 : -1) * Math.floor(Math.random() * 4 + 1);
+            const sk = (Math.random() > 0.5 ? 1 : -1) * Math.floor(Math.random() * G_SKEW_MAX + 1);
             const op = (0.5 + Math.random() * 0.5).toFixed(2);
             const br = (0.6 + Math.random() * 0.8).toFixed(2);
             const hasShadow = Math.random() > 0.25;
@@ -1050,26 +1172,26 @@ function generateAggressiveGlitch(el) {
             baseFrames += `            ${pct}% { transform: translate(${tx}px, ${ty}px) skewX(${sk}deg); opacity: ${op}; text-shadow: ${ts}; filter: brightness(${br}); }\n`;
 
             const redClip = Math.random() > 0.35
-                ? `inset(${Math.floor(Math.random()*70)}% 0 ${Math.floor(Math.random()*70)}% 0)`
+                ? `inset(${Math.floor(Math.random()*G_CLIP_MAX)}% 0 ${Math.floor(Math.random()*G_CLIP_MAX)}% 0)`
                 : 'inset(0 0 0 0)';
-            const redTx = -2 - Math.floor(Math.random() * 5);
+            const redTx = -2 - Math.floor(Math.random() * G_SHIFT_X);
             const redOp = Math.random() > 0.45 ? (0.4 + Math.random() * 0.6).toFixed(2) : 0;
             redFrames += `            ${pct}% { opacity: ${redOp}; clip-path: ${redClip}; transform: translateX(${redTx}px); }\n`;
 
             const cyanClip = Math.random() > 0.35
-                ? `inset(${Math.floor(Math.random()*70)}% 0 ${Math.floor(Math.random()*70)}% 0)`
+                ? `inset(${Math.floor(Math.random()*G_CLIP_MAX)}% 0 ${Math.floor(Math.random()*G_CLIP_MAX)}% 0)`
                 : 'inset(0 0 0 0)';
-            const cyanTx = 2 + Math.floor(Math.random() * 5);
+            const cyanTx = 2 + Math.floor(Math.random() * G_SHIFT_X);
             const cyanOp = Math.random() > 0.45 ? (0.4 + Math.random() * 0.6).toFixed(2) : 0;
             cyanFrames += `            ${pct}% { opacity: ${cyanOp}; clip-path: ${cyanClip}; transform: translateX(${cyanTx}px); }\n`;
 
             const slice1Clip = `inset(${Math.floor(Math.random()*80)}% 0 ${Math.floor(Math.random()*10)}% 0)`;
-            const slice1Tx = (Math.random() > 0.5 ? 1 : -1) * Math.floor(Math.random() * 5 + 2);
+            const slice1Tx = (Math.random() > 0.5 ? 1 : -1) * Math.floor(Math.random() * G_SHIFT_X + 2);
             const slice1Op = Math.random() > 0.5 ? (0.3 + Math.random() * 0.5).toFixed(2) : 0;
             slice1Frames += `            ${pct}% { opacity: ${slice1Op}; clip-path: ${slice1Clip}; transform: translateX(${slice1Tx}px); }\n`;
 
             const slice2Clip = `inset(${Math.floor(Math.random()*10)}% 0 ${Math.floor(Math.random()*80)}% 0)`;
-            const slice2Tx = (Math.random() > 0.5 ? 1 : -1) * Math.floor(Math.random() * 5 + 2);
+            const slice2Tx = (Math.random() > 0.5 ? 1 : -1) * Math.floor(Math.random() * G_SHIFT_X + 2);
             const slice2Op = Math.random() > 0.5 ? (0.3 + Math.random() * 0.5).toFixed(2) : 0;
             slice2Frames += `            ${pct}% { opacity: ${slice2Op}; clip-path: ${slice2Clip}; transform: translateX(${slice2Tx}px); }\n`;
         }
@@ -1120,6 +1242,8 @@ function generateAggressiveGlitch(el) {
             slice1.style.animation = '';
             slice2.style.animation = '';
             if (style.parentNode) style.remove();
+            /* послесвечение «эхо»: слово оставляет улетающие призрачные копии */
+            echoBurst(el);
         }, parseFloat(duration) * 1000);
     }, 70);
 }
@@ -1140,7 +1264,7 @@ function generateStandardGlitch(el) {
         const pct = Math.round((i / steps) * 100);
         const hasShadow = Math.random() > 0.4;
         const ts = hasShadow
-            ? `${Math.floor(Math.random()*2+1)}px 0 #c41e3a, -${Math.floor(Math.random()*2+1)}px 0 #00A8E8`
+            ? `${Math.floor(Math.random()*2+1)}px 0 ${G_C1}, -${Math.floor(Math.random()*2+1)}px 0 ${G_C2}`
             : 'none';
         const op = (0.85 + Math.random() * 0.15).toFixed(2);
         frames += `            ${pct}% { text-shadow: ${ts}; opacity: ${op}; }\n`;
@@ -1199,6 +1323,64 @@ function generateWhisperGlitch(el) {
 }
 
 
+/* VOICE: ORGANIC — «живой» регистр: буквы плывут, как сквозь горячий
+   воздух (SVG feTurbulence + feDisplacementMap). Один organic-эффект
+   одновременно; без поддержки filter: url() деградирует в standard. */
+let organicBusy = false;
+
+function generateOrganicGlitch(el) {
+    /* reduce-ветка: как whisper — статичный курсив, без анимации */
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        const text = prepareVoiceElement(el);
+        const base = document.createElement('span');
+        base.className = 'voice-base';
+        base.textContent = text;
+        el.appendChild(base);
+        return;
+    }
+    if (organicBusy) { generateStandardGlitch(el); return; }
+
+    const filterEl = document.getElementById('voice-warp');
+    const canWarp = filterEl && window.CSS && CSS.supports &&
+        CSS.supports('filter', 'url("#voice-warp")');
+    if (!canWarp) { generateStandardGlitch(el); return; }
+
+    const turb = filterEl.querySelector('feTurbulence');
+    const disp = filterEl.querySelector('feDisplacementMap');
+    if (!turb || !disp) { generateStandardGlitch(el); return; }
+
+    const text = prepareVoiceElement(el);
+    const base = document.createElement('span');
+    base.className = 'voice-base';
+    base.textContent = text;
+    el.appendChild(base);
+
+    const duration = 2500 + Math.random() * 1500; /* 2.5–4 с */
+    const start = performance.now();
+    organicBusy = true;
+    base.classList.add('voice-organic-breathe');
+    base.style.filter = 'url(#voice-warp)';
+
+    /* огибающая: нарастание до пика на 40%, затем затухание к нулю */
+    const envelope = (t) => (t < 0.4 ? t / 0.4 : 1 - (t - 0.4) / 0.6);
+
+    const frame = (now) => {
+        const t = Math.min(1, (now - start) / duration);
+        const env = envelope(t);
+        const wobble = (Math.random() - 0.5) * 0.004; /* лёгкая шумовая модуляция */
+        turb.setAttribute('baseFrequency', Math.max(0, env * 0.012 + wobble * env).toFixed(4));
+        disp.setAttribute('scale', (env * 14).toFixed(1));
+        if (t < 1) {
+            requestAnimationFrame(frame);
+        } else {
+            base.style.filter = '';
+            base.classList.remove('voice-organic-breathe');
+            organicBusy = false;
+        }
+    };
+    requestAnimationFrame(frame);
+}
+
 function generateGlitchAnimation(el) {
     const mode = el.dataset.voiceMode || 'aggressive';
     
@@ -1208,6 +1390,9 @@ function generateGlitchAnimation(el) {
             break;
         case 'whisper':
             generateWhisperGlitch(el);
+            break;
+        case 'organic':
+            generateOrganicGlitch(el);
             break;
         default:
             generateAggressiveGlitch(el);
@@ -1550,6 +1735,7 @@ function openContentsFresh() {
 function revealContentsItems() {
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     document.querySelectorAll('.contents-item').forEach((item, i) => {
+        item.style.setProperty('--i', Math.min(i, 14));
         setTimeout(() => {
             item.classList.add('revealed');
             if (reduced || item.dataset.scrambled) return;
@@ -2254,13 +2440,15 @@ function appendChapterEnd(textEl, index) {
         end.classList.add('has-next');
         note.textContent = 'Глава закончена';
         link.textContent = 'Глава ' + chapters[next].number + ' →';
-        link.addEventListener('click', () => openChapter(next));
+        link.addEventListener('click', () => transitionToChapter(next, 1));
     } else {
         note.textContent = 'На этом пока всё.';
         link.textContent = 'К оглавлению';
         link.addEventListener('click', exitChapterToContents);
     }
     textEl.appendChild(end);
+    /* послесвечение «эхо» на появлении плашки */
+    setTimeout(() => echoBurst(note), 120);
 }
 
 /* --- экран не гаснет во время чтения --- */
@@ -2864,8 +3052,9 @@ try { (function coverParallax() {
     function loop() {
         cx += (tx - cx) * 0.07;
         cy += (ty - cy) * 0.07;
-        img.style.setProperty('--px', cx.toFixed(2) + 'px');
-        img.style.setProperty('--py', cy.toFixed(2) + 'px');
+        /* переменные на контейнере: их же унаследует canvas ряби (задача 11) */
+        coverScreen.style.setProperty('--px', cx.toFixed(2) + 'px');
+        coverScreen.style.setProperty('--py', cy.toFixed(2) + 'px');
         if (Math.abs(tx - cx) > 0.05 || Math.abs(ty - cy) > 0.05) {
             raf = requestAnimationFrame(loop);
         } else {
@@ -2888,6 +3077,115 @@ try { (function coverParallax() {
             ty = Math.max(-1, Math.min(1, (e.beta - 45) / 25)) * MAX; // типичный хват ~45°
             kick();
         }, { passive: true });
+    }
+})(); } catch (e) {}
+
+/* === ЖИВОЙ ТИТУЛЬНЫЙ ЭКРАН (задача 6) ===
+   После входа .book-title следует за указателем (desktop) или наклоном
+   телефона (mobile): сдвиг ±6px, наклон ±2deg, lerp 0.08. Центр свечения
+   «Х» пересчитывается к курсору. iOS: разрешение гироскопа — только из
+   пользовательского жеста и только на видимом титуле; отказ/отсутствие —
+   молчаливый fallback на медленный автономный дрейф. */
+try { (function titleParallax() {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const titleScreen = document.getElementById('title-screen');
+    if (!titleScreen) return;
+    const bookTitle = titleScreen.querySelector('.book-title');
+    if (!bookTitle) return;
+    const hChar = bookTitle.querySelector('.h-char');
+
+    const MAX = 6, TILT = 2;
+    let tx = 0, ty = 0, cx = 0, cy = 0;
+    let trx = 0, ttry = 0, crx = 0, cry = 0;
+    let px = null, py = null;
+    let idle = true, raf = null;
+
+    function loop(now) {
+        raf = null;
+        if (!titleScreen.classList.contains('visible') || document.hidden) return;
+        if (idle) {
+            const t = now / 1000;
+            tx = Math.sin(t * 0.5) * 3;
+            ty = Math.cos(t * 0.4) * 3;
+            trx = Math.sin(t * 0.3) * 0.8;
+            ttry = Math.cos(t * 0.35) * 0.8;
+        }
+        cx += (tx - cx) * 0.08;
+        cy += (ty - cy) * 0.08;
+        crx += (trx - crx) * 0.08;
+        cry += (ttry - cry) * 0.08;
+        bookTitle.style.transform =
+            'translate(' + cx.toFixed(2) + 'px, ' + cy.toFixed(2) + 'px) ' +
+            'perspective(800px) rotateX(' + crx.toFixed(2) + 'deg) rotateY(' + cry.toFixed(2) + 'deg)';
+        if (hChar) {
+            const r = hChar.getBoundingClientRect();
+            const vx = px !== null ? px - (r.left + r.width / 2) : 0;
+            const vy = py !== null ? py - (r.top + r.height / 2) : 0;
+            const ox = Math.max(-14, Math.min(14, -vx / window.innerWidth * 40));
+            const oy = Math.max(-10, Math.min(10, -vy / window.innerHeight * 40));
+            const breathe = 0.28 + 0.12 * (0.5 + 0.5 * Math.sin(now / 1000 * Math.PI / 3));
+            hChar.style.textShadow =
+                ox.toFixed(1) + 'px ' + oy.toFixed(1) + 'px 18px rgba(0,168,232,' + breathe.toFixed(2) + '), ' +
+                (ox * 2).toFixed(1) + 'px ' + (oy * 2).toFixed(1) + 'px 40px rgba(0,168,232,' + (breathe * 0.45).toFixed(2) + ')';
+        }
+        raf = requestAnimationFrame(loop);
+    }
+    function kick() { if (!raf) raf = requestAnimationFrame(loop); }
+
+    /* transform переходит к JS только после окончания входа */
+    function goLive() {
+        if (!titleScreen.classList.contains('visible')) return;
+        titleScreen.classList.add('title-live');
+        if (hChar) hChar.style.animation = 'none';
+        kick();
+    }
+    new MutationObserver(() => {
+        if (titleScreen.classList.contains('visible')) {
+            if (!titleScreen.classList.contains('title-live')) setTimeout(goLive, 2200);
+        } else {
+            titleScreen.classList.remove('title-live');
+            bookTitle.style.transform = '';
+            if (hChar) { hChar.style.animation = ''; hChar.style.textShadow = ''; }
+        }
+    }).observe(titleScreen, { attributes: true, attributeFilter: ['class'] });
+
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) kick(); });
+
+    if (window.matchMedia('(pointer: fine)').matches) {
+        window.addEventListener('mousemove', (e) => {
+            px = e.clientX; py = e.clientY; idle = false;
+            const nx = (px / window.innerWidth - 0.5) * 2;
+            const ny = (py / window.innerHeight - 0.5) * 2;
+            tx = nx * MAX; ty = ny * MAX;
+            trx = -ny * TILT; ttry = nx * TILT;
+            kick();
+        }, { passive: true });
+    } else {
+        const startGyro = () => {
+            window.addEventListener('deviceorientation', (e) => {
+                if (e.gamma === null || e.beta === null) return;
+                idle = false;
+                const gx = Math.max(-1, Math.min(1, e.gamma / 25));
+                const gy = Math.max(-1, Math.min(1, (e.beta - 45) / 25));
+                tx = gx * MAX; ty = gy * MAX;
+                trx = gy * TILT; ttry = gx * TILT;
+                kick();
+            }, { passive: true });
+        };
+        /* iOS отдаёт гироскоп только после явного разрешения из жеста */
+        if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+            const ask = () => {
+                titleScreen.removeEventListener('click', ask);
+                titleScreen.removeEventListener('touchstart', ask);
+                DeviceMotionEvent.requestPermission()
+                    .then((s) => { if (s === 'granted') startGyro(); })
+                    .catch(() => {});
+            };
+            titleScreen.addEventListener('click', ask);
+            titleScreen.addEventListener('touchstart', ask, { passive: true });
+        } else {
+            startGyro();
+        }
     }
 })(); } catch (e) {}
 
@@ -3058,11 +3356,220 @@ try { (function heronAlive() {
 try { (function coverFallback() {
     const img = coverScreen && coverScreen.querySelector('img');
     if (!img) return;
-    const fail = () => coverScreen.classList.add('cover-img-fallback');
+    const fail = () => {
+        coverScreen.classList.add('cover-img-fallback');
+        /* рябь тоже на том же GPU: убираем, остаётся чистая картинка */
+        coverScreen.classList.remove('cover-gl-on');
+        const gl = coverScreen.querySelector('canvas.cover-gl');
+        if (gl) gl.remove();
+    };
     img.addEventListener('error', fail);
     const check = () => { if (!img.naturalWidth) fail(); };
     if (img.complete) check();
     else img.addEventListener('load', check, { once: true });
+})(); } catch (e) {}
+
+/* === ВОДА НА ОБЛОЖКЕ: WEBGL-РЯБЬ (задача 11) ===
+   Canvas поверх картинки (она прячется, но остаётся fallback и источником
+   текстуры). Классический heightfield на CPU (два буфера, damp 0.985),
+   высоты аплоадятся в текстуру; фрагментный шейдер смещает UV по градиенту.
+   Тап/палец/курсор — источник волн; на beckon-3 капли падают сами.
+   Любой сбой WebGL — удаляем canvas, остаётся текущая реализация. */
+try { (function coverWater() {
+    /* file:// таинтит canvas — рябь только на http(s); локально остаётся CSS-реализация */
+    if (location.protocol === 'file:') return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    if (!coverScreen) return;
+    const img = coverScreen.querySelector('img');
+    if (!img) return;
+
+    const GW = 96, GH = 128;          /* сетка heightfield */
+    const DAMP = 0.985;
+    const STR = 420;                  /* сила капли */
+    let cur = new Float32Array(GW * GH);
+    let prev = new Float32Array(GW * GH);
+    const heightsU8 = new Uint8Array(GW * GH);
+
+    const canvas = document.createElement('canvas');
+    canvas.className = 'cover-gl';
+    canvas.setAttribute('aria-hidden', 'true');
+    const gl = canvas.getContext('webgl', { antialias: false, depth: false, stencil: false, alpha: false });
+    if (!gl) { canvas.remove(); return; }
+
+    const fail = () => { canvas.remove(); coverScreen.classList.remove('cover-gl-on'); };
+
+    const vsrc = 'attribute vec2 aPos;varying vec2 vUv;void main(){vUv=aPos*0.5+0.5;gl_Position=vec4(aPos,0.0,1.0);}';
+    const fsrc = [
+        'precision mediump float;',
+        'varying vec2 vUv;',
+        'uniform sampler2D uTex;',
+        'uniform sampler2D uH;',
+        'uniform vec2 uTexel;',
+        'void main(){',
+        '  float h0 = texture2D(uH, vUv).r;',
+        '  float hx = texture2D(uH, vUv + vec2(uTexel.x, 0.0)).r - texture2D(uH, vUv - vec2(uTexel.x, 0.0)).r;',
+        '  float hy = texture2D(uH, vUv + vec2(0.0, uTexel.y)).r - texture2D(uH, vUv - vec2(0.0, uTexel.y)).r;',
+        '  vec2 uv = vUv + vec2(hx, hy) * 0.9;',
+        '  vec4 c = texture2D(uTex, clamp(uv, 0.001, 0.999));',
+        '  c.rgb *= 1.0 + (h0 - 0.5) * 0.55;',
+        '  gl_FragColor = c;',
+        '}'
+    ].join('\n');
+
+    function shader(type, src) {
+        const s = gl.createShader(type);
+        gl.shaderSource(s, src);
+        gl.compileShader(s);
+        if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error('shader');
+        return s;
+    }
+    let prog;
+    try {
+        prog = gl.createProgram();
+        gl.attachShader(prog, shader(gl.VERTEX_SHADER, vsrc));
+        gl.attachShader(prog, shader(gl.FRAGMENT_SHADER, fsrc));
+        gl.linkProgram(prog);
+        if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error('link');
+    } catch (e) { fail(); return; }
+    gl.useProgram(prog);
+
+    const buf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+    const aPos = gl.getAttribLocation(prog, 'aPos');
+    gl.enableVertexAttribArray(aPos);
+    gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+
+    const uTex = gl.getUniformLocation(prog, 'uTex');
+    const uH = gl.getUniformLocation(prog, 'uH');
+    const uTexel = gl.getUniformLocation(prog, 'uTexel');
+    gl.uniform1i(uTex, 0);
+    gl.uniform1i(uH, 1);
+    gl.uniform2f(uTexel, 1 / GW, 1 / GH);
+
+    /* текстура картинки обложки */
+    const texImg = gl.createTexture();
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, texImg);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+
+    /* текстура высот */
+    const texH = gl.createTexture();
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, texH);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.LUMINANCE, GW, GH, 0, gl.LUMINANCE, gl.UNSIGNED_BYTE, heightsU8);
+
+    let textureReady = false;
+    const uploadCover = () => {
+        try {
+            if (!img.naturalWidth) return;
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, texImg);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, img);
+            textureReady = true;
+        } catch (e) { fail(); }
+    };
+    if (img.complete && img.naturalWidth) uploadCover();
+    else img.addEventListener('load', uploadCover, { once: true });
+
+    /* размер canvas = отображаемому прямоугольнику картинки, DPR ≤ 2 */
+    function fit() {
+        const r = img.getBoundingClientRect();
+        if (r.width < 2 || r.height < 2) return false;
+        const dpr = Math.min(2, window.devicePixelRatio || 1);
+        canvas.width = Math.round(r.width * dpr);
+        canvas.height = Math.round(r.height * dpr);
+        canvas.style.width = r.width + 'px';
+        canvas.style.height = r.height + 'px';
+        gl.viewport(0, 0, canvas.width, canvas.height);
+        return true;
+    }
+
+    function drop(u, v, strength) {
+        const x = Math.max(1, Math.min(GW - 2, Math.round(u * GW)));
+        const y = Math.max(1, Math.min(GH - 2, Math.round(v * GH)));
+        cur[y * GW + x] += strength;
+    }
+
+    /* касания и курсор — волны в точке контакта */
+    let movePending = false;
+    const toUv = (e) => {
+        const r = canvas.getBoundingClientRect();
+        return { u: (e.clientX - r.left) / r.width, v: 1 - (e.clientY - r.top) / r.height };
+    };
+    coverScreen.addEventListener('pointerdown', (e) => {
+        if (isStarted) return;
+        const p = toUv(e);
+        if (p.u < 0 || p.u > 1 || p.v < 0 || p.v > 1) return;
+        drop(p.u, p.v, STR);
+    }, { passive: true });
+    coverScreen.addEventListener('pointermove', (e) => {
+        if (isStarted || movePending) return;
+        movePending = true;
+        requestAnimationFrame(() => {
+            movePending = false;
+            if (isStarted) return;
+            const p = toUv(e);
+            if (p.u < 0 || p.u > 1 || p.v < 0 || p.v > 1) return;
+            drop(p.u, p.v, STR * 0.25);
+        });
+    }, { passive: true });
+
+    /* капли на третьей ступени зова — около центра, ~раз в 3.2с */
+    setInterval(() => {
+        if (isStarted || document.hidden) return;
+        if (!coverScreen.classList.contains('beckon-3')) return;
+        drop(0.5 + (Math.random() - 0.5) * 0.4, 0.5 + (Math.random() - 0.5) * 0.4, STR * 0.8);
+    }, 3200);
+
+    function step() {
+        for (let y = 1; y < GH - 1; y++) {
+            const row = y * GW;
+            for (let x = 1; x < GW - 1; x++) {
+                const i = row + x;
+                const v = ((cur[i - 1] + cur[i + 1] + cur[i - GW] + cur[i + GW]) * 0.5 - prev[i]) * DAMP;
+                prev[i] = v;
+            }
+        }
+        const t = cur; cur = prev; prev = t;
+        for (let i = 0; i < cur.length; i++) heightsU8[i] = 128 + Math.max(-100, Math.min(100, cur[i] * 0.28)) | 0;
+        gl.activeTexture(gl.TEXTURE1);
+        gl.bindTexture(gl.TEXTURE_2D, texH);
+        gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, GW, GH, gl.LUMINANCE, gl.UNSIGNED_BYTE, heightsU8);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+    }
+
+    let raf = null;
+    function loop() {
+        raf = null;
+        if (isStarted || document.hidden || !textureReady || !canvas.isConnected) return;
+        step();
+        raf = requestAnimationFrame(loop);
+    }
+    const kick = () => { if (!raf && canvas.isConnected) raf = requestAnimationFrame(loop); };
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) kick(); });
+
+    /* включаемся, когда картинка реально встала и известен её прямоугольник */
+    const activate = () => {
+        if (coverScreen.classList.contains('cover-gl-on')) return;
+        if (coverScreen.classList.contains('cover-img-fallback')) return;
+        if (!fit() || !textureReady) return;
+        coverScreen.insertBefore(canvas, coverScreen.firstChild);
+        coverScreen.classList.add('cover-gl-on');
+        kick();
+    };
+    if (img.complete && img.naturalWidth) setTimeout(activate, 100);
+    else img.addEventListener('load', () => setTimeout(activate, 100), { once: true });
+    window.addEventListener('resize', () => { if (coverScreen.classList.contains('cover-gl-on')) fit(); });
 })(); } catch (e) {}
 
 /* === ДИАГНОСТИКА ?debug=1: плашка-приглашение прислать скриншот === */
@@ -3133,6 +3640,40 @@ try { (function echoDebugPanel() {
     }
     render();
 })(); } catch (e) {}
+
+/* === ОГЛАВЛЕНИЕ: РЕАКТИВНОСТЬ (.crt-live) ===
+   В покое экран тих; скролл (через rAF) и наведение на пункт (не чаще
+   раза в 2с) на 800 мс поднимают шум и развёртку. */
+try { (function contentsReactive() {
+    if (!contentsScreen) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    let liveTimer = null;
+    let liveRaf = null;
+    function wake() {
+        contentsScreen.classList.add('crt-live');
+        clearTimeout(liveTimer);
+        liveTimer = setTimeout(() => contentsScreen.classList.remove('crt-live'), 800);
+    }
+    contentsScreen.addEventListener('scroll', () => {
+        if (liveRaf) return;
+        liveRaf = requestAnimationFrame(() => { liveRaf = null; wake(); });
+    }, { passive: true });
+    let lastOver = 0;
+    contentsScreen.addEventListener('pointerover', (e) => {
+        if (!e.target.closest('.contents-item')) return;
+        const now = Date.now();
+        if (now - lastOver < 2000) return;
+        lastOver = now;
+        wake();
+    }, { passive: true });
+})(); } catch (e) {}
+
+/* === STAGGER: индексы для меню, прогресс-действий и шагов установки === */
+try {
+    document.querySelectorAll('.menu-item').forEach((el, i) => el.style.setProperty('--i', i));
+    document.querySelectorAll('.progress-actions > *').forEach((el, i) => el.style.setProperty('--i', i));
+    document.querySelectorAll('.install-step').forEach((el, i) => el.style.setProperty('--i', i));
+} catch (e) {}
 
 /* конец инициализации: гасим boot-сторож, снимаем аварийный экран,
    если он успел появиться на медленной сети */

@@ -80,6 +80,14 @@
     unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
+:root {
+    --ease-expo-out: cubic-bezier(0.16, 1, 0.3, 1);  /* все появления */
+    --ease-hard: cubic-bezier(0.7, 0, 0.3, 1);       /* уходы, маятники, разрывы */
+    --g-c1: #c41e3a;
+    --g-c2: #00A8E8;
+    --g-ink: #e8e6e3;
+}
+
 * {
     margin: 0;
     padding: 0;
@@ -150,9 +158,6 @@ html, body {
     0%, 100% { opacity: 0.45; }
     50% { opacity: 1; }
 }
-@media (prefers-reduced-motion: reduce) {
-    #cover-screen::after { animation: none; }
-}
 
 /* === ЭКРАН С ВОПРОСОМ === */
 #text-screen {
@@ -213,12 +218,12 @@ html, body {
 }
 
 .glitch-red {
-    color: #c41e3a;
+    color: var(--g-c1);
     transform: translateX(-2px);
 }
 
 .glitch-cyan {
-    color: #00A8E8;
+    color: var(--g-c2);
     transform: translateX(2px);
 }
 
@@ -260,10 +265,10 @@ html, body {
     72% { transform: translate(4px, -1px); opacity: 0.75; clip-path: inset(20% 0 60% 0); }
     
     /* Затухание: сигнал уходит в тишину */
-    78% { transform: translate(-1px, 0); filter: blur(2px); opacity: 0.45; color: #e8e6e3; }
-    84% { transform: translate(2px, 1px); filter: blur(6px); opacity: 0.18; color: #c41e3a; }
-    90% { transform: translate(-2px, -1px); filter: blur(10px); opacity: 0.04; color: #c41e3a; }
-    100% { transform: translate(0); filter: blur(12px); opacity: 0; color: #e8e6e3; }
+    60% { transform: translate(-1px, 0); filter: blur(2px); opacity: 0.45; color: #e8e6e3; }
+    66% { transform: translate(2px, 1px); filter: blur(6px); opacity: 0.18; color: #c41e3a; }
+    72% { transform: translate(-2px, -1px); filter: blur(10px); opacity: 0.04; color: #c41e3a; }
+    78% { transform: translate(0); filter: blur(12px); opacity: 0; color: #e8e6e3; }
 }
 
 @keyframes glitch-channel-red {
@@ -279,9 +284,9 @@ html, body {
     57% { opacity: 0.35; clip-path: inset(30% 0 50% 0); transform: translateX(-5px); }
     60% { opacity: 0.8; clip-path: inset(45% 0 35% 0); transform: translateX(-2px); }
     63%, 72% { opacity: 0.75; clip-path: inset(20% 0 60% 0); transform: translateX(-6px); }
-    78% { opacity: 0.3; clip-path: inset(40% 0 40% 0); transform: translateX(-3px); }
-    84% { opacity: 0.1; clip-path: inset(60% 0 20% 0); transform: translateX(-2px); }
-    90%, 100% { opacity: 0; clip-path: inset(0 0 0 0); transform: translateX(-2px); }
+    60% { opacity: 0.3; clip-path: inset(40% 0 40% 0); transform: translateX(-3px); }
+    66% { opacity: 0.1; clip-path: inset(60% 0 20% 0); transform: translateX(-2px); }
+    72%, 78% { opacity: 0; clip-path: inset(0 0 0 0); transform: translateX(-2px); }
 }
 
 @keyframes glitch-channel-cyan {
@@ -297,9 +302,9 @@ html, body {
     57% { opacity: 0.3; clip-path: inset(15% 0 60% 0); transform: translateX(5px); }
     60% { opacity: 0.75; clip-path: inset(40% 0 40% 0); transform: translateX(2px); }
     63%, 72% { opacity: 0.7; clip-path: inset(20% 0 60% 0); transform: translateX(6px); }
-    78% { opacity: 0.25; clip-path: inset(50% 0 30% 0); transform: translateX(3px); }
-    84% { opacity: 0.08; clip-path: inset(70% 0 10% 0); transform: translateX(2px); }
-    90%, 100% { opacity: 0; clip-path: inset(0 0 0 0); transform: translateX(2px); }
+    60% { opacity: 0.25; clip-path: inset(50% 0 30% 0); transform: translateX(3px); }
+    66% { opacity: 0.08; clip-path: inset(70% 0 10% 0); transform: translateX(2px); }
+    72%, 78% { opacity: 0; clip-path: inset(0 0 0 0); transform: translateX(2px); }
 }
 
 .glitching .glitch-base {
@@ -862,33 +867,6 @@ html, body {
     opacity: 0.1;
 }
 
-@media (prefers-reduced-motion: reduce) {
-    .filming .film-image,
-    .film-flick,
-    .film-tear .film-image,
-    .film-tear.film-zoom .film-image,
-    .film-zoom .film-image,
-    .film-hit .film-image,
-    .film-slip,
-    .film-drift,
-    .film-breathe,
-    .film-jam,
-    .film-lamp-stutter,
-    .film-lamp-die,
-    .film-scratch.run,
-    #film-screen.film-live .film-gate,
-    #film-screen.film-live .film-rail,
-    #film-screen.film-live .film-grain,
-    #film-screen.film-live .film-gap-dip .film-image,
-    .film-push {
-        animation: none !important;
-    }
-
-    #film-screen.film-live .film-grain {
-        animation: none;
-        opacity: 0.1;
-    }
-}
 
 /* === ЭКРАН С ОГЛАВЛЕНИЕМ === */
 #contents-screen {
@@ -1009,6 +987,7 @@ html, body {
 
 .contents-item.revealed {
     animation: contents-item-reveal 0.35s steps(1) forwards;
+    animation-delay: calc(var(--i, 0) * 45ms);
 }
 
 /* === УТИЛИТЫ === */
@@ -1120,14 +1099,8 @@ html, body {
     transition: opacity 0.07s ease;
 }
 
-#chapter-screen.xray-flash {
-    filter: brightness(1.35) contrast(1.1);
-    transform: translateX(2px) scale(1.001);
-}
-
-#chapter-screen.xray-flash::before {
-    opacity: 0.035;
-}
+/* xray-flash: пульс белого слоя ::before + лёгкий сдвиг текста
+   (правила в конце файла, задача 5 — filter на контейнере не используем) */
 
 #chapter-screen.xray-flash .crt-noise {
     animation-play-state: paused;
@@ -1215,13 +1188,24 @@ html, body {
     display: block;
 }
 
+/* оглавление в покое почти неподвижно; «оживает» классом .crt-live */
 #contents-screen .crt-noise {
-    opacity: 0.45;
-    animation: crt-noise-shift 0.4s steps(1) infinite;
+    opacity: 0.28;
+    animation: crt-noise-shift 0.8s steps(1) infinite;
 }
 
 #contents-screen .crt-rolling {
-    opacity: 1;
+    opacity: 0.25;
+    animation-play-state: paused;
+}
+
+#contents-screen.crt-live .crt-noise {
+    opacity: 0.45;
+}
+
+#contents-screen.crt-live .crt-rolling {
+    animation: crt-roll 7s linear 1;
+    animation-play-state: running;
 }
 
 #contents-screen .crt-vignette {
@@ -1302,7 +1286,7 @@ html, body {
     -webkit-backdrop-filter: blur(10px);
     border-top: 1px solid #1a1a1a;
     transform: translateY(0);
-    transition: transform 0.3s ease;
+    transition: transform 0.3s var(--ease-expo-out);
     user-select: none;
 }
 
@@ -1380,21 +1364,21 @@ html, body {
 /* === ЭЛЕКТРИЧЕСКИЙ ДРЕБЕЗГ В ОГЛАВЛЕНИИ === */
 @keyframes electric-glitch {
     0%   { transform: translate(0, 0) scaleX(1); opacity: 1; text-shadow: none; filter: brightness(1); clip-path: inset(0 0 0 0); }
-    6%   { transform: translate(-2px, 1px) scaleX(1.02); opacity: 0.3; text-shadow: 1px 0 #00A8E8, -1px 0 #c41e3a; filter: brightness(1.4); }
-    12%  { transform: translate(2px, -1px) scaleX(1); opacity: 1; text-shadow: -1px 0 #00A8E8, 1px 0 #c41e3a; filter: brightness(1); }
-    18%  { transform: translate(-1px, 2px) scaleX(1.02); opacity: 0.7; text-shadow: 2px 0 #00A8E8; }
+    6%   { transform: translate(-2px, 1px) scaleX(1.02); opacity: 0.3; text-shadow: 1px 0 var(--g-c2), -1px 0 var(--g-c1); filter: brightness(1.4); }
+    12%  { transform: translate(2px, -1px) scaleX(1); opacity: 1; text-shadow: -1px 0 var(--g-c2), 1px 0 var(--g-c1); filter: brightness(1); }
+    18%  { transform: translate(-1px, 2px) scaleX(1.02); opacity: 0.7; text-shadow: 2px 0 var(--g-c2); }
     24%  { transform: translate(1px, -2px) scaleX(1); opacity: 1; text-shadow: none; }
-    30%  { transform: translate(-2px, 0) scaleX(1.02); opacity: 0.9; text-shadow: -2px 0 #c41e3a; }
-    36%  { transform: translate(5px, 0) scaleX(1.02); opacity: 0.8; clip-path: inset(30% 0 40% 0); text-shadow: 1px 0 #00A8E8; }
+    30%  { transform: translate(-2px, 0) scaleX(1.02); opacity: 0.9; text-shadow: -2px 0 var(--g-c1); }
+    36%  { transform: translate(5px, 0) scaleX(1.02); opacity: 0.8; clip-path: inset(30% 0 40% 0); text-shadow: 1px 0 var(--g-c2); }
     42%  { transform: translate(0, -1px) scaleX(1); opacity: 1; text-shadow: none; clip-path: inset(0 0 0 0); }
-    48%  { transform: translate(-1px, 2px) scaleX(1.02); opacity: 0.7; text-shadow: 2px 0 #c41e3a; }
+    48%  { transform: translate(-1px, 2px) scaleX(1.02); opacity: 0.7; text-shadow: 2px 0 var(--g-c1); }
     54%  { transform: translate(1px, -1px) scaleX(1); opacity: 1; text-shadow: none; }
-    60%  { transform: translate(-2px, 1px) scaleX(1.02); opacity: 0.9; text-shadow: -1px 0 #00A8E8; }
-    66%  { transform: translate(-4px, 0) scaleX(1.02); opacity: 0.85; clip-path: inset(50% 0 20% 0); text-shadow: 1px 0 #c41e3a; }
+    60%  { transform: translate(-2px, 1px) scaleX(1.02); opacity: 0.9; text-shadow: -1px 0 var(--g-c2); }
+    66%  { transform: translate(-4px, 0) scaleX(1.02); opacity: 0.85; clip-path: inset(50% 0 20% 0); text-shadow: 1px 0 var(--g-c1); }
     72%  { transform: translate(1px, 0) scaleX(1); opacity: 1; text-shadow: none; clip-path: inset(0 0 0 0); }
-    78%  { transform: translate(-1px, 1px) scaleX(1.02); opacity: 0.75; text-shadow: 2px 0 #00A8E8; }
+    78%  { transform: translate(-1px, 1px) scaleX(1.02); opacity: 0.75; text-shadow: 2px 0 var(--g-c2); }
     84%  { transform: translate(2px, -1px) scaleX(1); opacity: 1; text-shadow: none; }
-    90%  { transform: translate(0, 0) scaleX(1.02); opacity: 0.9; text-shadow: -1px 0 #c41e3a; }
+    90%  { transform: translate(0, 0) scaleX(1.02); opacity: 0.9; text-shadow: -1px 0 var(--g-c1); }
     100% { transform: translate(0, 0) scaleX(1); opacity: 1; text-shadow: none; filter: brightness(1); clip-path: inset(0 0 0 0); }
 }
 
@@ -1594,10 +1578,6 @@ html, body {
     animation: heron-call 2.6s ease-in-out infinite;
 }
 
-@media (prefers-reduced-motion: reduce) {
-    .menu-trigger.heron-blink .heron-svg,
-    .menu-trigger.heron-call .heron-svg { animation: none; }
-}
 
 /* === МЕНЮ ОВЕРЛЕЙ === */
 .menu-overlay {
@@ -1615,7 +1595,7 @@ html, body {
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
-  transition: opacity 0.5s ease, visibility 0s linear 0.5s;
+  transition: opacity 0.5s var(--ease-expo-out), visibility 0s linear 0.5s;
 }
 
 .menu-overlay.open {
@@ -1672,7 +1652,7 @@ html, body {
   padding: 0 28px;
   opacity: 0;
   transform: translateY(12px);
-  transition: opacity 0.5s ease 0.15s, transform 0.5s ease 0.15s;
+  transition: opacity 0.5s var(--ease-expo-out) 0.15s, transform 0.5s var(--ease-expo-out) 0.15s;
 }
 
 .menu-overlay.open .menu-content {
@@ -1839,7 +1819,7 @@ html, body {
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
-  transition: opacity 0.08s ease, visibility 0s linear 0.08s;
+  transition: opacity 0.08s var(--ease-expo-out), visibility 0s linear 0.08s;
 }
 
 #photo-overlay.active {
@@ -1947,7 +1927,7 @@ html, body {
     max-width: 400px;
     padding: 24px;
     transform: translateY(10px);
-    transition: transform 0.5s ease;
+    transition: transform 0.5s var(--ease-expo-out);
 }
 
 #progress-overlay.visible .progress-content {
@@ -2126,21 +2106,6 @@ html, body {
         transparent 70%);
 }
 
-@media (prefers-reduced-motion: reduce) {
-    #swipe-hint.visible {
-        animation: none;
-        opacity: 0.6;
-    }
-    #chapter-screen.swipe-pulling .chapter-text {
-        transition: none;
-        transform: none;
-    }
-    #title-screen.film-enter .author,
-    #title-screen.film-enter .book-title { filter: none; }
-    .book-title .h-char { animation: none; }
-    #chapter-screen.visible .chapter-number,
-    #chapter-screen.visible .chapter-title { animation: none; }
-}
 
 /* ============================================================
    ЧИТАТЕЛЬСКИЙ ИНТЕРФЕЙС: ШТОРКА, ТОНЫ, РАЗМЕРЫ
@@ -2159,13 +2124,13 @@ html, body {
     padding: 18px 24px calc(18px + env(safe-area-inset-bottom));
     transform: translateY(100%);
     visibility: hidden;
-    transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), visibility 0s linear 0.35s;
+    transition: transform 0.35s var(--ease-expo-out), visibility 0s linear 0.35s;
     font-family: 'PT Serif', serif;
 }
 #reader-sheet.open {
     transform: translateY(0);
     visibility: visible;
-    transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), visibility 0s;
+    transition: transform 0.35s var(--ease-expo-out), visibility 0s;
 }
 
 .rs-row {
@@ -2350,14 +2315,14 @@ html, body {
     opacity: 0;
     visibility: hidden;
     pointer-events: none;
-    transition: opacity 0.2s ease, visibility 0s linear 0.2s;
+    transition: opacity 0.2s var(--ease-expo-out), visibility 0s linear 0.2s;
     box-shadow: 0 8px 40px rgba(0, 0, 0, 0.7);
 }
 .peek-card.open {
     opacity: 1;
     visibility: visible;
     pointer-events: all;
-    transition: opacity 0.2s ease, visibility 0s;
+    transition: opacity 0.2s var(--ease-expo-out), visibility 0s;
 }
 .peek-card.below {
     transform: translate(-50%, 24px);
@@ -2537,11 +2502,6 @@ html, body {
 }
 .sp-close:hover { color: #e8e6e3; border-color: #4a4a4a; }
 
-@media (prefers-reduced-motion: reduce) {
-    .share-fab,
-    .share-fab-wrap.share-fab-in,
-    .share-fab-wrap.share-fab-in .share-fab { animation: none; }
-}
 
 /* === ЗАСТАВКА: ЗОВ БЕЗДЕЙСТВИЯ (нарастающий) === */
 /* ступень 1 (~1.2с): обложка чуть дышит */
@@ -2628,14 +2588,6 @@ html, body {
   mix-blend-mode: screen;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  #cover-screen.beckon-1 img,
-  #cover-screen.beckon-2 img,
-  #cover-screen.beckon-3 img,
-  #cover-screen.beckon-3 .cover-ripples i {
-    animation: none !important;
-  }
-}
 
 /* микровспышка яркости в момент полной сборки скрембла */
 @keyframes scramble-flash {
@@ -2644,6 +2596,212 @@ html, body {
 }
 .scramble-flash { animation: scramble-flash 0.13s ease-out; }
 
+
+/* === STAGGER-ХОРЕОГРАФИЯ (задача 3) === */
+.menu-item {
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 0.45s var(--ease-expo-out), transform 0.45s var(--ease-expo-out),
+                color 0.35s ease, text-shadow 0.35s ease;
+}
+.menu-overlay.open .menu-item {
+    opacity: 1;
+    transform: translateY(0);
+    transition-delay: calc(150ms + var(--i, 0) * 60ms), calc(150ms + var(--i, 0) * 60ms), 0ms, 0ms;
+}
+.progress-actions > * {
+    opacity: 0;
+    transform: translateY(6px);
+    transition: opacity 0.4s var(--ease-expo-out), transform 0.4s var(--ease-expo-out);
+    transition-delay: calc(120ms + var(--i, 0) * 50ms);
+}
+#progress-overlay.visible .progress-actions > * {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* === СХЛОПЫВАНИЕ РАСТРА: «УМИРАЮЩИЙ КИНЕСКОП» (задача 4) === */
+#text-screen.raster-collapse {
+    animation: raster-collapse 260ms var(--ease-hard) forwards;
+    transform-origin: 50% 50%;
+}
+@keyframes raster-collapse {
+    0%   { transform: scaleY(1); }
+    100% { transform: scaleY(0.004); }
+}
+.collapse-line {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 100%;
+    height: 1px;
+    transform: translateX(-50%) scaleX(1);
+    background: rgba(0, 168, 232, 0.8);
+    box-shadow: 0 0 12px rgba(0, 168, 232, 0.5);
+    animation: collapse-line 600ms var(--ease-hard) forwards;
+    pointer-events: none;
+}
+@keyframes collapse-line {
+    0%   { transform: translateX(-50%) scaleX(1); opacity: 1; }
+    67%  { transform: translateX(-50%) scaleX(0.003); opacity: 1; }
+    100% { transform: translateX(-50%) scaleX(0.003); opacity: 0; }
+}
+
+/* === XRAY БЕЗ FILTER НА КОНТЕЙНЕРЕ (задача 5) === */
+#chapter-screen.xray-flash::before {
+    animation: xray-pulse 150ms ease-out;
+}
+@keyframes xray-pulse {
+    0%   { opacity: 0; }
+    40%  { opacity: 0.06; }
+    100% { opacity: 0; }
+}
+#chapter-screen.xray-flash .chapter-text {
+    transform: translateX(2px);
+}
+
+/* === ПОСЛЕСВЕЧЕНИЕ «ЭХО» ЗА ТЕКСТОМ (задача 10) ===
+   JS-клоны (не псевдоэлементы — у голосовых спанов вложенная структура),
+   pointer-events: none, цвет циановый канал, screen-наложение */
+.echo-ghost {
+    position: fixed;
+    z-index: 45;
+    margin: 0;
+    pointer-events: none;
+    color: var(--g-c2);
+    mix-blend-mode: screen;
+    overflow: visible;
+    animation: echo-rise-1 0.9s var(--ease-expo-out) forwards;
+}
+.echo-ghost-2 {
+    animation-name: echo-rise-2;
+    animation-delay: 90ms;
+}
+@keyframes echo-rise-1 {
+    0%   { transform: translateY(0); opacity: 0.25; }
+    100% { transform: translateY(-6px); opacity: 0; }
+}
+@keyframes echo-rise-2 {
+    0%   { transform: translateY(0); opacity: 0.12; }
+    100% { transform: translateY(-14px); opacity: 0; }
+}
+
+/* === VOICE: ORGANIC — «живой» регистр через SVG-дисплейсмент (задача 9) === */
+.voice-glitch[data-voice-mode="organic"] {
+    color: #a5a19a;
+    font-style: italic;
+}
+/* мягкое brightness-дыхание на время эффекта */
+.voice-organic-breathe {
+    animation: voice-organic-breathe 1.2s ease-in-out infinite alternate;
+}
+@keyframes voice-organic-breathe {
+    0%   { filter: url(#voice-warp) brightness(1); }
+    100% { filter: url(#voice-warp) brightness(1.15); }
+}
+
+/* === ЖИВОЙ ТИТУЛ (задача 6): transform ведёт JS после окончания входа === */
+#title-screen.title-live .book-title {
+    transition: opacity 0.5s ease;
+    will-change: transform;
+}
+#title-screen:not(.visible) .book-title {
+    will-change: auto;
+}
+
+/* === ВОДА НА ОБЛОЖКЕ: CANVAS РЯБИ (задача 11) ===
+   Поверх картинки (img остаётся в потоке как fallback и источник текстуры),
+   тот же параллакс --px/--py, что у img. При cover-gl-on CSS-кольца
+   и сама картинка скрыты — волны рисует шейдер. */
+#cover-screen canvas.cover-gl {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(calc(-50% + var(--px, 0px)), calc(-50% + var(--py, 0px)));
+    pointer-events: none;
+}
+#cover-screen.cover-gl-on img {
+    opacity: 0;
+}
+#cover-screen.cover-gl-on .cover-ripples {
+    display: none;
+}
+#cover-screen.cover-gl-on canvas.cover-gl {
+    filter: contrast(1.05) brightness(0.95);
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 10%, black 90%, transparent 100%);
+    mask-image: linear-gradient(to bottom, transparent 0%, black 10%, black 90%, transparent 100%);
+}
+/* на GPU, где mask роняет рендер, canvas убираем целиком */
+#cover-screen.cover-img-fallback canvas.cover-gl {
+    display: none;
+}
+
+/* === PREFERS-REDUCED-MOTION: ЕДИНЫЙ БЛОК ТИШИНЫ ===
+   Все reduce-правила собраны здесь: новые эффекты добавлять в этот блок.
+   JS-сторона дополнительно глушит: рябь обложки, живой титул, organic-голос,
+   послесвечение «эхо», полосу выпадения сигнала, схлопывание растра. */
 @media (prefers-reduced-motion: reduce) {
+    #cover-screen::after { animation: none; }
+
+    .filming .film-image,
+    .film-flick,
+    .film-tear .film-image,
+    .film-tear.film-zoom .film-image,
+    .film-zoom .film-image,
+    .film-hit .film-image,
+    .film-slip,
+    .film-drift,
+    .film-breathe,
+    .film-jam,
+    .film-lamp-stutter,
+    .film-lamp-die,
+    .film-scratch.run,
+    #film-screen.film-live .film-gate,
+    #film-screen.film-live .film-rail,
+    #film-screen.film-live .film-grain,
+    #film-screen.film-live .film-gap-dip .film-image,
+    .film-push {
+        animation: none !important;
+    }
+
+    #film-screen.film-live .film-grain {
+        animation: none;
+        opacity: 0.1;
+    }
+
+    .menu-trigger.heron-blink .heron-svg,
+    .menu-trigger.heron-call .heron-svg { animation: none; }
+
+    #swipe-hint.visible {
+        animation: none;
+        opacity: 0.6;
+    }
+    #chapter-screen.swipe-pulling .chapter-text {
+        transition: none;
+        transform: none;
+    }
+    #title-screen.film-enter .author,
+    #title-screen.film-enter .book-title { filter: none; }
+    .book-title .h-char { animation: none; }
+    #chapter-screen.visible .chapter-number,
+    #chapter-screen.visible .chapter-title { animation: none; }
+
+    .share-fab,
+    .share-fab-wrap.share-fab-in,
+    .share-fab-wrap.share-fab-in .share-fab { animation: none; }
+
+  #cover-screen.beckon-1 img,
+  #cover-screen.beckon-2 img,
+  #cover-screen.beckon-3 img,
+  #cover-screen.beckon-3 .cover-ripples i {
+    animation: none !important;
+  }
+
     .scramble-flash { animation: none; }
+
+    /* новые эффекты (задачи 6–11): JS их и так не запускает — страховка на CSS */
+    .echo-ghost { display: none; }
+    .voice-organic-breathe { animation: none; }
+    #text-screen.raster-collapse { animation: none; }
+    .collapse-line { display: none; }
 }
