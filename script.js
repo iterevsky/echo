@@ -3396,7 +3396,16 @@ try { (function coverWater() {
     const gl = canvas.getContext('webgl', { antialias: false, depth: false, stencil: false, alpha: false });
     if (!gl) { canvas.remove(); return; }
 
-    const fail = () => { canvas.remove(); coverScreen.classList.remove('cover-gl-on'); };
+    let raf = null;
+    let dead = false;
+    /* полный откат к обычной картинке; идемпотентна, глушит цикл */
+    const fail = () => {
+        if (dead) return;
+        dead = true;
+        if (raf) { cancelAnimationFrame(raf); raf = null; }
+        coverScreen.classList.remove('cover-gl-on');
+        if (canvas.parentNode) canvas.parentNode.removeChild(canvas);
+    };
 
     const vsrc = 'attribute vec2 aPos;varying vec2 vUv;void main(){vUv=aPos*0.5+0.5;gl_Position=vec4(aPos,0.0,1.0);}';
     const fsrc = [
@@ -3470,11 +3479,17 @@ try { (function coverWater() {
 
     let textureReady = false;
     const uploadCover = () => {
+        if (dead) return;
         try {
             if (!img.naturalWidth) return;
             gl.activeTexture(gl.TEXTURE0);
             gl.bindTexture(gl.TEXTURE_2D, texImg);
+            /* переворот ставим и снимаем ПРЯМО здесь: глобальный флаг,
+               иначе текстура обложки уйдёт вверх ногами */
+            gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
             gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, img);
+            gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+            if (gl.getError() !== gl.NO_ERROR) { fail(); return; }
             textureReady = true;
         } catch (e) { fail(); }
     };
@@ -3531,6 +3546,21 @@ try { (function coverWater() {
         drop(0.5 + (Math.random() - 0.5) * 0.4, 0.5 + (Math.random() - 0.5) * 0.4, STR * 0.8);
     }, 3200);
 
+    /* картинка не должна быть «tainted»: иначе текстура в части браузеров
+       (проксирование картинок, Turbo) уходит молча в чёрный — тогда рябь
+       не включаем вовсе, обложка остаётся обычной */
+    function probeImage() {
+        try {
+            const c = document.createElement('canvas');
+            c.width = c.height = 8;
+            const ctx = c.getContext('2d');
+            if (!ctx) return false;
+            ctx.drawImage(img, 0, 0, 8, 8);
+            ctx.getImageData(0, 0, 1, 1);
+            return true;
+        } catch (e) { return false; }
+    }
+
     function step() {
         for (let y = 1; y < GH - 1; y++) {
             const row = y * GW;
@@ -3548,28 +3578,36 @@ try { (function coverWater() {
         gl.drawArrays(gl.TRIANGLES, 0, 3);
     }
 
-    let raf = null;
     function loop() {
         raf = null;
-        if (isStarted || document.hidden || !textureReady || !canvas.isConnected) return;
-        step();
+        if (dead || isStarted || document.hidden || !textureReady || !canvas.isConnected) return;
+        try {
+            step();
+        } catch (e) { fail(); return; }
         raf = requestAnimationFrame(loop);
     }
-    const kick = () => { if (!raf && canvas.isConnected) raf = requestAnimationFrame(loop); };
+    const kick = () => { if (!raf && !dead && canvas.isConnected) raf = requestAnimationFrame(loop); };
     document.addEventListener('visibilitychange', () => { if (!document.hidden) kick(); });
 
     /* включаемся, когда картинка реально встала и известен её прямоугольник */
     const activate = () => {
-        if (coverScreen.classList.contains('cover-gl-on')) return;
-        if (coverScreen.classList.contains('cover-img-fallback')) return;
-        if (!fit() || !textureReady) return;
-        coverScreen.insertBefore(canvas, coverScreen.firstChild);
-        coverScreen.classList.add('cover-gl-on');
-        kick();
+        if (dead) return;
+        try {
+            if (coverScreen.classList.contains('cover-gl-on')) return;
+            if (coverScreen.classList.contains('cover-img-fallback')) return;
+            if (!probeImage()) return;
+            if (!fit() || !textureReady) return;
+            coverScreen.insertBefore(canvas, coverScreen.firstChild);
+            coverScreen.classList.add('cover-gl-on');
+            kick();
+        } catch (e) { fail(); }
     };
     if (img.complete && img.naturalWidth) setTimeout(activate, 100);
     else img.addEventListener('load', () => setTimeout(activate, 100), { once: true });
-    window.addEventListener('resize', () => { if (coverScreen.classList.contains('cover-gl-on')) fit(); });
+    window.addEventListener('resize', () => {
+        if (dead || !coverScreen.classList.contains('cover-gl-on')) return;
+        try { fit(); } catch (e) { fail(); }
+    });
 })(); } catch (e) {}
 
 /* === ДИАГНОСТИКА ?debug=1: плашка-приглашение прислать скриншот === */
@@ -3580,7 +3618,8 @@ try { (function echoDebugPanel() {
         css: (document.styleSheets || []).length > 0 ? 'ok' : 'нет стилей',
         chapters: typeof chapterTexts !== 'undefined' ? 'ok' : 'НЕ ЗАГРУЖЕН',
         script: 'ok',
-        cover: 'проверка…'
+        cover: 'проверка…',
+        covergl: 'проверка…'
     };
     const coverImg = document.getElementById('cover-screen')
         ? document.getElementById('cover-screen').querySelector('img') : null;
@@ -3590,6 +3629,15 @@ try { (function echoDebugPanel() {
             : 'НЕ ВСТАЛА';
         render();
     };
+    /* через 2с после загрузки известно, встала ли WebGL-рябь или мы на фолбэке */
+    setTimeout(() => {
+        const on = document.getElementById('cover-screen') &&
+            document.getElementById('cover-screen').classList.contains('cover-gl-on');
+        const fb = document.getElementById('cover-screen') &&
+            document.getElementById('cover-screen').classList.contains('cover-img-fallback');
+        stages.covergl = fb ? 'выкл (GPU-фолбэк)' : (on ? 'вкл (WebGL)' : 'выкл');
+        render();
+    }, 2000);
 
     const panel = document.createElement('div');
     panel.style.cssText = 'position:fixed;left:8px;top:8px;z-index:999999;background:rgba(0,0,0,0.88);color:#9a9a9a;font:11px/1.5 monospace;padding:10px 12px;border:1px solid #2a2a2a;max-width:92vw;white-space:pre-wrap;word-break:break-all;user-select:text';
@@ -3632,7 +3680,8 @@ try { (function echoDebugPanel() {
                 'SW: ' + sw + '\n' +
                 'кэши: ' + cacheList + '\n' +
                 'css: ' + stages.css + ' · chapters.js: ' + stages.chapters +
-                ' · script.js: ' + stages.script + ' · заставка: ' + stages.cover + '\n' +
+                ' · script.js: ' + stages.script + ' · заставка: ' + stages.cover +
+                ' · рябь: ' + stages.covergl + '\n' +
                 (errors.length ? 'ошибки:\n' + errors.map((e2) => '  · ' + e2).join('\n') : 'ошибок нет');
         } catch (err) {
             panel.textContent = 'render error: ' + (err && err.message);
