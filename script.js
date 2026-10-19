@@ -3377,11 +3377,11 @@ try { (function coverFallback() {
    Любой сбой WebGL — удаляем canvas, остаётся текущая реализация. */
 try { (function coverWater() {
     /* file:// таинтит canvas — рябь только на http(s); локально остаётся CSS-реализация */
-    if (location.protocol === 'file:') return;
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    if (!coverScreen) return;
+    if (location.protocol === 'file:') { try { window.__echoCoverGl = "skip:file"; } catch (e) {} return; }
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { try { window.__echoCoverGl = "skip:reduce"; } catch (e) {} return; }
+    if (!coverScreen) { try { window.__echoCoverGl = "skip:no-cover"; } catch (e) {} return; }
     const img = coverScreen.querySelector('img');
-    if (!img) return;
+    if (!img) { try { window.__echoCoverGl = "skip:no-img"; } catch (e) {} return; }
 
     const GW = 96, GH = 128;          /* сетка heightfield */
     const DAMP = 0.985;
@@ -3394,18 +3394,27 @@ try { (function coverWater() {
     canvas.className = 'cover-gl';
     canvas.setAttribute('aria-hidden', 'true');
     const gl = canvas.getContext('webgl', { antialias: false, depth: false, stencil: false, alpha: false });
-    if (!gl) { canvas.remove(); return; }
+    if (!gl) { try { window.__echoCoverGl = "no-webgl"; } catch (e) {} canvas.remove(); return; }
 
     let raf = null;
     let dead = false;
+    /* причина состояния ряби — читается панелью ?debug=1 */
+    const setStatus = (s) => { try { window.__echoCoverGl = s; } catch (e) {} };
     /* полный откат к обычной картинке; идемпотентна, глушит цикл */
-    const fail = () => {
+    const fail = (why) => {
+        setStatus('fail:' + why);
         if (dead) return;
         dead = true;
         if (raf) { cancelAnimationFrame(raf); raf = null; }
         coverScreen.classList.remove('cover-gl-on');
         if (canvas.parentNode) canvas.parentNode.removeChild(canvas);
     };
+
+    /* потеря контекста (типично для мобильных под памятью) — тихий откат */
+    canvas.addEventListener('webglcontextlost', (e) => {
+        try { e.preventDefault(); } catch (err) {}
+        fail('contextlost');
+    });
 
     const vsrc = 'attribute vec2 aPos;varying vec2 vUv;void main(){vUv=aPos*0.5+0.5;gl_Position=vec4(aPos,0.0,1.0);}';
     const fsrc = [
@@ -3439,7 +3448,7 @@ try { (function coverWater() {
         gl.attachShader(prog, shader(gl.FRAGMENT_SHADER, fsrc));
         gl.linkProgram(prog);
         if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error('link');
-    } catch (e) { fail(); return; }
+    } catch (e) { fail('gl'); return; }
     gl.useProgram(prog);
 
     const buf = gl.createBuffer();
@@ -3489,9 +3498,9 @@ try { (function coverWater() {
             gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
             gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, img);
             gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
-            if (gl.getError() !== gl.NO_ERROR) { fail(); return; }
+            if (gl.getError() !== gl.NO_ERROR) { fail('upload'); return; }
             textureReady = true;
-        } catch (e) { fail(); }
+        } catch (e) { fail('upload'); }
     };
     if (img.complete && img.naturalWidth) uploadCover();
     else img.addEventListener('load', uploadCover, { once: true });
@@ -3583,30 +3592,48 @@ try { (function coverWater() {
         if (dead || isStarted || document.hidden || !textureReady || !canvas.isConnected) return;
         try {
             step();
-        } catch (e) { fail(); return; }
+        } catch (e) { fail('step'); return; }
         raf = requestAnimationFrame(loop);
     }
     const kick = () => { if (!raf && !dead && canvas.isConnected) raf = requestAnimationFrame(loop); };
     document.addEventListener('visibilitychange', () => { if (!document.hidden) kick(); });
 
-    /* включаемся, когда картинка реально встала и известен её прямоугольник */
+    /* включаемся, когда картинка реально встала и известен её прямоугольник.
+       Возвращает: null — включились; 'wait' — рано, повторить; иначе причина
+       окончательного отказа. */
     const activate = () => {
-        if (dead) return;
+        if (dead) return 'dead';
         try {
-            if (coverScreen.classList.contains('cover-gl-on')) return;
-            if (coverScreen.classList.contains('cover-img-fallback')) return;
-            if (!probeImage()) return;
-            if (!fit() || !textureReady) return;
+            if (coverScreen.classList.contains('cover-gl-on')) return null;
+            if (coverScreen.classList.contains('cover-img-fallback')) { setStatus('off:fallback'); return 'fallback'; }
+            if (!img.naturalWidth || !textureReady) return 'wait';
+            if (!probeImage()) { setStatus('off:tainted'); return 'tainted'; }
+            if (!fit()) return 'wait';
             coverScreen.insertBefore(canvas, coverScreen.firstChild);
             coverScreen.classList.add('cover-gl-on');
+            setStatus('on');
             kick();
-        } catch (e) { fail(); }
+            return null;
+        } catch (e) { fail('activate'); return 'dead'; }
     };
-    if (img.complete && img.naturalWidth) setTimeout(activate, 100);
-    else img.addEventListener('load', () => setTimeout(activate, 100), { once: true });
+    /* мобильные браузеры раскладывают страницу и декодируют картинку с
+       заметным разбросом — пробуем включиться несколько раз с нарастающим
+       интервалом, а не один раз */
+    let attempts = 0;
+    const tryActivate = () => {
+        if (dead || coverScreen.classList.contains('cover-gl-on')) return;
+        const r = activate();
+        if (r === 'wait' && attempts < 6) {
+            attempts++;
+            setStatus('wait:' + attempts);
+            setTimeout(tryActivate, 250 * attempts);
+        }
+    };
+    if (img.complete && img.naturalWidth) setTimeout(tryActivate, 100);
+    else img.addEventListener('load', () => setTimeout(tryActivate, 100), { once: true });
     window.addEventListener('resize', () => {
         if (dead || !coverScreen.classList.contains('cover-gl-on')) return;
-        try { fit(); } catch (e) { fail(); }
+        try { fit(); } catch (e) { fail('resize'); }
     });
 })(); } catch (e) {}
 
@@ -3631,11 +3658,13 @@ try { (function echoDebugPanel() {
     };
     /* через 2с после загрузки известно, встала ли WebGL-рябь или мы на фолбэке */
     setTimeout(() => {
-        const on = document.getElementById('cover-screen') &&
-            document.getElementById('cover-screen').classList.contains('cover-gl-on');
-        const fb = document.getElementById('cover-screen') &&
-            document.getElementById('cover-screen').classList.contains('cover-img-fallback');
-        stages.covergl = fb ? 'выкл (GPU-фолбэк)' : (on ? 'вкл (WebGL)' : 'выкл');
+        const cs = document.getElementById('cover-screen');
+        const on = cs && cs.classList.contains('cover-gl-on');
+        const fb = cs && cs.classList.contains('cover-img-fallback');
+        let why = '';
+        try { why = window.__echoCoverGl || ''; } catch (e) {}
+        stages.covergl = fb ? 'выкл (GPU-фолбэк)'
+            : (on ? 'вкл (WebGL)' : 'выкл' + (why ? ' — ' + why : ''));
         render();
     }, 2000);
 
