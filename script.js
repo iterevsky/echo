@@ -694,6 +694,7 @@ function openChapter(index, opts = {}) {
 
     contentsScreen.classList.remove('visible');
     contentsScreen.inert = true;
+    clearRevealTimers();   // contents hidden — pending reveals are obsolete
     if (menuTrigger) menuTrigger.classList.remove('visible');
 
 
@@ -1500,11 +1501,19 @@ function openContentsFresh() {
 }
 
 /* проявление пунктов оглавления — идемпотентно, из любой точки показа */
+let revealTimers = [];
+function clearRevealTimers() {
+    revealTimers.forEach(clearTimeout);
+    revealTimers = [];
+}
 function revealContentsItems() {
+function revealContentsItems() {
+    clearRevealTimers();   // reopening/hiding cancels the previous schedule
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     document.querySelectorAll('.contents-item').forEach((item, i) => {
+        if (item.classList.contains('revealed')) return;
         if (reduced) { item.classList.add('revealed'); return; }
-        setTimeout(() => item.classList.add('revealed'), 200 + i * 80);
+        revealTimers.push(setTimeout(() => item.classList.add('revealed'), 200 + i * 80));
     });
 }
 
@@ -1523,10 +1532,7 @@ function initProgress() {
     if (menuTrigger) menuTrigger.classList.add('visible');
     scrollContentsToCurrent();
 
-    const items = document.querySelectorAll('.contents-item');
-    items.forEach((item, index) => {
-        setTimeout(() => item.classList.add('revealed'), 200 + index * 80);
-    });
+    revealContentsItems();
 
     contentsScreen.classList.add('progress-dimmed');
 
