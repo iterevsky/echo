@@ -1,0 +1,85 @@
+<!doctype html>
+<!-- Wake-lock lifecycle test. The embedded browser denies real wake locks,
+     so an observable stub is injected into the REAL index.html (via iframe
+     srcdoc, before the site's scripts). Tests drive the production functions
+     inside the iframe. -->
+<meta charset="utf-8">
+<title>wake-test</title>
+<body>
+<iframe id="f" style="width:900px;height:400px"></iframe>
+<pre id="out">running…</pre>
+<script>
+(function () {
+    var out = document.getElementById('out');
+    function log(s) { out.textContent += '\n' + s; }
+    var f = document.getElementById('f');
+
+    var stubSrc = '(function(){'
+        + 'window.__wakeStats={created:0,released:0};'
+        + 'var stub={request:function(){return new Promise(function(resolve){'
+        + 'setTimeout(function(){'
+        + 'window.__wakeStats.created++;'
+        + 'var s={released:false,_cb:null,'
+        + 'addEventListener:function(ev,cb){if(ev==="release")this._cb=cb;},'
+        + 'release:function(){if(this.released)return Promise.resolve();'
+        + 'this.released=true;window.__wakeStats.released++;'
+        + 'if(this._cb)this._cb();return Promise.resolve();}};'
+        + 'resolve(s);},50);});}};'
+        + 'try{Object.defineProperty(navigator,"wakeLock",{value:stub,configurable:true});}'
+        + 'catch(e){Object.getPrototypeOf(navigator).wakeLock=stub;}'
+        + '})();';
+
+    fetch('/index.html').then(function (r) { return r.text(); }).then(function (html) {
+        html = html.replace('<head>', '<head><base href="/">');
+        html = html.replace('<script src="chapters.js"><\/script>',
+            '<script>' + stubSrc + '<\/script><script src="chapters.js"><\/script>');
+        f.srcdoc = html;
+    });
+
+    f.onload = function () { setTimeout(run, 1500); };
+
+    function run() {
+        var w = f.contentWindow;
+        var st = w.__wakeStats;
+        if (!st) { log('STUB MISSING — BAD'); log('DONE'); return; }
+        log('typeof requestReaderWakeLock=' + typeof w.requestReaderWakeLock);
+
+        // T1: triple rapid request -> exactly one sentinel created
+        w.requestReaderWakeLock();
+        w.requestReaderWakeLock();
+        w.requestReaderWakeLock();
+        setTimeout(function () {
+            log('T1 created=' + st.created + ' -> ' + (st.created === 1 ? 'SINGLE OK' : 'DUPLICATE — BAD'));
+
+            // T2: request while held creates nothing new
+            w.requestReaderWakeLock();
+            setTimeout(function () {
+                log('T2 created=' + st.created + ' -> ' + (st.created === 1 ? 'NO-DUPLICATE OK' : 'BAD'));
+
+                // T3: release works
+                w.releaseReaderWakeLock();
+                setTimeout(function () {
+                    log('T3 released=' + st.released + ' -> ' + (st.released === 1 && !w.readerWakeLock ? 'RELEASE OK' : 'BAD'));
+
+                    // T4: in-flight request cancelled by release -> late sentinel released immediately
+                    w.requestReaderWakeLock();
+                    w.releaseReaderWakeLock();
+                    setTimeout(function () {
+                        var lateOk = (st.created === 2 && st.released === 2 && !w.readerWakeLock);
+                        log('T4 created=' + st.created + ' released=' + st.released + ' held=' + !!w.readerWakeLock +
+                            ' -> ' + (lateOk ? 'NO LATE ACQUIRE OK' : 'LATE ACQUIRE — BAD'));
+
+                        // T5: reacquire after the storm creates a fresh sentinel
+                        w.requestReaderWakeLock();
+                        setTimeout(function () {
+                            log('T5 created=' + st.created + ' -> ' + (st.created === 3 ? 'REACQUIRE OK' : 'REACQUIRE BAD'));
+                            w.releaseReaderWakeLock();
+                            log('DONE');
+                        }, 300);
+                    }, 300);
+                }, 100);
+            }, 300);
+        }, 300);
+    }
+})();
+</script>

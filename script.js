@@ -2148,16 +2148,34 @@ function appendChapterEnd(textEl, index) {
 
 /* --- экран не гаснет во время чтения --- */
 let readerWakeLock = null;
+let wakeLockPending = false;
+let wakeLockGeneration = 0;
 
 async function requestReaderWakeLock() {
     if (!('wakeLock' in navigator)) return;
+    if (readerWakeLock || wakeLockPending) return;  // one lock, one in-flight request
+    wakeLockPending = true;
+    const gen = wakeLockGeneration;
     try {
-        readerWakeLock = await navigator.wakeLock.request('screen');
-        readerWakeLock.addEventListener('release', () => { readerWakeLock = null; });
-    } catch (err) {}
+        const sentinel = await navigator.wakeLock.request('screen');
+        wakeLockPending = false;
+        if (gen !== wakeLockGeneration || readerWakeLock) {
+            // deactivated while the request was in flight — don't keep the lock
+            sentinel.release().catch(() => {});
+            return;
+        }
+        readerWakeLock = sentinel;
+        sentinel.addEventListener('release', () => {
+            if (readerWakeLock === sentinel) readerWakeLock = null;
+        });
+    } catch (err) {
+        wakeLockPending = false;
+    }
 }
 
 function releaseReaderWakeLock() {
+    wakeLockGeneration++;   // cancels an in-flight request
+    wakeLockPending = false;
     if (readerWakeLock) {
         readerWakeLock.release().catch(() => {});
         readerWakeLock = null;
