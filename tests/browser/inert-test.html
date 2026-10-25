@@ -1,0 +1,63 @@
+<!doctype html>
+<!-- Inert-state test: drives the real site in a same-origin iframe and
+     asserts the inert attribute follows screen visibility. -->
+<meta charset="utf-8">
+<title>inert-test</title>
+<body>
+<iframe id="f" src="/?ch=0" style="width:900px;height:400px"></iframe>
+<pre id="out">running…</pre>
+<script>
+(function () {
+    var out = document.getElementById('out');
+    function log(s) { out.textContent += '\n' + s; }
+    var f = document.getElementById('f');
+    f.onload = function () { setTimeout(run, 1000); };
+
+    function run() {
+        var w = f.contentWindow, d = f.contentDocument;
+        var contents = d.getElementById('contents-screen');
+        var chapter = d.getElementById('chapter-screen');
+        var menu = d.getElementById('menu-overlay');
+        var install = d.getElementById('install-overlay');
+        var photo = d.getElementById('photo-overlay');
+        var sheet = d.getElementById('reader-sheet');
+        var trigger = d.getElementById('menu-trigger');
+
+        var fails = 0;
+        function check(name, cond) { log((cond ? 'PASS  ' : 'FAIL  ') + name); if (!cond) fails++; }
+
+        // after deep-link open: chapter live, everything else inert
+        check('chapter live after open', chapter.inert === false && chapter.classList.contains('visible'));
+        check('contents inert', contents.inert === true);
+        check('menu inert', menu.inert === true);
+        check('install inert', install.inert === true);
+        check('photo inert', photo.inert === true);
+        check('sheet inert', sheet.inert === true);
+        check('trigger inert while hidden', trigger.inert === true);
+
+        w.openMenu();
+        check('menu live when open', menu.inert === false);
+        w.closeMenu();
+        check('menu inert after close', menu.inert === true);
+
+        w.toggleReaderSheet(true);
+        check('sheet live when open', sheet.inert === false);
+        w.toggleReaderSheet(false);
+        check('sheet inert after close', sheet.inert === true);
+
+        w.openInstall();
+        check('install live when open', install.inert === false);
+        w.closeInstall();
+        check('install inert after close', install.inert === true);
+
+        // exit to contents: chapter goes inert, contents goes live
+        w.doExitChapterToContents();
+        check('chapter inert immediately after exit', chapter.inert === true);
+        setTimeout(function () {
+            check('contents live after exit', contents.inert === false && contents.classList.contains('visible'));
+            check('trigger focusable on contents', trigger.inert === false);
+            log(fails ? 'RESULT: FAILED (' + fails + ')' : 'RESULT: OK');
+        }, 800);
+    }
+})();
+</script>
