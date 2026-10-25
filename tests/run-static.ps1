@@ -24,6 +24,7 @@ try {
     # --- CACHE_VERSION bump iff served files changed vs BaseRef ---
     $changed = @()
     try { $changed = git diff --name-only $BaseRef HEAD 2>$null } catch { $changed = @() }
+    try { $changed += git diff --name-only $BaseRef 2>$null } catch {}  # uncommitted vs BaseRef
     if (-not $changed) { $changed = @() }
     $servedChanged = $changed | Where-Object {
         $p = $_ -replace '\\','/'
