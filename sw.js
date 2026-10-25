@@ -16,7 +16,7 @@
    ПЕРЕД ЛЮБЫМ КОММИТОМ, который меняет хоть один файл сайта,
    подними CACHE_VERSION на +1 — старые кэши удалятся при активации.
    ============================================================ */
-const CACHE_VERSION = 'echo-v39';
+const CACHE_VERSION = 'echo-v40';
 
 /* все кэши «ЭХО» начинаются с этого префикса; чужие кэши не трогаем */
 const CACHE_PREFIX = 'echo-';
@@ -113,15 +113,34 @@ function offlinePage() {
     );
 }
 
+/* only good, complete, same-origin responses are cached */
+function isCacheable(res) {
+    return !!res && res.ok && res.status !== 206 && res.type === 'basic';
+}
+
+/* cache write tied to the fetch event's lifetime */
+function cachePut(event, req, res) {
+    const copy = res.clone();
+    const write = caches.open(CACHE_VERSION)
+        .then((cache) => cache.put(req, copy))
+        .catch(() => {});
+    event.waitUntil(write);
+}
+
 /* сеть с таймаутом; успех — в кэш; таймаут/обрыв — кэш;
    кэша нет — заглушка (навигация) или Response.error() */
-function networkFirst(req) {
+function networkFirst(req, event) {
     return fetchWithTimeout(req, NETWORK_TIMEOUT).then((res) => {
-        if (res && res.ok) {
-            const copy = res.clone();
-            caches.open(CACHE_VERSION).then((cache) => cache.put(req, copy));
+        if (isCacheable(res)) {
+            cachePut(event, req, res);
+            return res;
         }
-        return res;
+        // HTTP/серверная ошибка: в кэш не пишем; отдаём кэш, если он есть
+        return caches.match(req, { ignoreSearch: true }).then((hit) => {
+            if (hit) return hit;
+            if (req.mode === 'navigate') return offlinePage();
+            return res;
+        });
     }).catch(() => {
         return caches.match(req, { ignoreSearch: true }).then((hit) => {
             if (hit) return hit;
@@ -133,14 +152,11 @@ function networkFirst(req) {
 
 /* кэш с догрузкой: картинки, шрифты, кадры плёнки;
    сеть тоже под таймаутом — чтобы не виснуть на мёртвом соединении */
-function cacheFirst(req) {
+function cacheFirst(req, event) {
     return caches.match(req, { ignoreSearch: true }).then((hit) => {
         if (hit) return hit;
         return fetchWithTimeout(req, NETWORK_TIMEOUT).then((res) => {
-            if (res && res.ok) {
-                const copy = res.clone();
-                caches.open(CACHE_VERSION).then((cache) => cache.put(req, copy));
-            }
+            if (isCacheable(res)) cachePut(event, req, res);
             return res;
         }).catch(() => Response.error());
     });
@@ -152,5 +168,5 @@ self.addEventListener('fetch', (e) => {
     const url = new URL(req.url);
     if (url.origin !== self.location.origin) return;
 
-    e.respondWith(isCodeRequest(req, url) ? networkFirst(req) : cacheFirst(req));
+    e.respondWith(isCodeRequest(req, url) ? networkFirst(req, e) : cacheFirst(req, e));
 });

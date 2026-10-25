@@ -35,6 +35,15 @@ while ($true) {
 
         $parts = $requestLine -split ' '
         $path = [System.Uri]::UnescapeDataString(($parts[1] -split '\?')[0])
+        # test hook: while tests/_fail500.flag exists, test-browser paths answer 500
+        $flag = Join-Path $root 'tests\_fail500.flag'
+        if (($path -eq '/tests/browser/flaky.txt' -or $path -eq '/tests/browser/never.txt') -and (Test-Path $flag)) {
+            $body = [System.Text.Encoding]::UTF8.GetBytes('simulated server failure')
+            $head = "HTTP/1.1 500 Internal Server Error`r`nContent-Length: $($body.Length)`r`nConnection: close`r`n`r`n"
+            $h = [System.Text.Encoding]::ASCII.GetBytes($head)
+            $stream.Write($h, 0, $h.Length); $stream.Write($body, 0, $body.Length)
+            $client.Close(); continue
+        }
         if ($path -eq '/') { $path = '/index.html' }
         $file = Join-Path $root ($path.TrimStart('/') -replace '/', [System.IO.Path]::DirectorySeparatorChar)
         $full = [System.IO.Path]::GetFullPath($file)
