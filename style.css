@@ -2382,3 +2382,73 @@ html, body {
         animation: none !important;
     }
 }
+
+/* === BECKON CHOREOGRAPHY: one authored 13s run, then settle ===
+   The class is added by coverBeckon() after 1s of idle stillness;
+   any interaction removes it (same cancel path as the old beckon-1/2/3).
+   Tremor uses the `translate` property so it never fights the
+   transform-based breathing or the hide-up exit. */
+#cover-screen.beckon-play img {
+  animation: beckon-tremor 13s linear forwards,
+             beckon-glow 13s ease-in-out forwards;
+}
+#cover-screen.beckon-play .cover-ripples i {
+  animation: beckon-ripple-once 13s cubic-bezier(0.2, 0.5, 0.3, 1) forwards;
+}
+#cover-screen.beckon-play .cover-ripples i:last-child {
+  animation-delay: 0.28s;   /* the reflection answers a beat late, quieter */
+}
+
+#cover-screen.beckon-settle img {
+  animation: beckon-breath 5s ease-in-out infinite;
+}
+
+/* still gaps -> intermittent 0.2-0.4px tremor -> growth to 0.5-0.8px -> stillness */
+@keyframes beckon-tremor {
+  0%, 6%    { translate: 0 0; }
+  8%        { translate: 0.3px 0; }
+  9.5%      { translate: 0 0; }
+  12.5%     { translate: -0.3px 0.2px; }
+  14%       { translate: 0 0; }
+  18%       { translate: 0.2px -0.3px; }
+  19.5%     { translate: 0 0; }
+  24%       { translate: -0.4px 0; }
+  25.5%     { translate: 0 0; }
+  31%       { translate: 0.5px 0.3px; }
+  33%       { translate: 0 0; }
+  39%       { translate: -0.5px -0.4px; }
+  41%       { translate: 0 0; }
+  47%       { translate: 0.7px -0.5px; }
+  49%       { translate: 0 0; }
+  56%       { translate: -0.8px 0.5px; }
+  58%       { translate: 0 0; }
+  64%       { translate: 0.6px 0.4px; }
+  66%       { translate: 0 0; }
+  100%      { translate: 0 0; }
+}
+
+/* illumination: +1-2% pulse mid-run, one restrained dip near the end */
+@keyframes beckon-glow {
+  0%    { filter: contrast(1.05) brightness(0.95); }
+  20%   { filter: contrast(1.05) brightness(0.96); }
+  40%   { filter: contrast(1.05) brightness(0.965); }
+  56%   { filter: contrast(1.05) brightness(0.955); }
+  68%   { filter: contrast(1.05) brightness(0.912); }
+  78%   { filter: contrast(1.05) brightness(0.95); }
+  100%  { filter: contrast(1.05) brightness(0.95); }
+}
+
+/* the water answers the dip once: one ring, attenuated, then gone */
+@keyframes beckon-ripple-once {
+  0%, 70%   { transform: scale(0.25); opacity: 0; }
+  73%       { opacity: 0.22; }
+  90%, 100% { transform: scale(1.8); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #cover-screen.beckon-play img,
+  #cover-screen.beckon-settle img,
+  #cover-screen.beckon-play .cover-ripples i {
+    animation: none !important;
+  }
+}

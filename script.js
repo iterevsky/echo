@@ -2557,15 +2557,22 @@ if ('serviceWorker' in navigator) {
 (function coverBeckon() {
     if (!coverScreen) return;
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    const timers = [];
-    const add = (cls) => { if (!isStarted) coverScreen.classList.add(cls); };
-    timers.push(setTimeout(() => add('beckon-1'), 1200));
-    timers.push(setTimeout(() => add('beckon-2'), 5200));
-    timers.push(setTimeout(() => add('beckon-3'), 10500));
+    /* authored single run: 1s stillness, then a 13s choreography
+       (beckon-play), then faint breathing (beckon-settle) */
+    let settleTimer = null;
+    const startTimer = setTimeout(() => {
+        if (isStarted) return;
+        coverScreen.classList.add('beckon-play');
+        settleTimer = setTimeout(() => {
+            coverScreen.classList.remove('beckon-play');
+            if (!isStarted) coverScreen.classList.add('beckon-settle');
+        }, 13000);
+    }, 1000);
     ['touchstart', 'mousedown', 'keydown'].forEach((ev) => {
         document.addEventListener(ev, () => {
-            timers.forEach(clearTimeout);
-            coverScreen.classList.remove('beckon-1', 'beckon-2', 'beckon-3');
+            clearTimeout(startTimer);
+            clearTimeout(settleTimer);
+            coverScreen.classList.remove('beckon-play', 'beckon-settle');
         }, { once: true, passive: true });
     });
 })();
