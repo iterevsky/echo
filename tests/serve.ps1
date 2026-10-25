@@ -35,6 +35,10 @@ while ($true) {
 
         $parts = $requestLine -split ' '
         $path = [System.Uri]::UnescapeDataString(($parts[1] -split '\?')[0])
+        # test hook: log film-frame requests for preload-gating tests
+        if ($path.Contains('/images/frame/')) {
+            [System.IO.File]::AppendAllText((Join-Path $root 'tests\_frames.log'), "$path`n")
+        }
         # test hook: while tests/_fail500.flag exists, test-browser paths answer 500
         $flag = Join-Path $root 'tests\_fail500.flag'
         if (($path -eq '/tests/browser/flaky.txt' -or $path -eq '/tests/browser/never.txt') -and (Test-Path $flag)) {

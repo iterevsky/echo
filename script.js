@@ -1673,10 +1673,14 @@ function buildFilmGrain() {
 
 buildFilmGrain();
 
-if ('requestIdleCallback' in window) {
-    requestIdleCallback(startFilmPreload, { timeout: 8000 });
-} else {
-    setTimeout(startFilmPreload, 4000);
+/* preload only when the intro will actually run: bypassed intro
+   (deep link, hash link, saved progress) never plays the film */
+if (!isStarted) {
+    if ('requestIdleCallback' in window) {
+        requestIdleCallback(startFilmPreload, { timeout: 8000 });
+    } else {
+        setTimeout(startFilmPreload, 4000);
+    }
 }
 
 function runFilmSequence() {
