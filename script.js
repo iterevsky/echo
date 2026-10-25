@@ -1509,7 +1509,12 @@ function revealContentsItems() {
     document.querySelectorAll('.contents-item').forEach((item, i) => {
         if (item.classList.contains('revealed')) return;
         if (reduced) { item.classList.add('revealed'); return; }
-        revealTimers.push(setTimeout(() => item.classList.add('revealed'), 200 + i * 80));
+        const id = setTimeout(() => {
+            item.classList.add('revealed');
+            const at = revealTimers.indexOf(id);
+            if (at !== -1) revealTimers.splice(at, 1);
+        }, 200 + i * 80);
+        revealTimers.push(id);
     });
 }
 

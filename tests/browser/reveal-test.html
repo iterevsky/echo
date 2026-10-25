@@ -1,9 +1,9 @@
 <!doctype html>
-<!-- Contents reveal timer test: instruments setTimeout/clearTimeout in the
-     real page (srcdoc iframe) and asserts:
-     - a single revealContentsItems() schedules one timer per unrevealed item
+<!-- Contents reveal timer test (hardened): instruments setTimeout/clearTimeout
+     in the real page (srcdoc iframe, SW disabled, error hook) and asserts:
+     - one revealContentsItems() schedules one timer per unrevealed item
      - a second call cancels the first schedule completely
-     - after everything fired, another call schedules nothing -->
+     - after everything fired, another call schedules/cancels nothing -->
 <meta charset="utf-8">
 <title>reveal-test</title>
 <body>
@@ -15,29 +15,47 @@
     function log(s) { out.textContent += '\n' + s; }
     var f = document.getElementById('f');
 
-    var stub =
-        '(function(){'
-        + 'window.__t={scheduled:[],cleared:0};'
-        + 'var os=window.setTimeout.bind(window), oc=window.clearTimeout.bind(window);'
-        + 'window.setTimeout=function(fn,ms){var id=os(fn,ms);window.__t.scheduled.push(id);return id;};'
-        + 'window.clearTimeout=function(id){window.__t.cleared++;oc(id);};'
-        + '})();';
+    try { localStorage.removeItem('echo_state'); localStorage.removeItem('echo_state_backup'); } catch (e) {}
+
+    var inject =
+        '<script>' +
+        'window.__errs=[];' +
+        'window.onerror=function(m,s,l,c){window.__errs.push(m+" @"+l+":"+c);};' +
+        'window.__t={scheduled:[],cleared:0};' +
+        'var os=window.setTimeout, oc=window.clearTimeout;' +
+        'window.setTimeout=function(fn,ms){var id=os(fn,ms);window.__t.scheduled.push(id);return id;};' +
+        'window.clearTimeout=function(id){window.__t.cleared++;oc(id);};' +
+        'var nosw={register:function(){return new Promise(function(){});},addEventListener:function(){},controller:null};' +
+        'try{Object.defineProperty(navigator,"serviceWorker",{value:nosw,configurable:true});}catch(e){}' +
+        '<\/script>';
 
     fetch('/index.html').then(function (r) { return r.text(); }).then(function (html) {
         html = html.replace('<head>', '<head><base href="/">');
-        html = html.replace('<script src="chapters.js"><\/script>',
-            '<script>' + stub + '<\/script><script src="chapters.js"><\/script>');
+        html = html.replace('<script src="chapters.js"><\/script>', inject + '<script src="chapters.js"><\/script>');
         f.srcdoc = html;
     });
 
-    f.onload = function () { setTimeout(run, 1200); };
+    var poll = setInterval(function () {
+        try {
+            if (f.contentWindow && f.contentWindow.__t &&
+                typeof f.contentWindow.revealContentsItems === 'function') {
+                clearInterval(poll);
+                setTimeout(run, 800);
+            }
+        } catch (e) {}
+    }, 300);
 
     function run() {
+        try { runInner(); } catch (e) { log('RUN ERROR: ' + e.message); }
+    }
+
+    function runInner() {
         var w = f.contentWindow, d = f.contentDocument;
-        var items = d.querySelectorAll('.contents-item');
-        var n = items.length;
+        var n = d.querySelectorAll('.contents-item').length;
         var fails = 0;
         function check(name, cond) { log((cond ? 'PASS  ' : 'FAIL  ') + name); if (!cond) fails++; }
+
+        if (w.__errs.length) log('page errors: ' + w.__errs.join(' || '));
 
         var s0 = w.__t.scheduled.length, c0 = w.__t.cleared;
         w.revealContentsItems();
@@ -50,7 +68,6 @@
         check('second reveal cancels first schedule', clearedBySecond === n);
         check('second reveal reschedules all', scheduled2 === n);
 
-        // let everything fire (last timer: 200 + (n-1)*80 ms)
         setTimeout(function () {
             var s1 = w.__t.scheduled.length, c1 = w.__t.cleared;
             w.revealContentsItems();
@@ -58,7 +75,7 @@
             check('third reveal schedules nothing new', w.__t.scheduled.length === s1);
             check('third reveal cancels nothing', w.__t.cleared === c1);
             log(fails ? 'RESULT: FAILED (' + fails + ')' : 'RESULT: OK');
-        }, 200 + n * 80 + 500);
+        }, 200 + n * 80 + 600);
     }
 })();
 </script>

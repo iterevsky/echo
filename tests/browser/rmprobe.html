@@ -1,0 +1,83 @@
+<!doctype html>
+<!-- Reduced-motion probe: real page in srcdoc iframe with matchMedia stubbed
+     to report "reduce", SW disabled, error hook, timer instrumentation.
+     Asserts: reveal is instant (no timers), voice glitch renders stable text
+     without animation spans or injected keyframes. -->
+<meta charset="utf-8">
+<title>rmprobe</title>
+<body>
+<iframe id="f" style="width:900px;height:300px"></iframe>
+<pre id="out">running…</pre>
+<script>
+(function () {
+    var out = document.getElementById('out');
+    function log(s) { out.textContent += '\n' + s; }
+    var f = document.getElementById('f');
+
+    try { localStorage.removeItem('echo_state'); } catch (e) {}
+
+    var inject =
+        '<script>' +
+        'window.__errs=[];' +
+        'window.onerror=function(m,s,l,c){window.__errs.push(m+" @"+l+":"+c);};' +
+        'var om=window.matchMedia.bind(window);' +
+        'window.matchMedia=function(q){' +
+        '  if(q.indexOf("prefers-reduced-motion")!==-1){' +
+        '    return {matches:true,media:q,addEventListener:function(){},removeEventListener:function(){},addListener:function(){},removeListener:function(){}};' +
+        '  } return om(q);};' +
+        'window.__t={scheduled:0};' +
+        'var os=window.setTimeout;' +
+        'window.setTimeout=function(fn,ms){window.__t.scheduled++;return os(fn,ms);};' +
+        'var nosw={register:function(){return new Promise(function(){});},addEventListener:function(){},controller:null};' +
+        'try{Object.defineProperty(navigator,"serviceWorker",{value:nosw,configurable:true});}catch(e){}' +
+        '<\/script>';
+
+    fetch('/index.html').then(function (r) { return r.text(); }).then(function (html) {
+        html = html.replace('<head>', '<head><base href="/">');
+        html = html.replace('<script src="chapters.js"><\/script>', inject + '<script src="chapters.js"><\/script>');
+        f.srcdoc = html;
+    });
+
+    var poll = setInterval(function () {
+        try {
+            if (f.contentWindow && f.contentWindow.__t &&
+                typeof f.contentWindow.revealContentsItems === 'function') {
+                clearInterval(poll);
+                setTimeout(run, 800);
+            }
+        } catch (e) {}
+    }, 300);
+
+    function run() {
+        try { runInner(); } catch (e) { log('RUN ERROR: ' + e.message); }
+    }
+
+    function runInner() {
+        var w = f.contentWindow, d = f.contentDocument;
+        var fails = 0;
+        function check(name, cond) { log((cond ? 'PASS  ' : 'FAIL  ') + name); if (!cond) fails++; }
+        if (w.__errs.length) log('page errors: ' + w.__errs.join(' || '));
+
+        // reveal must be instant: zero timers scheduled
+        var before = w.__t.scheduled;
+        w.revealContentsItems();
+        check('reveal schedules no timers under reduce', w.__t.scheduled === before);
+        check('all items revealed instantly',
+            d.querySelectorAll('.contents-item.revealed').length === d.querySelectorAll('.contents-item').length);
+
+        // voice glitch: stable text, no animation spans, no injected keyframes
+        var el = d.createElement('span');
+        el.className = 'voice-glitch';
+        el.dataset.voiceMode = 'standard';
+        el.textContent = 'probe text';
+        d.body.appendChild(el);
+        w.generateGlitchAnimation(el);
+        check('voice text stable', el.textContent === 'probe text');
+        check('no animation spans', el.children.length === 0);
+        setTimeout(function () {
+            check('no injected keyframes', d.querySelectorAll('style[data-voice-glitch]').length === 0);
+            log(fails ? 'RESULT: FAILED (' + fails + ')' : 'RESULT: OK');
+        }, 400);
+    }
+})();
+</script>
