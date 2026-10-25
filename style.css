@@ -2452,3 +2452,33 @@ html, body {
     animation: none !important;
   }
 }
+
+/* === CONTENTS: first-entry signal acquisition (once, transient) ===
+   a glyph blip layered over each item at its own reveal moment;
+   the item text itself is never modified */
+#contents-screen.signal-boot .contents-item::after {
+  content: '▓▒░';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.62em;
+  letter-spacing: 0.25em;
+  color: rgba(0, 168, 232, 0.55);
+  text-shadow: 0 0 8px rgba(0, 168, 232, 0.35);
+  opacity: 0;
+  pointer-events: none;
+  animation: boot-blip 0.65s steps(1) forwards;
+  animation-delay: var(--boot-delay, 0ms);
+}
+
+@keyframes boot-blip {
+  0%   { opacity: 0; }
+  18%  { opacity: 1; }
+  55%  { opacity: 0.55; }
+  100% { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #contents-screen.signal-boot .contents-item::after { animation: none; }
+}

@@ -602,9 +602,32 @@ function showContents() {
             if (menuTrigger) menuTrigger.classList.add('visible');
             scrollContentsToCurrent();
             revealContentsItems();
+            bootContentsOnce();
         }, 300);
 
     }, 1200);
+}
+
+/* signal-acquisition boot: only the first full contents entry, started when
+   fonts are actually ready; the real labels are never touched — the glyphs
+   are a separate transient layer */
+function bootContentsOnce() {
+    const s = loadState();
+    if (s.seenContentsBoot) return;
+    saveState({ seenContentsBoot: true });
+    const start = () => {
+        if (!contentsScreen.classList.contains('visible')) return;
+        document.querySelectorAll('.contents-item').forEach((item, i) => {
+            item.style.setProperty('--boot-delay', (200 + i * 80) + 'ms');
+        });
+        contentsScreen.classList.add('signal-boot');
+        setTimeout(() => contentsScreen.classList.remove('signal-boot'), 7500);
+    };
+    if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(start);
+    } else {
+        start();
+    }
 }
 
 function openChapter(index, opts = {}) {
