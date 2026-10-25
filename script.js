@@ -443,6 +443,13 @@ document.addEventListener('keydown', (e) => {
     // сначала — закрытие оверлеев в порядке приоритета, независимо от видимого экрана
     if (e.key === 'Escape') {
         e.preventDefault();
+        const progOverlay = document.getElementById('progress-overlay');
+        if (progOverlay && progOverlay.classList.contains('visible')) {
+            progOverlay.classList.remove('visible');
+            contentsScreen.classList.remove('progress-dimmed');
+            contentsScreen.inert = false;
+            return;
+        }
         if (installOverlay && installOverlay.classList.contains('visible')) { closeInstall(); return; }
         if (photoOverlay && photoOverlay.classList.contains('active')) { closePhoto(); return; }
         if (isMenuOpen) { closeMenu(); return; }
@@ -665,7 +672,7 @@ function openChapter(index, opts = {}) {
     let processedText = chapter.text
       .replace(
         /\{\{PHOTO:([^:]+):([^}]+)\}\}/g,
-        '<span class="photo-link" data-photo="$2">$1</span>'
+        '<span class="photo-link" data-photo="$2" role="button" tabindex="0">$1</span>'
       )
       .replace(
         /{{VOICE(?::(\w+))?}}(.*?){{\/VOICE}}/g,
@@ -1180,6 +1187,27 @@ function toggleMenu() {
 if (menuTrigger) menuTrigger.addEventListener('click', toggleMenu);
 if (menuClose) menuClose.addEventListener('click', closeMenu);
 
+/* focus stays inside a modal overlay while it is open */
+function trapTab(container, e) {
+    if (e.key !== 'Tab') return;
+    const focusables = Array.from(container.querySelectorAll(
+        'a[href], button:not([disabled]), input, [tabindex="0"]'
+    )).filter((el) => el.getClientRects().length > 0);
+    if (!focusables.length) return;
+    const first = focusables[0];
+    const last = focusables[focusables.length - 1];
+    if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+    }
+}
+[menuOverlay, installOverlay, photoOverlay].forEach((ov) => {
+    if (ov) ov.addEventListener('keydown', (e) => trapTab(ov, e));
+});
+
 /* === КОПИРОВАНИЕ НОМЕРА КАРТЫ === */
 function fallbackCopy(text, btn) {
     const ta = document.createElement('textarea');
@@ -1378,11 +1406,25 @@ document.addEventListener('touchstart', function(e) {
       const filename = link.getAttribute('data-photo');
       if (filename) {
         e.preventDefault();
+        photoTrigger = link;
         openPhoto(filename);
       }
     }
   }, 150);
 }, { passive: false });
+
+/* keyboard: Enter/Space on a photo-link (role=button) */
+document.addEventListener('keydown', function(e) {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  const link = e.target && e.target.classList ? e.target.closest('.photo-link') : null;
+  if (!link) return;
+  e.preventDefault();
+  const filename = link.getAttribute('data-photo');
+  if (filename) {
+    photoTrigger = link;
+    openPhoto(filename);
+  }
+});
 
 document.addEventListener('touchmove', function(e) {
   if (photoTouchTimer) {
@@ -1487,19 +1529,33 @@ function initProgress() {
     if (!overlay) return;
     overlay.innerHTML = `
         <div class="progress-content">
-            <div class="progress-title">Вы остановились на главе ${chapter.number}</div>
+            <div class="progress-title" id="progress-title">Вы остановились на главе ${chapter.number}</div>
             <div class="progress-subtitle">${chapter.title}</div>
             <div class="progress-actions">
-                <span class="progress-continue">Продолжить</span>
-                <span class="progress-restart">Начать сначала</span>
+                <span class="progress-continue" role="button" tabindex="0">Продолжить</span>
+                <span class="progress-restart" role="button" tabindex="0">Начать сначала</span>
             </div>
         </div>
     `;
+    overlay.setAttribute('aria-labelledby', 'progress-title');
     overlay.classList.add('visible');
+    contentsScreen.inert = true;   // dimmed contents stays out of the Tab order
+    overlay.querySelector('.progress-continue').focus();
+
+    /* role=button: Enter/Space активируют */
+    overlay.querySelectorAll('[role="button"]').forEach((el) => {
+        el.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                el.click();
+            }
+        });
+    });
 
     overlay.querySelector('.progress-continue').addEventListener('click', () => {
         overlay.classList.remove('visible');
         contentsScreen.classList.remove('progress-dimmed');
+        contentsScreen.inert = false;
         setTimeout(() => openChapter(saved.lastChapter, { restore: true }), 400);
     });
 
@@ -1515,6 +1571,7 @@ function initProgress() {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
         } catch (err) {}
         contentsScreen.classList.remove('progress-dimmed');
+        contentsScreen.inert = false;
         overlay.classList.remove('visible');
         location.reload();
     });
