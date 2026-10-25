@@ -1213,9 +1213,6 @@ function trapTab(container, e) {
         first.focus();
     }
 }
-[menuOverlay, installOverlay, photoOverlay].forEach((ov) => {
-    if (ov) ov.addEventListener('keydown', (e) => trapTab(ov, e));
-});
 
 /* === КОПИРОВАНИЕ НОМЕРА КАРТЫ === */
 function fallbackCopy(text) {
@@ -1506,7 +1503,6 @@ function clearRevealTimers() {
     revealTimers.forEach(clearTimeout);
     revealTimers = [];
 }
-function revealContentsItems() {
 function revealContentsItems() {
     clearRevealTimers();   // reopening/hiding cancels the previous schedule
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -2568,3 +2564,8 @@ if ('serviceWorker' in navigator) {
         }, { once: true, passive: true });
     });
 })();
+
+/* focus containment hooks — registered last, after every overlay exists */
+[menuOverlay, installOverlay, photoOverlay].forEach((ov) => {
+    if (ov) ov.addEventListener('keydown', (e) => trapTab(ov, e));
+});

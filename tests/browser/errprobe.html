@@ -1,0 +1,56 @@
+<!doctype html>
+<!-- Error probe: real index.html in a srcdoc iframe, with an onerror hook
+     injected before the site's scripts; then a synthetic click to start the
+     intro and a check that the intro actually advanced. SW disabled. -->
+<meta charset="utf-8">
+<title>errprobe</title>
+<body>
+<iframe id="f" style="width:900px;height:400px"></iframe>
+<pre id="out">running…</pre>
+<script>
+(function () {
+    var out = document.getElementById('out');
+    function log(s) { out.textContent += '\n' + s; }
+    var f = document.getElementById('f');
+
+    var inject =
+        '<script>window.__errs=[];' +
+        'window.onerror=function(m,s,l,c){window.__errs.push(m+" @"+l+":"+c);};' +
+        'var nosw={register:function(){return new Promise(function(){});},addEventListener:function(){},controller:null};' +
+        'try{Object.defineProperty(navigator,"serviceWorker",{value:nosw,configurable:true});}catch(e){}' +
+        '<\/script>';
+
+    fetch('/index.html').then(function (r) { return r.text(); }).then(function (html) {
+        html = html.replace('<head>', '<head><base href="/">');
+        html = html.replace('<script src="chapters.js"><\/script>', inject + '<script src="chapters.js"><\/script>');
+        f.srcdoc = html;
+    });
+
+    var poll = setInterval(function () {
+        try {
+            if (f.contentWindow && f.contentWindow.__errs &&
+                f.contentDocument.querySelectorAll('.contents-item').length > 0) {
+                clearInterval(poll);
+                setTimeout(run, 1200);
+            }
+        } catch (e) {}
+    }, 300);
+
+    function run() {
+        var w = f.contentWindow, d = f.contentDocument;
+        log('errors after load: ' + (w.__errs.length ? w.__errs.join(' || ') : 'none'));
+        log('typeof startSequence: ' + typeof w.startSequence);
+        // synthetic click -> intro must start (cover gets hide-up, text-screen visible)
+        d.body.click();
+        setTimeout(function () {
+            var cover = d.getElementById('cover-screen');
+            var text = d.getElementById('text-screen');
+            log('after click: cover hide-up=' + cover.classList.contains('hide-up') +
+                ' text visible=' + text.classList.contains('visible'));
+            log('errors after click: ' + (w.__errs.length ? w.__errs.join(' || ') : 'none'));
+            var ok = cover.classList.contains('hide-up');
+            log(ok ? 'RESULT: OK' : 'RESULT: INTRO DID NOT START');
+        }, 1200);
+    }
+})();
+</script>

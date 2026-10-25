@@ -1,0 +1,26 @@
+<!doctype html>
+<!-- Syntax/runtime probe: loads chapters.js + script.js and reports
+     window errors and whether top-level functions exist after parsing. -->
+<meta charset="utf-8">
+<title>probe</title>
+<body>
+<div id="cover-screen"></div><div id="text-screen"><div id="glitch-text">x</div></div>
+<div id="final-screen"></div><div id="title-screen"></div>
+<div id="contents-screen"><div class="contents-list"><div class="contents-header">x</div></div></div>
+<div id="chapter-screen"></div>
+<button id="menu-trigger"></button><div id="menu-overlay"></div><button id="menu-close"></button>
+<button id="install-trigger"></button><div id="install-overlay"></div><button id="install-close"></button>
+<div id="progress-overlay"></div><div id="photo-overlay"></div><div id="swipe-hint"></div>
+<div id="reader-sheet-backdrop"></div><div id="reader-sheet"></div><div id="reader-dim"></div>
+<pre id="out">pending</pre>
+<script>
+window.__errs = [];
+window.onerror = function (m, s, l, c) { window.__errs.push(m + ' @' + l + ':' + c); };
+</script>
+<script src="/chapters.js"></script>
+<script src="/script.js"></script>
+<script>
+document.getElementById('out').textContent =
+    'startSequence=' + typeof startSequence +
+    ' | errors: ' + (window.__errs.length ? window.__errs.join(' || ') : 'none');
+</script>
