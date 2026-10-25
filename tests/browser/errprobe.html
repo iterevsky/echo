@@ -20,7 +20,13 @@
         'try{Object.defineProperty(navigator,"serviceWorker",{value:nosw,configurable:true});}catch(e){}' +
         '<\/script>';
 
-    fetch('/index.html').then(function (r) { return r.text(); }).then(function (html) {
+    var p = new URLSearchParams(location.search);
+    if (p.get('clear')) { localStorage.removeItem('echo_state'); localStorage.removeItem('echo_state_backup'); }
+    if (p.get('state')) { try { localStorage.setItem('echo_state', p.get('state')); } catch (e) {} }
+    var noClick = !!p.get('noclick');
+    var target = p.get('to') || '/index.html';
+
+    fetch(target).then(function (r) { return r.text(); }).then(function (html) {
         html = html.replace('<head>', '<head><base href="/">');
         html = html.replace('<script src="chapters.js"><\/script>', inject + '<script src="chapters.js"><\/script>');
         f.srcdoc = html;
@@ -40,6 +46,10 @@
         var w = f.contentWindow, d = f.contentDocument;
         log('errors after load: ' + (w.__errs.length ? w.__errs.join(' || ') : 'none'));
         log('typeof startSequence: ' + typeof w.startSequence);
+        if (noClick) {
+            log(w.__errs.length === 0 ? 'RESULT: OK' : 'RESULT: ERRORS');
+            return;
+        }
         // synthetic click -> intro must start (cover gets hide-up, text-screen visible)
         d.body.click();
         setTimeout(function () {

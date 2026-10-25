@@ -49,6 +49,7 @@ let barHidden = false;
 let barLastScroll = 0;
 let readPosTimer = null;
 let readerGeneration = 0;  // bumped on every chapter open/exit; stale writes check it
+let revealTimers = [];     // declared up here: initProgress/openChapter run during initial eval
 
 const STORAGE_KEY = 'echo_state';
 const STORAGE_BACKUP_KEY = 'echo_state_backup';
@@ -1498,7 +1499,6 @@ function openContentsFresh() {
 }
 
 /* проявление пунктов оглавления — идемпотентно, из любой точки показа */
-let revealTimers = [];
 function clearRevealTimers() {
     revealTimers.forEach(clearTimeout);
     revealTimers = [];
