@@ -50,6 +50,107 @@ let barLastScroll = 0;
 let readPosTimer = null;
 
 const STORAGE_KEY = 'echo_state';
+const STORAGE_BACKUP_KEY = 'echo_state_backup';
+
+/* --- ключи глав: «01» и 1 — одна глава; при конфликте форм берём большее --- */
+function normalizeChapterMap(obj, clamp) {
+    const out = {};
+    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return out;
+    Object.keys(obj).forEach((k) => {
+        if (!/^\d+$/.test(k)) return;
+        const raw = obj[k];
+        if (typeof raw !== 'number' && typeof raw !== 'string') return;
+        if (typeof raw === 'string' && raw.trim() === '') return;
+        const idx = parseInt(k, 10);
+        const v = Number(raw);
+        if (!isFinite(v)) return;
+        const val = clamp ? Math.min(1, Math.max(0, v)) : v;
+        if (out[idx] === undefined || val > out[idx]) out[idx] = val;
+    });
+    return out;
+}
+
+function normalizeSeenNew(obj) {
+    const out = {};
+    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return out;
+    Object.keys(obj).forEach((k) => {
+        if (!/^\d+$/.test(k)) return;
+        if (obj[k]) out[parseInt(k, 10)] = true;
+    });
+    return out;
+}
+
+function sanitizeReaderSettings(rs) {
+    if (!rs || typeof rs !== 'object' || Array.isArray(rs)) return undefined;
+    const size = Number(rs.size);
+    const dim = Number(rs.dim);
+    return {
+        size: isFinite(size) ? Math.min(3, Math.max(0, Math.round(size))) : 1,
+        tone: (rs.tone === 'soft' || rs.tone === 'warm') ? rs.tone : 'standard',
+        dim: isFinite(dim) ? Math.min(45, Math.max(0, dim)) : 0
+    };
+}
+
+function sanitizeDateString(v) {
+    if (typeof v !== 'string') return undefined;
+    return isNaN(new Date(v).getTime()) ? undefined : v;
+}
+
+/* чистим известные поля, неизвестные поля и их порядок не трогаем */
+function sanitizeState(parsed) {
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+    const s = Object.assign({}, parsed);
+    if ('readPos' in s) s.readPos = normalizeChapterMap(s.readPos, true);
+    if ('seenNew' in s) s.seenNew = normalizeSeenNew(s.seenNew);
+    if ('readerSettings' in s) {
+        const rs = sanitizeReaderSettings(s.readerSettings);
+        if (rs) s.readerSettings = rs; else delete s.readerSettings;
+    }
+    if ('lastChapter' in s) {
+        const n = Number(s.lastChapter);
+        if (!isFinite(n) || n < 0 || Math.floor(n) !== n) delete s.lastChapter;
+        else s.lastChapter = n;
+    }
+    ['lastVisit', 'prevVisit'].forEach((k) => {
+        if (k in s) {
+            const d = sanitizeDateString(s[k]);
+            if (d === undefined) delete s[k]; else s[k] = d;
+        }
+    });
+    return s;
+}
+
+let stateChecked = false;
+function loadState() {
+    let raw = null;
+    try { raw = localStorage.getItem(STORAGE_KEY); } catch (e) { return {}; }
+    if (!raw) return {};
+    let parsed;
+    try { parsed = JSON.parse(raw); }
+    catch (e) {
+        /* битый JSON: резервная копия, чтобы запись поверх не стёрла данные молча */
+        try { localStorage.setItem(STORAGE_BACKUP_KEY, raw); } catch (e2) {}
+        return {};
+    }
+    const clean = sanitizeState(parsed);
+    if (!stateChecked) {
+        stateChecked = true;
+        if (JSON.stringify(clean) !== JSON.stringify(parsed)) {
+            try {
+                localStorage.setItem(STORAGE_BACKUP_KEY, raw);
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(clean));
+            } catch (e2) {}
+        }
+    }
+    return clean;
+}
+function saveState(patch) {
+    try {
+        const s = loadState();
+        Object.assign(s, patch);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
+    } catch (e) {}
+}
 
 /* === СВАЙП ВВЕРХ: ПЕРЕХОД К СЛЕДУЮЩЕЙ ГЛАВЕ === */
 let swipeStartY = 0;
@@ -199,18 +300,6 @@ function initSwipeHandlers() {
 
 function cleanupSwipeHandlers() {
     resetSwipeHint();
-}
-
-function loadState() {
-    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; }
-    catch (e) { return {}; }
-}
-function saveState(patch) {
-    try {
-        const s = loadState();
-        Object.assign(s, patch);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
-    } catch (e) {}
 }
 
 /* --- ротация визитов: если с прошлого захода больше 12 часов,
