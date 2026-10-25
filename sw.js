@@ -16,17 +16,24 @@
    ПЕРЕД ЛЮБЫМ КОММИТОМ, который меняет хоть один файл сайта,
    подними CACHE_VERSION на +1 — старые кэши удалятся при активации.
    ============================================================ */
-const CACHE_VERSION = 'echo-v36';
+const CACHE_VERSION = 'echo-v37';
 
 /* все кэши «ЭХО» начинаются с этого префикса; чужие кэши не трогаем */
 const CACHE_PREFIX = 'echo-';
 
-const PRECACHE = [
+/* NOTE: install is atomic for the core again (see below) — the
+   allSettled-for-everything scheme described above was retired because
+   it let an incomplete worker replace a working one. */
+const CORE_FILES = [
     './',
     './index.html',
     './style.css',
     './script.js',
-    './chapters.js',
+    './chapters.js'
+];
+
+/* nonessential: cached best-effort, refilled on demand at runtime */
+const EXTRA_FILES = [
     './Zastavka.jpg',
     './icons/icon.svg',
     './icons/icon-192.png',
@@ -42,6 +49,8 @@ const PRECACHE = [
     './fonts/golos-text-latin.woff2'
 ];
 
+const PRECACHE = CORE_FILES.concat(EXTRA_FILES);
+
 /* файлы, которые всегда сначала спрашивают у сети */
 const CODE_FILES = ['index.html', 'style.css', 'script.js', 'chapters.js'];
 
@@ -51,7 +60,8 @@ const NETWORK_TIMEOUT = 8000;
 self.addEventListener('install', (e) => {
     e.waitUntil(
         caches.open(CACHE_VERSION)
-            .then((cache) => Promise.allSettled(PRECACHE.map((f) => cache.add(f))))
+            .then((cache) => cache.addAll(CORE_FILES)
+                .then(() => Promise.allSettled(EXTRA_FILES.map((f) => cache.add(f)))))
             .then(() => self.skipWaiting())
     );
 });

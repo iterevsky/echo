@@ -1,0 +1,63 @@
+<!doctype html>
+<!-- Atomic install test: v1 good core -> active; v2 missing core file ->
+     install must fail, v1 stays active; v3 good again -> activates.
+     ?phase=1 register v1
+     ?phase=2 register v2 (bad) and report who survives
+     ?phase=3 register v3 (good) and report -->
+<meta charset="utf-8">
+<title>atomic-test</title>
+<body><pre id="out">running…</pre>
+<script>
+(function () {
+    var p = new URLSearchParams(location.search);
+    var out = document.getElementById('out');
+    function log(s) { out.textContent += '\n' + s; }
+    var SCOPE = '/tests/browser/';
+
+    function registerAndWatch(url) {
+        return navigator.serviceWorker.register(url, { scope: SCOPE }).then(function (reg) {
+            return new Promise(function (resolve) {
+                var settled = false;
+                function done(tag) { if (!settled) { settled = true; resolve({ reg: reg, tag: tag }); } }
+                function watch(w) {
+                    if (!w) return;
+                    w.addEventListener('statechange', function () {
+                        if (w.state === 'activated') done('activated:' + w.scriptURL.split('/').pop());
+                        if (w.state === 'redundant') done('redundant:' + w.scriptURL.split('/').pop());
+                    });
+                }
+                if (reg.installing) watch(reg.installing);
+                reg.addEventListener('updatefound', function () { watch(reg.installing); });
+                if (reg.active && !reg.installing) done('already:' + reg.active.scriptURL.split('/').pop());
+                setTimeout(function () { done('timeout'); }, 8000);
+            });
+        });
+    }
+
+    var phase = p.get('phase');
+    if (phase === '1') {
+        registerAndWatch('/tests/browser/atomic-sw-v1.js').then(function (r) {
+            log('phase1 ' + r.tag);
+            log(r.tag === 'activated:atomic-sw-v1.js' ? 'V1 ACTIVE OK' : 'V1 UNEXPECTED');
+            log('DONE');
+        });
+    } else if (phase === '2') {
+        registerAndWatch('/tests/browser/atomic-sw-v2-bad.js').then(function (r) {
+            log('phase2 ' + r.tag);
+            return navigator.serviceWorker.getRegistration(SCOPE).then(function (reg) {
+                var active = reg && reg.active ? reg.active.scriptURL.split('/').pop() : 'none';
+                log('active after bad update: ' + active);
+                log(r.tag.indexOf('redundant') === 0 && active === 'atomic-sw-v1.js'
+                    ? 'BAD INSTALL REJECTED, PREVIOUS SURVIVES — OK' : 'ATOMICITY BROKEN');
+                log('DONE');
+            });
+        });
+    } else if (phase === '3') {
+        registerAndWatch('/tests/browser/atomic-sw-v3.js').then(function (r) {
+            log('phase3 ' + r.tag);
+            log(r.tag === 'activated:atomic-sw-v3.js' ? 'V3 ACTIVE OK' : 'V3 UNEXPECTED');
+            log('DONE');
+        });
+    }
+})();
+</script>

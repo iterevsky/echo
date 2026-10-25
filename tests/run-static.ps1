@@ -68,15 +68,17 @@ Check "chapterCount ($metaCount) == contents-item count ($htmlCount)" ($metaCoun
 $regen = [System.IO.File]::ReadAllText((Join-Path $root 'chapters-meta.js'))
 Check 'chapters-meta.js is up to date with chapters.js' (($regen -replace "`r`n", "`n") -eq ($meta -replace "`r`n", "`n"))
 
-# --- sw.js PRECACHE entries reference existing files ---
-$pm = [regex]::Match($swNow, '(?s)PRECACHE\s*=\s*\[(.*?)\]')
-if ($pm.Success) {
+# --- sw.js precache entries (CORE_FILES + EXTRA_FILES) reference existing files ---
+$swListsOk = $true
+foreach ($listName in 'CORE_FILES', 'EXTRA_FILES') {
+    $pm = [regex]::Match($swNow, "(?s)$listName\s*=\s*\[(.*?)\]")
+    if (-not $pm.Success) { Check "$listName list parseable" $false; $swListsOk = $false; continue }
     $entries = [regex]::Matches($pm.Groups[1].Value, "'\./([^']*)'") | ForEach-Object { $_.Groups[1].Value }
     foreach ($e in $entries) {
         $p = if ($e -eq '') { 'index.html' } else { $e }
         Check "precache file exists: $e" (Test-Path (Join-Path $root $p))
     }
-} else { Check 'PRECACHE list parseable' $false }
+}
 
 if ($script:failures -gt 0) { Write-Host "`n$($script:failures) check(s) FAILED"; exit 1 }
 Write-Host "`nAll static checks passed."
