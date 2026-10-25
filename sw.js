@@ -16,7 +16,10 @@
    ПЕРЕД ЛЮБЫМ КОММИТОМ, который меняет хоть один файл сайта,
    подними CACHE_VERSION на +1 — старые кэши удалятся при активации.
    ============================================================ */
-const CACHE_VERSION = 'echo-v35';
+const CACHE_VERSION = 'echo-v36';
+
+/* все кэши «ЭХО» начинаются с этого префикса; чужие кэши не трогаем */
+const CACHE_PREFIX = 'echo-';
 
 const PRECACHE = [
     './',
@@ -57,7 +60,8 @@ self.addEventListener('activate', (e) => {
     e.waitUntil(
         caches.keys()
             .then((keys) => Promise.all(
-                keys.filter((k) => k !== CACHE_VERSION).map((k) => caches.delete(k))
+                keys.filter((k) => k.startsWith(CACHE_PREFIX) && k !== CACHE_VERSION)
+                    .map((k) => caches.delete(k))
             ))
             .then(() => self.clients.claim())
     );

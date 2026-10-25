@@ -1,0 +1,50 @@
+<!doctype html>
+<!-- Repro/verification for SW cache cleanup. Uses an isolated fixture SW
+     scoped to /tests/browser/ so the site's own worker is untouched.
+     ?phase=1  register fixture v1 + create sentinel cache 'other-app-v1'
+     ?phase=2  register fixture v2 (triggers activate) and report caches -->
+<meta charset="utf-8">
+<title>sw-repro</title>
+<body><pre id="out">running…</pre>
+<script>
+(function () {
+    var p = new URLSearchParams(location.search);
+    var out = document.getElementById('out');
+    function log(s) { out.textContent += '\n' + s; }
+
+    function listCaches(tag) {
+        return caches.keys().then(function (keys) {
+            log(tag + ': [' + keys.sort().join(', ') + ']');
+            log(keys.indexOf('other-app-v1') >= 0 ? 'SENTINEL PRESENT' : 'SENTINEL LOST');
+        });
+    }
+
+    if (!p.get('phase')) {
+        listCaches('list').then(function () { log('DONE'); });
+        return;
+    }
+    if (p.get('phase') === '1') {
+        caches.open('other-app-v1')
+            .then(function (c) { return c.put('/x', new Response('sentinel')); })
+            .then(function () { return listCaches('after seed'); })
+            .then(function () { log('READY'); });
+    } else if (p.get('phase') === '2') {
+        navigator.serviceWorker.register('/tests/browser/repro-sw-v2.js', { scope: '/tests/browser/' })
+            .then(function (reg) {
+                return new Promise(function (resolve) {
+                    if (reg.active && !reg.installing && !reg.waiting) return resolve();
+                    reg.addEventListener('updatefound', function () {
+                        var w = reg.installing;
+                        w.addEventListener('statechange', function () {
+                            if (w.state === 'activated') resolve();
+                        });
+                    });
+                    setTimeout(resolve, 5000);
+                });
+            })
+            .then(function () { return new Promise(function (r) { setTimeout(r, 500); }); })
+            .then(function () { return listCaches('after phase 2'); })
+            .then(function () { log('DONE'); });
+    }
+})();
+</script>
