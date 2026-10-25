@@ -1471,11 +1471,14 @@ function initProgress() {
 
     overlay.querySelector('.progress-restart').addEventListener('click', () => {
         // стираем только прогресс чтения; настройки читателя сохраняем
+        // everything else survives too: installed flag, visit rotation,
+        // badge state, unknown fields — no wholesale replacement
         const s = loadState();
-        const clean = {};
-        if (s.readerSettings) clean.readerSettings = s.readerSettings;
+        delete s.readPos;
+        delete s.lastChapter;
+        delete s.chapterTitle;
         try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(clean));
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
         } catch (err) {}
         contentsScreen.classList.remove('progress-dimmed');
         overlay.classList.remove('visible');
