@@ -1,0 +1,60 @@
+<!doctype html>
+<!-- Response-cache lifecycle test (fixture SW scoped to /tests/browser/).
+     The server answers 500 for /tests/browser/* while tests/_fail500.flag exists.
+     ?phase=1  register fixture SW, prime the cache with flaky.txt (online)
+     ?phase=2  (flag ON)  fetch flaky.txt -> must come from cache ('flaky-ok');
+                          fetch never.txt -> must be an honest 500, not cached
+     ?phase=3  (flag OFF) inspect: flaky.txt cached, never.txt NOT cached -->
+<meta charset="utf-8">
+<title>lifecycle-test</title>
+<body><pre id="out">running…</pre>
+<script>
+(function () {
+    var p = new URLSearchParams(location.search);
+    var out = document.getElementById('out');
+    function log(s) { out.textContent += '\n' + s; }
+    var SCOPE = '/tests/browser/';
+
+    function reg() { return navigator.serviceWorker.register('/tests/browser/lifecycle-sw.js', { scope: SCOPE }); }
+    function waitActive(r) {
+        return new Promise(function (resolve) {
+            if (r.active) return resolve();
+            var w = r.installing || r.waiting;
+            if (w) w.addEventListener('statechange', function () { if (w.state === 'activated') resolve(); });
+            setTimeout(resolve, 5000);
+        });
+    }
+
+    var phase = p.get('phase');
+    if (phase === '1') {
+        reg().then(waitActive).then(function () {
+            return fetch('/tests/browser/flaky.txt');
+        }).then(function (r) { return r.text(); }).then(function (t) {
+            log('phase1 body: ' + t.trim());
+            log(t.trim() === 'flaky-ok' ? 'PRIME OK' : 'PRIME FAILED');
+            log('DONE');
+        }).catch(function (e) { log('PRIME ERROR ' + e); log('DONE'); });
+    } else if (phase === '2') {
+        fetch('/tests/browser/flaky.txt').then(function (r) {
+            return r.text().then(function (t) {
+                log('flaky under 500: status=' + r.status + ' body=' + t.trim());
+                log(r.status === 200 && t.trim() === 'flaky-ok' ? 'CACHE FALLBACK OK' : 'CACHE FALLBACK BROKEN');
+            });
+        }).then(function () {
+            return fetch('/tests/browser/never.txt');
+        }).then(function (r) {
+            log('never under 500: status=' + r.status);
+            log(r.status === 500 ? 'HONEST 500 OK' : 'UNEXPECTED status ' + r.status);
+            log('DONE');
+        }).catch(function (e) { log('PHASE2 ERROR ' + e); log('DONE'); });
+    } else if (phase === '3') {
+        caches.open('echo-lifecycle-v1').then(function (c) {
+            return Promise.all([c.match('/tests/browser/flaky.txt'), c.match('/tests/browser/never.txt')]);
+        }).then(function (m) {
+            log(!!m[0] ? 'GOOD ENTRY CACHED OK' : 'GOOD ENTRY MISSING');
+            log(!m[1] ? 'ERROR NOT CACHED OK' : 'ERROR WAS CACHED — BAD');
+            log('DONE');
+        });
+    }
+})();
+</script>
