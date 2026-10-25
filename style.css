@@ -2348,3 +2348,26 @@ html, body {
     animation: none !important;
   }
 }
+
+/* === REDUCED MOTION: remaining nonessential motion becomes static === */
+@media (prefers-reduced-motion: reduce) {
+    .crt-noise,
+    .crt-rolling,
+    .blinking,
+    .glitching .glitch-base,
+    .glitching .glitch-red,
+    .glitching .glitch-cyan,
+    .final-flash,
+    .melting .author,
+    .melting .book-title,
+    #chapter-screen.tear-flash,
+    .contents-item.revealed,
+    .contents-item.electric-glitch,
+    #contents-screen.analog-drop,
+    #contents-screen.analog-drop::after,
+    .voice-shock-prev,
+    .voice-shock-next,
+    .contents-item.new .dot {
+        animation: none !important;
+    }
+}

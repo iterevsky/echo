@@ -608,7 +608,8 @@ function openChapter(index, opts = {}) {
     readPosTimer = null;
     const tearOverlay = document.getElementById('tear-overlay');
     const chScreen = document.getElementById('chapter-screen');
-    if (tearOverlay && chScreen) {
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (tearOverlay && chScreen && !reducedMotion) {
         tearOverlay.style.display = 'block';
         tearOverlay.querySelector('.tear-top').style.animation = 'tear-top-shift 0.12s steps(1) forwards';
         tearOverlay.querySelector('.tear-bottom').style.animation = 'tear-bottom-shift 0.12s steps(1) forwards';
@@ -840,6 +841,7 @@ if (photoOverlay) {
 
     function startGlitches() {
         if (glitchTimer) return;
+        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
         glitchTimer = setInterval(triggerGlitch, INTERVAL_MS);
         scheduleAnalogDrop();
     }
@@ -1088,7 +1090,13 @@ function generateWhisperGlitch(el) {
 
 function generateGlitchAnimation(el) {
     const mode = el.dataset.voiceMode || 'aggressive';
-    
+
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        // reduced motion: stable text immediately, no glitch sequence
+        el.textContent = prepareVoiceElement(el);
+        return;
+    }
+
     switch (mode) {
         case 'standard':
             generateStandardGlitch(el);
@@ -1456,7 +1464,9 @@ function openContentsFresh() {
 
 /* проявление пунктов оглавления — идемпотентно, из любой точки показа */
 function revealContentsItems() {
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     document.querySelectorAll('.contents-item').forEach((item, i) => {
+        if (reduced) { item.classList.add('revealed'); return; }
         setTimeout(() => item.classList.add('revealed'), 200 + i * 80);
     });
 }
