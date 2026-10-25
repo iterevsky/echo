@@ -1,0 +1,55 @@
+<!doctype html>
+<!-- Reader-position race test. Loads the real site in a same-origin iframe
+     and drives it with precise timing:
+     t0: scroll chapter 0 to 50% (schedules the 500ms debounced write)
+     t0+250: openChapter(1) — inside the race window
+     Under the bug, the pending timer fires with currentChapter=1 while the
+     scroll position still belongs to chapter 0 -> readPos[1] ~= 0.5. -->
+<meta charset="utf-8">
+<title>race-test</title>
+<body>
+<iframe id="f" style="width:900px;height:500px"></iframe>
+<pre id="out">running…</pre>
+<script>
+(function () {
+    var out = document.getElementById('out');
+    function log(s) { out.textContent += '\n' + s; }
+    var f = document.getElementById('f');
+    f.src = '/?ch=0';
+    f.onload = function () { setTimeout(run, 900); };
+
+    function run() {
+        var w = f.contentWindow, d = f.contentDocument;
+        var cs = d.getElementById('chapter-screen');
+        try { localStorage.removeItem('echo_state'); } catch (e) {}
+
+        var total0 = cs.scrollHeight - cs.clientHeight;
+        cs.scrollTop = total0 * 0.5;
+        cs.dispatchEvent(new w.Event('scroll'));
+
+        setTimeout(function () {
+            w.openChapter(1);
+            setTimeout(function () {
+                var s = JSON.parse(localStorage.getItem('echo_state') || '{}');
+                var rp = s.readPos || {};
+                log('readPos after race: ' + JSON.stringify(rp));
+                var polluted = typeof rp['1'] === 'number' && rp['1'] > 0.3;
+                log(polluted ? 'RACE PRESENT (readPos[1] polluted with ch0 position)'
+                             : 'RACE ABSENT');
+
+                // legit saving must still work: scroll chapter 1 to ~10%
+                var total1 = cs.scrollHeight - cs.clientHeight;
+                cs.scrollTop = total1 * 0.1;
+                cs.dispatchEvent(new w.Event('scroll'));
+                setTimeout(function () {
+                    var s2 = JSON.parse(localStorage.getItem('echo_state') || '{}');
+                    log('readPos after legit scroll: ' + JSON.stringify(s2.readPos || {}));
+                    var legit = s2.readPos && Math.abs((s2.readPos['1'] || 0) - 0.1) < 0.03;
+                    log(legit ? 'LEGIT SAVE OK' : 'LEGIT SAVE BROKEN');
+                    log('DONE');
+                }, 900);
+            }, 900);
+        }, 250);
+    }
+})();
+</script>

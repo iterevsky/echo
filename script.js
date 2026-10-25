@@ -48,6 +48,7 @@ let currentChapter = 0;
 let barHidden = false;
 let barLastScroll = 0;
 let readPosTimer = null;
+let readerGeneration = 0;  // bumped on every chapter open/exit; stale writes check it
 
 const STORAGE_KEY = 'echo_state';
 const STORAGE_BACKUP_KEY = 'echo_state_backup';
@@ -600,6 +601,10 @@ function showContents() {
 function openChapter(index, opts = {}) {
     if (index < 0 || index >= chapters.length) return;
     if (chapters[index].empty) return;
+    // invalidate any pending position write from the previous chapter
+    readerGeneration++;
+    clearTimeout(readPosTimer);
+    readPosTimer = null;
     const tearOverlay = document.getElementById('tear-overlay');
     const chScreen = document.getElementById('chapter-screen');
     if (tearOverlay && chScreen) {
@@ -1937,15 +1942,20 @@ chapterScreen.addEventListener('scroll', () => {
 
     updateChapterProgress();
 
+    // capture identity now; the delayed write must not outlive this chapter
+    const sessionChapter = currentChapter;
+    const sessionGeneration = readerGeneration;
     clearTimeout(readPosTimer);
     readPosTimer = setTimeout(() => {
+        if (sessionGeneration !== readerGeneration || sessionChapter !== currentChapter) return;
+        if (!chapterScreen.classList.contains('visible')) return;
         const total = chapterScreen.scrollHeight - chapterScreen.clientHeight;
         if (total <= 0) return;
         const frac = chapterScreen.scrollTop / total;
         if (frac > 0.02) {
             const s = loadState();
             const readPos = s.readPos || {};
-            readPos[currentChapter] = Math.min(frac, 1);
+            readPos[sessionChapter] = Math.min(frac, 1);
             saveState({ readPos });
         }
     }, 500);
@@ -2057,6 +2067,9 @@ function scrollContentsToCurrent() {
 
 function doExitChapterToContents() {
     chapterExitInProgress = false;
+    readerGeneration++;            // leaving the reader invalidates pending writes
+    clearTimeout(readPosTimer);
+    readPosTimer = null;
     releaseReaderWakeLock();
     updateContentsMemory();
     cleanupVoiceObserver();
