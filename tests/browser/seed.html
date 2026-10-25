@@ -1,0 +1,30 @@
+<!doctype html>
+<!-- Test helper: seeds localStorage from the query string, then redirects.
+     Same-origin with the site, so state carries over.
+     ?clear=1&to=/          wipe echo_state + backup, then go to `to`
+     ?state=<json>&to=/     set echo_state, then go to `to`
+     ?report=1              dump echo_state + echo_state_backup into the page -->
+<meta charset="utf-8">
+<title>seed</title>
+<body><pre id="out">seeding…</pre>
+<script>
+(function () {
+    var p = new URLSearchParams(location.search);
+    var out = document.getElementById('out');
+    if (p.get('report')) {
+        out.textContent =
+            'echo_state=' + localStorage.getItem('echo_state') + '\n' +
+            'echo_state_backup=' + localStorage.getItem('echo_state_backup');
+        return;
+    }
+    if (p.get('clear')) {
+        localStorage.removeItem('echo_state');
+        localStorage.removeItem('echo_state_backup');
+    }
+    if (p.get('state') !== null) {
+        try { localStorage.setItem('echo_state', p.get('state')); }
+        catch (e) { out.textContent = 'SEED ERROR: ' + e.message; return; }
+    }
+    location.replace(p.get('to') || '/');
+})();
+</script>

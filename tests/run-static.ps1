@@ -62,10 +62,10 @@ $htmlCount = [regex]::Matches($html, 'class="contents-item"').Count
 $metaCount = [int]([regex]::Match($meta, 'chapterCount:\s*(\d+)').Groups[1].Value)
 Check "chapterCount ($metaCount) == contents-item count ($htmlCount)" ($metaCount -eq $htmlCount)
 
-# regenerate meta and compare with committed file
+# regenerate meta and compare with committed file (line-ending insensitive)
 & pwsh -NoProfile -File (Join-Path $root 'tests/build-meta.ps1') | Out-Null
 $regen = [System.IO.File]::ReadAllText((Join-Path $root 'chapters-meta.js'))
-Check 'chapters-meta.js is up to date with chapters.js' ($regen -eq $meta)
+Check 'chapters-meta.js is up to date with chapters.js' (($regen -replace "`r`n", "`n") -eq ($meta -replace "`r`n", "`n"))
 
 # --- sw.js PRECACHE entries reference existing files ---
 $pm = [regex]::Match($swNow, '(?s)PRECACHE\s*=\s*\[(.*?)\]')

@@ -1,0 +1,111 @@
+<!doctype html>
+<!-- Unit tests for the state layer in script.js (synthetic fixtures only).
+     The function sources are extracted from the real /script.js by name and
+     eval'd here — no copy of the logic lives in this file. -->
+<meta charset="utf-8">
+<title>unit-state</title>
+<body><pre id="out">running…</pre>
+<script>
+(function () {
+    var out = [];
+    function log(s) { out.push(s); document.getElementById('out').textContent = out.join('\n'); }
+    var failures = 0;
+    function check(name, cond, detail) {
+        if (cond) log('PASS  ' + name);
+        else { failures++; log('FAIL  ' + name + (detail ? ' — ' + detail : '')); }
+    }
+    function eq(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
+
+    function extract(src, name) {
+        var start = src.indexOf('function ' + name + '(');
+        if (start < 0) throw new Error('not found: ' + name);
+        var i = src.indexOf('{', start), depth = 0, inStr = null, esc = false;
+        for (; i < src.length; i++) {
+            var c = src[i];
+            if (inStr) {
+                if (esc) esc = false;
+                else if (c === '\\') esc = true;
+                else if (c === inStr) inStr = null;
+                continue;
+            }
+            if (c === "'" || c === '"' || c === '`') inStr = c;
+            else if (c === '{') depth++;
+            else if (c === '}') { depth--; if (depth === 0) return src.slice(start, i + 1); }
+        }
+        throw new Error('unbalanced: ' + name);
+    }
+
+    fetch('/script.js').then(function (r) { return r.text(); }).then(function (src) {
+        var names = ['normalizeChapterMap', 'normalizeSeenNew', 'sanitizeReaderSettings', 'sanitizeDateString', 'sanitizeState'];
+        eval(names.map(function (n) { return extract(src, n); }).join('\n'));
+
+        // T1: zero-padded legacy keys become numeric
+        check('T1 zero-padded keys', eq(
+            sanitizeState({ readPos: { '01': 1, '02': 1, '04': 1 } }).readPos,
+            { 1: 1, 2: 1, 4: 1 }));
+
+        // T2: both forms exist — keep the greater value
+        check('T2 collision keeps greater', eq(
+            sanitizeState({ readPos: { '1': 0.3, '01': 0.9 } }).readPos, { 1: 0.9 }));
+        check('T2b collision keeps greater (reversed)', eq(
+            sanitizeState({ readPos: { '01': 0.9, '1': 0.3 } }).readPos, { 1: 0.9 }));
+
+        // T3: clamping to 0..1, numeric strings accepted
+        check('T3 clamp + string numbers', eq(
+            sanitizeState({ readPos: { '3': 1.7, '4': -2, '5': '0.4' } }).readPos,
+            { 3: 1, 4: 0, 5: 0.4 }));
+
+        // T4: non-finite / non-numeric / non-numeric-key entries dropped
+        check('T4 invalid dropped', eq(
+            sanitizeState({ readPos: { '6': NaN, '7': Infinity, 'x': 1, '8': null, '09': 'abc' } }).readPos,
+            {}));
+
+        // T5: unknown fields preserved verbatim
+        var unk = { custom: { a: [1, 2] }, note: 'keep me', readPos: { '0': 0.5 } };
+        var s5 = sanitizeState(unk);
+        check('T5 unknown fields preserved', eq(s5.custom, unk.custom) && s5.note === 'keep me');
+
+        // T6: wrong-type known fields reset safely, others preserved
+        var s6 = sanitizeState({ readPos: 42, lastChapter: 'x', readerSettings: 'no', installed: true });
+        check('T6 wrong types', eq(s6.readPos, {}) && !('lastChapter' in s6) &&
+            !('readerSettings' in s6) && s6.installed === true);
+
+        // T7: idempotent
+        var messy = { readPos: { '03': 2, 3: 0.4, 'zz': 1 }, seenNew: { '07': true, '7': false, '09': 1 },
+                      lastChapter: 5.0, lastVisit: 'not a date', weird: { deep: true } };
+        check('T7 idempotent', eq(sanitizeState(sanitizeState(messy)), sanitizeState(messy)));
+        check('T7b seenNew normalized', eq(sanitizeState(messy).seenNew, { 7: true, 9: true }));
+        check('T7b invalid date dropped, unknown kept',
+            !('lastVisit' in sanitizeState(messy)) && eq(sanitizeState(messy).weird, { deep: true }));
+
+        // T8: readerSettings partial validity
+        check('T8 readerSettings', eq(
+            sanitizeState({ readerSettings: { size: 9, tone: 'warm', dim: 'x' } }).readerSettings,
+            { size: 3, tone: 'warm', dim: 0 }));
+
+        // T9: lastChapter validation
+        check('T9 lastChapter int kept', sanitizeState({ lastChapter: 5 }).lastChapter === 5);
+        check('T9b lastChapter fraction dropped', !('lastChapter' in sanitizeState({ lastChapter: 3.7 })));
+        check('T9c lastChapter negative dropped', !('lastChapter' in sanitizeState({ lastChapter: -1 })));
+
+        // T10: non-object top level
+        check('T10 non-object state', eq(sanitizeState('junk'), {}) && eq(sanitizeState(null), {}) &&
+            eq(sanitizeState([1, 2]), {}));
+
+        // T11: progress for a not-yet-published chapter index survives migration
+        check('T11 future chapter kept', eq(
+            sanitizeState({ readPos: { '77': 1 } }).readPos, { 77: 1 }));
+
+        // T12: valid numeric state passes through unchanged (no-op migration)
+        var clean = { readPos: { 0: 1, 1: 0.92, 2: 0.5, 3: 0.86 }, lastChapter: 3,
+                      lastVisit: '2026-10-25T10:00:00.000Z', prevVisit: '2026-10-20T10:00:00.000Z',
+                      seenNew: { 70: true }, installed: true,
+                      readerSettings: { size: 2, tone: 'soft', dim: 10 } };
+        check('T12 valid state is a no-op', eq(sanitizeState(clean), clean));
+
+        log(failures ? 'RESULT: FAILED (' + failures + ')' : 'RESULT: OK');
+    }).catch(function (e) {
+        log('RESULT: ERROR ' + e.message);
+    });
+})();
+</script>
