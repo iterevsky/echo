@@ -306,7 +306,7 @@ body.install-open { overflow: hidden; }
         </div>
     </div>
 
-    <div id="menu-overlay" class="menu-overlay" inert>
+    <div id="menu-overlay" class="menu-overlay" role="dialog" aria-modal="true" aria-label="Меню" inert>
       <button class="menu-close" id="menu-close" aria-label="Закрыть меню">
         <svg class="heron-svg"><use href="#heron"/></svg>
       </button>
@@ -352,10 +352,10 @@ body.install-open { overflow: hidden; }
         </div>
     </div>
 
-<div id="install-overlay" class="install-overlay" inert style="position:fixed;inset:0;z-index:3000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.88);opacity:0;visibility:hidden;pointer-events:none;transition:opacity 0.4s ease, visibility 0s linear 0.4s;">
+<div id="install-overlay" class="install-overlay" role="dialog" aria-modal="true" aria-labelledby="install-title" inert style="position:fixed;inset:0;z-index:3000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.88);opacity:0;visibility:hidden;pointer-events:none;transition:opacity 0.4s ease, visibility 0s linear 0.4s;">
       <div class="install-sheet">
         <button class="install-close" id="install-close" aria-label="Закрыть">×</button>
-        <div class="install-title">Книга на рабочий стол</div>
+        <div class="install-title" id="install-title">Книга на рабочий стол</div>
         <div class="install-lead">Открывается как приложение — во весь экран, без адресной строки.</div>
         <button class="install-native" id="install-native" type="button" style="display:none">Установить</button>
 
@@ -383,14 +383,14 @@ body.install-open { overflow: hidden; }
       </div>
     </div>
 
-<div id="progress-overlay"></div>
+<div id="progress-overlay" role="dialog" aria-modal="true"></div>
 <div id="tear-overlay" style="position:fixed;inset:0;pointer-events:none;z-index:90;display:none;">
   <div class="tear-top" style="position:absolute;top:0;left:0;width:100%;height:55%;background:transparent;pointer-events:none;"></div>
   <div class="tear-bottom" style="position:absolute;bottom:0;left:0;width:100%;height:55%;background:transparent;pointer-events:none;"></div>
   <div class="tear-line" style="position:absolute;top:0;left:0;width:100%;height:1px;background:rgba(232,230,227,0.3);box-shadow:0 0 8px rgba(232,230,227,0.2);opacity:0;"></div>
 </div>
 <!-- PHOTO overlay -->
-<div id="photo-overlay" inert>
+<div id="photo-overlay" role="dialog" aria-modal="true" aria-label="Фото" inert>
   <div id="photo-backdrop"></div>
   <div id="photo-container">
     <img id="photo-image" src="" alt="">
