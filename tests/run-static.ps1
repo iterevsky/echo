@@ -80,6 +80,17 @@ foreach ($listName in 'CORE_FILES', 'EXTRA_FILES') {
     }
 }
 
+# --- JS syntax gate: node --check when Node.js is installed ---
+$node = Get-Command node -ErrorAction SilentlyContinue
+if ($node) {
+    foreach ($js in 'script.js','sw.js') {
+        node --check (Join-Path $root $js) 2>$null
+        Check "node --check $js" ($LASTEXITCODE -eq 0)
+    }
+} else {
+    Write-Host "SKIP  node --check (Node.js not installed — required by push-echo.cmd)"
+}
+
 if ($script:failures -gt 0) { Write-Host "`n$($script:failures) check(s) FAILED"; exit 1 }
 Write-Host "`nAll static checks passed."
 exit 0

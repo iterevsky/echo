@@ -21,6 +21,10 @@
 
 ## 3. Локальная проверка
 
+Нужен установленный Node.js (https://nodejs.org): `push-echo.cmd` перед
+публикацией обязательно прогоняет `node --check script.js` и
+`node --check sw.js` — без Node публикация остановится.
+
 ```bat
 pwsh -NoProfile -File tests\run-static.ps1
 ```

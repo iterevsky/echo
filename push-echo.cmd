@@ -1,4 +1,4 @@
-﻿@echo off
+@echo off
 chcp 65001 >nul
 setlocal EnableDelayedExpansion
 cd /d "%~dp0"
@@ -71,6 +71,31 @@ if errorlevel 1 (
 rem --- структурные проверки + контроль CACHE_VERSION ---
 echo.
 echo Проверки перед публикацией...
+
+rem --- обязательная проверка синтаксиса JS (node --check) ---
+where node >nul 2>&1
+if errorlevel 1 (
+    echo.
+    echo ОШИБКА: Node.js не найден. Установи Node.js ^(https://nodejs.org^) —
+    echo без node --check публикация невозможна. Такова политика проекта.
+    goto :fail
+)
+node --check script.js >nul 2>&1
+if errorlevel 1 (
+    echo.
+    echo ОШИБКА СИНТАКСИСА в script.js:
+    node --check script.js
+    goto :fail
+)
+node --check sw.js >nul 2>&1
+if errorlevel 1 (
+    echo.
+    echo ОШИБКА СИНТАКСИСА в sw.js:
+    node --check sw.js
+    goto :fail
+)
+echo node --check: script.js и sw.js — синтаксис в порядке.
+
 set "BASEREF=HEAD"
 if defined HAS_UPSTREAM set "BASEREF=@{u}"
 pwsh -NoProfile -File "tests\run-static.ps1" -BaseRef "%BASEREF%"
