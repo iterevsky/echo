@@ -1,0 +1,48 @@
+<!doctype html>
+<!-- Copy truthfulness test: real index.html in a srcdoc iframe with stubbed
+     clipboard APIs. ?mode=fail -> both APIs fail -> honest failure label;
+     ?mode=fallback -> modern fails, execCommand works -> success;
+     ?mode=modern -> clipboard API works -> success. -->
+<meta charset="utf-8">
+<title>copy-test</title>
+<body>
+<iframe id="f" style="width:900px;height:400px"></iframe>
+<pre id="out">running…</pre>
+<script>
+(function () {
+    var p = new URLSearchParams(location.search);
+    var mode = p.get('mode') || 'fail';
+    var out = document.getElementById('out');
+    function log(s) { out.textContent += '\n' + s; }
+    var f = document.getElementById('f');
+
+    var stub =
+        '(function(){'
+        + 'var clip={writeText:function(){return '
+        + (mode === 'modern' ? 'Promise.resolve()' : 'Promise.reject(new Error("denied"))')
+        + ';}};'
+        + 'try{Object.defineProperty(navigator,"clipboard",{value:clip,configurable:true});}catch(e){}'
+        + 'document.execCommand=function(){return ' + (mode === 'modern' || mode === 'fallback' ? 'true' : 'false') + ';};'
+        + '})();';
+
+    fetch('/index.html').then(function (r) { return r.text(); }).then(function (html) {
+        html = html.replace('<head>', '<head><base href="/">');
+        html = html.replace('<script src="chapters.js"><\/script>',
+            '<script>' + stub + '<\/script><script src="chapters.js"><\/script>');
+        f.srcdoc = html;
+    });
+
+    f.onload = function () { setTimeout(run, 1200); };
+
+    function run() {
+        var d = f.contentDocument;
+        var btn = d.querySelector('.donate-copy');
+        btn.click();
+        setTimeout(function () {
+            log('mode=' + mode + ' label=' + btn.textContent);
+            var expect = (mode === 'fail') ? 'Не скопировалось' : 'Скопировано';
+            log(btn.textContent === expect ? 'RESULT: OK' : 'RESULT: FAILED');
+        }, 400);
+    }
+})();
+</script>

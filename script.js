@@ -1181,26 +1181,17 @@ if (menuTrigger) menuTrigger.addEventListener('click', toggleMenu);
 if (menuClose) menuClose.addEventListener('click', closeMenu);
 
 /* === КОПИРОВАНИЕ НОМЕРА КАРТЫ === */
-function fallbackCopy(text, btn) {
+function fallbackCopy(text) {
     const ta = document.createElement('textarea');
     ta.value = text;
     ta.style.position = 'fixed';
     ta.style.opacity = '0';
     document.body.appendChild(ta);
     ta.select();
-    try {
-        document.execCommand('copy');
-        if (btn) {
-            const originalText = btn.textContent;
-            btn.textContent = 'Скопировано';
-            btn.classList.add('copied');
-            setTimeout(() => {
-                btn.textContent = originalText;
-                btn.classList.remove('copied');
-            }, 2000);
-        }
-    } catch (err) {}
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch (err) {}
     document.body.removeChild(ta);
+    return ok;
 }
 
 function copyCard(targetId, btn) {
@@ -1208,22 +1199,26 @@ function copyCard(targetId, btn) {
     if (!cardEl || !btn) return;
     const text = cardEl.textContent.trim();
 
-    const onSuccess = () => {
-        const originalText = btn.textContent;
-        btn.textContent = 'Скопировано';
-        btn.classList.add('copied');
+    const flash = (label, ok) => {
+        const originalText = btn.dataset.origText || btn.textContent;
+        btn.dataset.origText = originalText;
+        btn.textContent = label;
+        btn.classList.toggle('copied', ok);
         setTimeout(() => {
             btn.textContent = originalText;
             btn.classList.remove('copied');
         }, 2000);
     };
+    /* success only on real success: both APIs failing -> honest failure */
+    const onSuccess = () => flash('Скопировано', true);
+    const onFailure = () => flash('Не скопировалось', false);
 
     if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(text).then(onSuccess).catch(() => {
-            fallbackCopy(text, btn);
+            if (fallbackCopy(text)) onSuccess(); else onFailure();
         });
     } else {
-        fallbackCopy(text, btn);
+        if (fallbackCopy(text)) onSuccess(); else onFailure();
     }
 }
 
