@@ -590,6 +590,7 @@ function showContents() {
         // Показываем оглавление
         setTimeout(() => {
             contentsScreen.classList.add('visible');
+            contentsScreen.inert = false;
             if (menuTrigger) menuTrigger.classList.add('visible');
             scrollContentsToCurrent();
             revealContentsItems();
@@ -684,11 +685,13 @@ function openChapter(index, opts = {}) {
     nextBtn.classList.toggle('inactive', nextReadableIndex(index) === -1);
 
     contentsScreen.classList.remove('visible');
+    contentsScreen.inert = true;
     if (menuTrigger) menuTrigger.classList.remove('visible');
 
 
     setTimeout(() => {
         chapterScreen.classList.add('visible');
+        chapterScreen.inert = false;
         chapterScreen.scrollTop = 0;
         if (opts.restore) {
             const restorePos = () => {
@@ -725,17 +728,25 @@ let photoTouchStartY = 0;
 let photoTouchStartX = 0;
 let photoTouchMoved = false;
 let photoTouchTimer = null;
+let photoTrigger = null;   // the photo-link that opened the overlay (focus restore)
 
 function openPhoto(src) {
   photoImage.src = 'images/' + src;
   photoOverlay.classList.add('active');
+  photoOverlay.inert = false;
   document.body.style.overflow = 'hidden';
+  if (photoClose) photoClose.focus();
 }
 
 function closePhoto() {
   photoOverlay.classList.remove('active');
+  photoOverlay.inert = true;
   document.body.style.overflow = '';
   photoImage.src = '';
+  if (photoTrigger && document.contains(photoTrigger)) {
+      photoTrigger.focus();
+      photoTrigger = null;
+  }
 }
 
 if (photoBackdrop) photoBackdrop.addEventListener('click', closePhoto);
@@ -1138,6 +1149,7 @@ function openMenu() {
     if (isMenuOpen) return;
     isMenuOpen = true;
     menuOverlay.classList.add('open');
+    menuOverlay.inert = false;
     if (contentsScreen.classList.contains('visible')) {
         contentsScreen.classList.add('menu-dimmed');
     }
@@ -1145,16 +1157,19 @@ function openMenu() {
         chapterScreen.classList.add('menu-dimmed');
     }
     if (menuTrigger) menuTrigger.classList.remove('visible');
+    if (menuClose) menuClose.focus();
 }
 
 function closeMenu() {
     if (!isMenuOpen) return;
     isMenuOpen = false;
     menuOverlay.classList.remove('open');
+    menuOverlay.inert = true;
     contentsScreen.classList.remove('menu-dimmed');
     chapterScreen.classList.remove('menu-dimmed');
     if (contentsScreen.classList.contains('visible') && menuTrigger) {
         menuTrigger.classList.add('visible');
+        menuTrigger.focus();   // keyboard focus returns to the trigger
     }
 }
 
@@ -1273,12 +1288,16 @@ function openInstall() {
     }
 
     installOverlay.classList.add('visible');
+    installOverlay.inert = false;
     document.body.classList.add('install-open');
+    if (installClose) installClose.focus();
 }
 
 function closeInstall() {
     installOverlay.classList.remove('visible');
+    installOverlay.inert = true;
     document.body.classList.remove('install-open');
+    if (installTrigger && installTrigger.classList.contains('visible')) installTrigger.focus();
 }
 
 if (installTrigger) installTrigger.addEventListener('click', openInstall);
@@ -1288,6 +1307,18 @@ if (installTrigger && typeof menuTrigger !== 'undefined' && menuTrigger) {
         installTrigger.classList.toggle('visible', menuTrigger.classList.contains('visible'));
     }).observe(menuTrigger, { attributes: true, attributeFilter: ['class'] });
 }
+
+/* hidden triggers stay out of the Tab order */
+function syncTriggerInert() {
+    const vis = !!(menuTrigger && menuTrigger.classList.contains('visible'));
+    if (menuTrigger) menuTrigger.inert = !vis;
+    if (installTrigger) installTrigger.inert = !vis;
+}
+if (menuTrigger) {
+    new MutationObserver(syncTriggerInert)
+        .observe(menuTrigger, { attributes: true, attributeFilter: ['class'] });
+}
+syncTriggerInert();
 if (installClose) installClose.addEventListener('click', closeInstall);
 if (installOverlay) installOverlay.addEventListener('click', (e) => {
     if (e.target === installOverlay) closeInstall();
@@ -1332,6 +1363,7 @@ document.addEventListener('click', function(e) {
   
   const filename = link.getAttribute('data-photo');
   if (filename) {
+    photoTrigger = link;
     openPhoto(filename);
   }
 });
@@ -1417,6 +1449,7 @@ function handleHashLink() {
 
 function openContentsFresh() {
     contentsScreen.classList.add('visible');
+    contentsScreen.inert = false;
     if (menuTrigger) menuTrigger.classList.add('visible');
     revealContentsItems();
 }
@@ -1439,6 +1472,7 @@ function initProgress() {
 
     updateContentsMemory();
     contentsScreen.classList.add('visible');
+    contentsScreen.inert = false;
     if (menuTrigger) menuTrigger.classList.add('visible');
     scrollContentsToCurrent();
 
@@ -2023,8 +2057,15 @@ function toggleReaderSheet(open) {
     const backdrop = document.getElementById('reader-sheet-backdrop');
     if (!sheet || !backdrop) return;
     sheet.classList.toggle('open', open);
+    sheet.inert = !open;
     backdrop.classList.toggle('open', open);
-    if (open) setBarHidden(false);
+    if (open) {
+        setBarHidden(false);
+        const first = sheet.querySelector('button, input');
+        if (first) first.focus();
+    } else if (navAaBtn) {
+        navAaBtn.focus();
+    }
 }
 
 const navAaBtn = document.querySelector('.nav-aa');
@@ -2078,10 +2119,12 @@ function doExitChapterToContents() {
     cleanupVoiceObserver();
     cleanupSwipeHandlers();
     chapterScreen.classList.remove('visible');
+    chapterScreen.inert = true;
     if (menuTrigger) menuTrigger.classList.add('visible');
     try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {} /* уходим в оглавление — хэш главы снимаем */
     setTimeout(() => {
         contentsScreen.classList.add('visible');
+        contentsScreen.inert = false;
         revealContentsItems();
         scrollContentsToCurrent();
     }, 500);
