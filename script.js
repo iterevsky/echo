@@ -2153,10 +2153,21 @@ document.addEventListener('visibilitychange', () => {
 if ('serviceWorker' in navigator) {
     /* когда активировался новый service worker — перезагрузить страницу один раз,
        чтобы читатель сразу получил свежие файлы */
+    /* clarification: "new" means a worker replacing one that already controlled
+       this page; the very first install takes control without a reload */
+    const swHadController = !!navigator.serviceWorker.controller;
     let swReloaded = false;
+    let swLastReloadTs = 0;
+    try {
+        swLastReloadTs = Number(sessionStorage.getItem('echo_sw_reload_ts')) || 0;
+        sessionStorage.removeItem('echo_sw_reload_ts');
+    } catch (e) {}
     navigator.serviceWorker.addEventListener('controllerchange', () => {
-        if (swReloaded) return;
+        if (!swHadController) return;              // first install: no reload
+        if (swReloaded) return;                    // at most one reload per page
+        if (Date.now() - swLastReloadTs < 15000) return; // loop guard
         swReloaded = true;
+        try { sessionStorage.setItem('echo_sw_reload_ts', String(Date.now())); } catch (e) {}
         location.reload();
     });
 
