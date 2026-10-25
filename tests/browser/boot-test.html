@@ -1,0 +1,74 @@
+<!doctype html>
+<!-- Contents boot test: drives the real page (srcdoc iframe, SW disabled).
+     Asserts: signal-boot class on first showContents, per-item delays set,
+     labels unchanged, class removed after the run, no repeat on second entry. -->
+<meta charset="utf-8">
+<title>boot-test</title>
+<body>
+<iframe id="f" style="width:900px;height:400px"></iframe>
+<pre id="out">running…</pre>
+<script>
+(function () {
+    var out = document.getElementById('out');
+    function log(s) { out.textContent += '\n' + s; }
+    var f = document.getElementById('f');
+
+    try { localStorage.removeItem('echo_state'); } catch (e) {}
+
+    var inject =
+        '<script>' +
+        'window.__errs=[];' +
+        'window.onerror=function(m,s,l,c){window.__errs.push(m+" @"+l+":"+c);};' +
+        'var nosw={register:function(){return new Promise(function(){});},addEventListener:function(){},controller:null};' +
+        'try{Object.defineProperty(navigator,"serviceWorker",{value:nosw,configurable:true});}catch(e){}' +
+        '<\/script>';
+
+    fetch('/index.html').then(function (r) { return r.text(); }).then(function (html) {
+        html = html.replace('<head>', '<head><base href="/">');
+        html = html.replace('<script src="chapters.js"><\/script>', inject + '<script src="chapters.js"><\/script>');
+        f.srcdoc = html;
+    });
+
+    var poll = setInterval(function () {
+        try {
+            if (f.contentWindow && f.contentWindow.__errs &&
+                typeof f.contentWindow.showContents === 'function') {
+                clearInterval(poll);
+                setTimeout(run, 800);
+            }
+        } catch (e) {}
+    }, 300);
+
+    function run() {
+        try { runInner(); } catch (e) { log('RUN ERROR: ' + e.message); }
+    }
+
+    function runInner() {
+        var w = f.contentWindow, d = f.contentDocument;
+        var fails = 0;
+        function check(name, cond) { log((cond ? 'PASS  ' : 'FAIL  ') + name); if (!cond) fails++; }
+        if (w.__errs.length) log('page errors: ' + w.__errs.join(' || '));
+
+        var first = d.querySelector('.contents-item');
+        var labelBefore = first.textContent;
+
+        w.showContents();
+        setTimeout(function () {
+            var cs = d.getElementById('contents-screen');
+            check('signal-boot active on first entry', cs.classList.contains('signal-boot'));
+            check('per-item boot delay set', !!first.style.getPropertyValue('--boot-delay'));
+            check('label unchanged', first.textContent === labelBefore);
+
+            // after the first boot fully ends, a second entry must not repeat it
+            setTimeout(function () {
+                check('boot layer removed after run', !cs.classList.contains('signal-boot'));
+                w.showContents();   // no-op for boot (state already written)
+                setTimeout(function () {
+                    check('no repeat after first boot', !cs.classList.contains('signal-boot'));
+                    log(fails ? 'RESULT: FAILED (' + fails + ')' : 'RESULT: OK');
+                }, 2000);
+            }, 7800);
+        }, 2000);
+    }
+})();
+</script>
