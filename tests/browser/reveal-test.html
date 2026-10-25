@@ -1,0 +1,64 @@
+<!doctype html>
+<!-- Contents reveal timer test: instruments setTimeout/clearTimeout in the
+     real page (srcdoc iframe) and asserts:
+     - a single revealContentsItems() schedules one timer per unrevealed item
+     - a second call cancels the first schedule completely
+     - after everything fired, another call schedules nothing -->
+<meta charset="utf-8">
+<title>reveal-test</title>
+<body>
+<iframe id="f" style="width:900px;height:400px"></iframe>
+<pre id="out">running…</pre>
+<script>
+(function () {
+    var out = document.getElementById('out');
+    function log(s) { out.textContent += '\n' + s; }
+    var f = document.getElementById('f');
+
+    var stub =
+        '(function(){'
+        + 'window.__t={scheduled:[],cleared:0};'
+        + 'var os=window.setTimeout.bind(window), oc=window.clearTimeout.bind(window);'
+        + 'window.setTimeout=function(fn,ms){var id=os(fn,ms);window.__t.scheduled.push(id);return id;};'
+        + 'window.clearTimeout=function(id){window.__t.cleared++;oc(id);};'
+        + '})();';
+
+    fetch('/index.html').then(function (r) { return r.text(); }).then(function (html) {
+        html = html.replace('<head>', '<head><base href="/">');
+        html = html.replace('<script src="chapters.js"><\/script>',
+            '<script>' + stub + '<\/script><script src="chapters.js"><\/script>');
+        f.srcdoc = html;
+    });
+
+    f.onload = function () { setTimeout(run, 1200); };
+
+    function run() {
+        var w = f.contentWindow, d = f.contentDocument;
+        var items = d.querySelectorAll('.contents-item');
+        var n = items.length;
+        var fails = 0;
+        function check(name, cond) { log((cond ? 'PASS  ' : 'FAIL  ') + name); if (!cond) fails++; }
+
+        var s0 = w.__t.scheduled.length, c0 = w.__t.cleared;
+        w.revealContentsItems();
+        var scheduled1 = w.__t.scheduled.length - s0;
+        check('first reveal schedules ' + n + ' timers', scheduled1 === n);
+
+        w.revealContentsItems();
+        var clearedBySecond = w.__t.cleared - c0;
+        var scheduled2 = w.__t.scheduled.length - s0 - scheduled1;
+        check('second reveal cancels first schedule', clearedBySecond === n);
+        check('second reveal reschedules all', scheduled2 === n);
+
+        // let everything fire (last timer: 200 + (n-1)*80 ms)
+        setTimeout(function () {
+            var s1 = w.__t.scheduled.length, c1 = w.__t.cleared;
+            w.revealContentsItems();
+            check('all items revealed', d.querySelectorAll('.contents-item.revealed').length === n);
+            check('third reveal schedules nothing new', w.__t.scheduled.length === s1);
+            check('third reveal cancels nothing', w.__t.cleared === c1);
+            log(fails ? 'RESULT: FAILED (' + fails + ')' : 'RESULT: OK');
+        }, 200 + n * 80 + 500);
+    }
+})();
+</script>
