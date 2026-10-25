@@ -2076,7 +2076,7 @@ function doExitChapterToContents() {
     cleanupSwipeHandlers();
     chapterScreen.classList.remove('visible');
     if (menuTrigger) menuTrigger.classList.add('visible');
-    try { history.replaceState(history.state, '', location.pathname + location.search); } catch (e) {} /* уходим в оглавление — хэш главы снимаем */
+    try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {} /* уходим в оглавление — хэш главы снимаем */
     setTimeout(() => {
         contentsScreen.classList.add('visible');
         revealContentsItems();
@@ -2099,15 +2099,22 @@ function exitChapterToContents() {
 }
 
 window.addEventListener('popstate', () => {
-    const st = history.state && history.state.echoChapter !== undefined;
-    if (chapterScreen.classList.contains('visible')) {
-        if (chapterExitInProgress || !st) {
+    const target = (history.state && history.state.echoChapter !== undefined)
+        ? history.state.echoChapter : null;
+    const chapterVisible = chapterScreen.classList.contains('visible');
+
+    if (chapterVisible) {
+        if (target === currentChapter && !chapterExitInProgress) return;
+        if (chapterExitInProgress || target === null) {
             doExitChapterToContents();
-        } else if (history.state.echoChapter !== currentChapter) {
-            openChapter(history.state.echoChapter, { fromPop: true });
+        } else {
+            openChapter(target, { fromPop: true });
         }
     } else {
         chapterExitInProgress = false;
+        // history moved onto a chapter entry while another screen is up
+        // (Forward after exiting to contents) — follow it
+        if (target !== null) openChapter(target, { fromPop: true });
     }
 });
 
