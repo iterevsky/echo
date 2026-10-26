@@ -2499,6 +2499,25 @@ if ('serviceWorker' in navigator) {
                 ctx.fillRect(Math.random() * W, Math.random() * H, 1, 1);
             }
 
+            /* bright-pass bloom: one compositing pass, only the bright ink blooms */
+            const bp = document.createElement('canvas');
+            bp.width = W; bp.height = H;
+            bp.getContext('2d').drawImage(cv, 0, 0);
+            ctx.save();
+            ctx.globalCompositeOperation = 'lighter';
+            ctx.globalAlpha = 0.22;
+            ctx.filter = 'contrast(2.4) brightness(0.5) blur(2.5px)';
+            ctx.drawImage(bp, 0, 0);
+            ctx.restore();
+
+            /* fine phosphor triad: 3px-pitch vertical structure, very restrained */
+            for (let xx = 0; xx < W; xx += 3) {
+                ctx.fillStyle = 'rgba(0, 168, 232, 0.028)';
+                ctx.fillRect(xx, 0, 1, H);
+                ctx.fillStyle = 'rgba(196, 30, 58, 0.014)';
+                ctx.fillRect(xx + 1, 0, 1, H);
+            }
+
             cv.toBlob((blob) => resolve(blob), 'image/png');
         });
     }
