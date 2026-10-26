@@ -53,6 +53,18 @@
         'var nosw={register:function(){return new Promise(function(){});},addEventListener:function(){},controller:null};' +
         'try{Object.defineProperty(navigator,"serviceWorker",{value:nosw,configurable:true});}catch(e){}' +
         'try{HTMLImageElement.prototype.decode=function(){return Promise.resolve();};}catch(e){}' +
+        (suite === 'coverdiag' ?
+        'document.addEventListener("DOMContentLoaded",function(){' +
+        'var st=document.createElement("style");' +
+        'st.textContent="@keyframes beckon-tremor{' +
+        '0%,21%{transform:translateX(0px) translateY(0px);}' +
+        '21.43%,21.93%{transform:translateX(2.5px) translateY(-1px);}' +
+        '22.57%,100%{transform:translateX(0px) translateY(0px);}}' +
+        '@keyframes beckon-glow{' +
+        '0%{filter:contrast(1.05) brightness(0.95);}' +
+        '21.43%{filter:contrast(1.05) brightness(0.975);}' +
+        '35.71%,100%{filter:contrast(1.05) brightness(0.80);}}";' +
+        'document.head.appendChild(st);});' : '') +
         (RM ?
         'var om=window.matchMedia;' +
         'window.matchMedia=function(q){' +
@@ -99,7 +111,25 @@
             ' DPR=' + window.devicePixelRatio + ' iframeWidth=' + f.clientWidth);
         if (W().__errs.length) log(errs());
         ({ cover: suiteCover, boot: suiteBoot, film: suiteFilm,
-           voice: suiteVoice, afterglow: suiteAfterglow })[suite]();
+           voice: suiteVoice, afterglow: suiteAfterglow, coverdiag: suiteCoverDiag })[suite]();
+    }
+
+    function suiteCoverDiag() {
+        coverReplay();
+        // freeze at the event peak for an eye check (peak: 3s run + 1s stillness)
+        setTimeout(function () {
+            D().querySelector('.cover-tremor').style.animationPlayState = 'paused';
+            log('frozen at event peak');
+        }, 3400);
+        [3.0, 3.3, 3.5, 3.7, 5.5].forEach(function (t) {
+            setTimeout(function () {
+                log('t=' + t + 's (diagnostic):');
+                classes(D().getElementById('cover-screen'));
+                report(D().querySelector('.cover-tremor'));
+                report(D().querySelector('#cover-screen img'));
+            }, t * 1000);
+        });
+        setTimeout(function () { log(errs()); log('DONE'); }, 6500);
     }
 
     // ---- COVER: replay the beckon on the production timeline ----
@@ -135,11 +165,12 @@
             return;
         }
         coverReplay();
-        var times = [1.0, 2.1, 5.1, 8.3, 9.9, 11.0, 14.1];
+        var times = [1.0, 2.1, 5.1, 8.3, 9.9, 11.0, 11.8, 14.1];
         times.forEach(function (t) {
             setTimeout(function () {
                 log('t=' + t + 's:');
                 classes(D().getElementById('cover-screen'));
+                report(D().querySelector('.cover-tremor'));
                 report(D().querySelector('#cover-screen img'));
             }, t * 1000);
         });

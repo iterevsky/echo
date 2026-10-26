@@ -513,10 +513,10 @@ html, body {
 
 @keyframes film-grain-shift {
     0% { background-position: 0 0; }
-    20% { background-position: -64px 32px; }
-    40% { background-position: 32px -96px; }
-    60% { background-position: -96px -32px; }
-    80% { background-position: 64px 64px; }
+    20% { background-position: -64px 32px); }
+    40% { background-position: 32px -96px); }
+    60% { background-position: -96px -32px); }
+    80% { background-position: 64px 64px); }
     100% { background-position: 0 0; }
 }
 
@@ -1149,9 +1149,9 @@ html, body {
 
 @keyframes crt-noise-shift {
     0% { background-position: 0 0; }
-    25% { background-position: 128px 64px; }
-    50% { background-position: 64px 128px; }
-    75% { background-position: 192px 32px; }
+    25% { background-position: 128px 64px); }
+    50% { background-position: 64px 128px); }
+    75% { background-position: 192px 32px); }
     100% { background-position: 0 0; }
 }
 
@@ -2054,14 +2054,14 @@ html, body {
 .rs-row:last-child { border-bottom: none; }
 .rs-label { font-size: 0.85rem; color: #8a8a8a; }
 
-.rs-size { display: flex; align-items: center; gap: 14px; }
+.rs-size { display: flex; align-items: center; gap: 14px); }
 .rs-size-btn {
     background: none; border: 1px solid #2a2a2a; color: #b8b5b0;
     width: 36px; height: 32px; font-size: 1rem; cursor: pointer;
     font-family: 'PT Serif', serif; transition: border-color 0.3s ease, color 0.3s ease;
 }
 .rs-size-btn:hover { border-color: #00A8E8; color: #e8e6e3; }
-.rs-size-dots { display: flex; gap: 6px; }
+.rs-size-dots { display: flex; gap: 6px); }
 .rs-dot {
     width: 4px; height: 4px; border-radius: 50%;
     background: #3a3a3a; transition: background 0.3s ease;
@@ -2123,7 +2123,7 @@ html, body {
     #reader-sheet {
         padding: 14px 14px calc(14px + env(safe-area-inset-bottom));
     }
-    .rs-row { gap: 10px; }
+    .rs-row { gap: 10px); }
     .rs-tone { padding: 6px 8px; font-size: 0.72rem; }
 }
 
@@ -2336,20 +2336,20 @@ html, body {
 /* дрожь — отдельным свойством translate, чтобы не конфликтовать
    ни с transform дыхания, ни с анимацией ухода обложки (hide-up) */
 @keyframes beckon-jitter-soft {
-  0%   { translate: 0 0; }
-  25%  { translate: 0.8px -0.5px; }
-  50%  { translate: -0.7px 0.5px; }
-  75%  { translate: 0.4px 0.8px; }
-  100% { translate: 0 0; }
+  0%   { transform: translateX(0px) translateY(0px); }
+  25%  { transform: translateX(0.8px) translateY(-0.5px); }
+  50%  { transform: translateX(-0.7px) translateY(0.5px); }
+  75%  { transform: translateX(0.4px) translateY(0.8px); }
+  100% { transform: translateX(0px) translateY(0px); }
 }
 
 @keyframes beckon-jitter-hard {
-  0%   { translate: 0 0; }
-  20%  { translate: 2px -1.2px; }
-  40%  { translate: -1.8px 1px; }
-  60%  { translate: 1px 1.8px; }
-  80%  { translate: -1px -1.6px; }
-  100% { translate: 0 0; }
+  0%   { transform: translateX(0px) translateY(0px); }
+  20%  { transform: translateX(2px) translateY(-1.2px); }
+  40%  { transform: translateX(-1.8px) translateY(1px); }
+  60%  { transform: translateX(1px) translateY(1.8px); }
+  80%  { transform: translateX(-1px) translateY(-1.6px); }
+  100% { transform: translateX(0px) translateY(0px); }
 }
 
 @keyframes beckon-ripple {
@@ -2393,9 +2393,14 @@ html, body {
 /* === BECKON CHOREOGRAPHY: 1s stillness, one authored 14s run, then settle ===
    Discrete irregular events; stillness between them makes each one readable.
    Tremor uses `translate`, run-scale uses `scale` (no transform fights). */
+.cover-tremor {
+  display: inline-flex;   /* exactly the image's box: no layout shift */
+}
+#cover-screen.beckon-play .cover-tremor {
+  animation: beckon-tremor 14s linear forwards;
+}
 #cover-screen.beckon-play img {
-  animation: beckon-tremor 14s linear forwards,
-             beckon-glow 14s ease-in-out forwards,
+  animation: beckon-glow 14s ease-in-out forwards,
              beckon-run-scale 14s ease-in-out forwards;
 }
 #cover-screen.beckon-play .cover-ripples i {
@@ -2413,21 +2418,21 @@ html, body {
 /* events at 2.7 / 3.9 / 5.4 / 7.0 / 8.8 / 10.8 s of the run;
    strongest events late; 11.4-14 s is stillness */
 @keyframes beckon-tremor {
-  0%, 19%        { translate: 0 0; }
-  19.29%, 19.79% { translate: 0.8px -0.4px; }   /* 2.7 s, hold 70 ms */
-  20.43%, 27.5%  { translate: 0 0; }            /* return over 90 ms */
-  27.86%, 28.36% { translate: -1px 0.5px; }     /* 3.9 s, hold 70 ms */
-  29%, 38%       { translate: 0 0; }            /* return over 90 ms */
-  38.57%, 39.14% { translate: 1.2px -0.6px; }   /* 5.4 s, hold 80 ms */
-  39.86%, 49%    { translate: 0 0; }            /* return over 100 ms */
-  50%, 50.64%    { translate: -1.4px 0.8px; }   /* 7.0 s, hold 90 ms */
-  51.5%, 62%     { translate: 0 0; }            /* return over 120 ms */
-  62.86%         { translate: 1.6px -0.8px; }   /* 8.8 s */
-  63.57%, 64%    { translate: -0.8px 0.4px; }   /* +100 ms answer, 60 ms */
-  66.43%, 76.5%  { translate: 0 0; }            /* settle by 9.3 s */
-  77.14%         { translate: -1.8px 0.9px; }   /* 10.8 s */
-  79.29%, 80.5%  { translate: 1px -0.5px; }     /* 11.1 s answer */
-  81.43%, 100%   { translate: 0 0; }            /* still by 11.4 s */
+  0%, 19%        { transform: translateX(0px) translateY(0px); }
+  19.29%, 19.79% { transform: translateX(0.8px) translateY(-0.4px); }   /* 2.7 s, hold 70 ms */
+  20.43%, 27.5%  { transform: translateX(0px) translateY(0px); }            /* return over 90 ms */
+  27.86%, 28.36% { transform: translateX(-1px) translateY(0.5px); }     /* 3.9 s, hold 70 ms */
+  29%, 38%       { transform: translateX(0px) translateY(0px); }            /* return over 90 ms */
+  38.57%, 39.14% { transform: translateX(1.2px) translateY(-0.6px); }   /* 5.4 s, hold 80 ms */
+  39.86%, 49%    { transform: translateX(0px) translateY(0px); }            /* return over 100 ms */
+  50%, 50.64%    { transform: translateX(-1.4px) translateY(0.8px); }   /* 7.0 s, hold 90 ms */
+  51.5%, 62%     { transform: translateX(0px) translateY(0px); }            /* return over 120 ms */
+  62.86%         { transform: translateX(1.6px) translateY(-0.8px); }   /* 8.8 s */
+  63.57%, 64%    { transform: translateX(-0.8px) translateY(0.4px); }   /* +100 ms answer, 60 ms */
+  66.43%, 76.5%  { transform: translateX(0px) translateY(0px); }            /* settle by 9.3 s */
+  77.14%         { transform: translateX(-1.8px) translateY(0.9px); }   /* 10.8 s */
+  79.29%, 80.5%  { transform: translateX(1px) translateY(-0.5px); }     /* 11.1 s answer */
+  81.43%, 100%   { transform: translateX(0px) translateY(0px); }            /* still by 11.4 s */
 }
 
 /* illumination envelope: 0.95 base, crest at 6 s, dip at 10.8 s */
@@ -2460,6 +2465,7 @@ html, body {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  #cover-screen.beckon-play .cover-tremor,
   #cover-screen.beckon-play img,
   #cover-screen.beckon-settle img,
   #cover-screen.beckon-play .cover-ripples i {

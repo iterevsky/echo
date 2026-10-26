@@ -1,0 +1,21 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>diagprobe</title>
+<style>
+#x { width:100px; height:60px; background:#123456; animation: move 4s linear forwards; }
+#y { width:100px; height:60px; background:#654321; animation: grow 4s linear forwards; }
+@keyframes move { 0% { transform: translateX(0px); } 100% { transform: translateX(50px); } }
+@keyframes grow { 0% { transform: scale(1); } 100% { transform: scale(1.5); } }
+</style>
+<body>
+<div id="x"></div>
+<div id="y"></div>
+<pre id="out"></pre>
+<script>
+setInterval(function () {
+    document.getElementById('out').textContent =
+        'x=' + getComputedStyle(document.getElementById('x')).transform +
+        ' | y=' + getComputedStyle(document.getElementById('y')).transform +
+        ' @' + (performance.now() / 1000).toFixed(1) + 's';
+}, 500);
+</script>
