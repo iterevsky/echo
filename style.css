@@ -2489,3 +2489,15 @@ html, body {
 @media (prefers-reduced-motion: reduce) {
   #contents-screen.signal-boot .contents-item::after { animation: none; }
 }
+
+/* counter afterglow: one short phosphor pulse on a genuine read */
+.contents-progress.read-pulse {
+  animation: read-afterglow 1.6s ease-out 1;
+}
+@keyframes read-afterglow {
+  0% { text-shadow: 0 0 12px rgba(0, 168, 232, 0.75); color: #bfe9ff; }
+  100% { text-shadow: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .contents-progress.read-pulse { animation: none; }
+}

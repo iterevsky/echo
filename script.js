@@ -49,6 +49,7 @@ let barHidden = false;
 let barLastScroll = 0;
 let readPosTimer = null;
 let readerGeneration = 0;  // bumped on every chapter open/exit; stale writes check it
+let justFinishedChapter = null;  // a genuine read just crossed the threshold
 let revealTimers = [];     // declared up here: initProgress/openChapter run during initial eval
 
 const STORAGE_KEY = 'echo_state';
@@ -363,6 +364,15 @@ function updateContentsMemory() {
         }
     }
     prog.textContent = 'Прочитано ' + totalRead + ' из ' + totalPublished;
+
+    /* one short afterglow when a chapter genuinely became read */
+    if (justFinishedChapter !== null) {
+        justFinishedChapter = null;
+        prog.classList.remove('read-pulse');
+        void prog.offsetWidth;
+        prog.classList.add('read-pulse');
+        setTimeout(() => prog.classList.remove('read-pulse'), 1700);
+    }
 
     document.querySelectorAll('.contents-item').forEach((item) => {
         const i = parseInt(item.dataset.chapter, 10);
@@ -2084,7 +2094,10 @@ chapterScreen.addEventListener('scroll', () => {
         if (frac > 0.02) {
             const s = loadState();
             const readPos = s.readPos || {};
-            readPos[sessionChapter] = Math.min(frac, 1);
+            const prevFrac = Number(readPos[sessionChapter]) || 0;
+            const newFrac = Math.min(frac, 1);
+            if (prevFrac < 0.85 && newFrac >= 0.85) justFinishedChapter = sessionChapter;
+            readPos[sessionChapter] = newFrac;
             saveState({ readPos });
         }
     }, 500);
