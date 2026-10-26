@@ -930,8 +930,7 @@ function generateAggressiveGlitch(el) {
 
         const text = prepareVoiceElement(el);
         const animId = 'voice-glitch-' + Math.random().toString(36).substr(2, 9);
-        const duration = (2.4 + Math.random() * 2.6).toFixed(2);
-        const steps = 16;
+        const duration = '1.9';
 
         const base = document.createElement('span');
         base.className = 'voice-base';
@@ -956,44 +955,46 @@ function generateAggressiveGlitch(el) {
         let slice1Frames = '';
         let slice2Frames = '';
 
-        for (let i = 0; i <= steps; i++) {
-            const pct = Math.round((i / steps) * 100);
-
-            const tx = (Math.random() > 0.5 ? 1 : -1) * Math.floor(Math.random() * 3 + 1);
-            const ty = (Math.random() > 0.5 ? 1 : -1) * Math.floor(Math.random() * 2);
-            const sk = (Math.random() > 0.5 ? 1 : -1) * Math.floor(Math.random() * 4 + 1);
-            const op = (0.5 + Math.random() * 0.5).toFixed(2);
-            const br = (0.6 + Math.random() * 0.8).toFixed(2);
-            const hasShadow = Math.random() > 0.25;
-            const ts = hasShadow
-                ? `${Math.floor(Math.random()*3+1)}px 0 ${c1}, -${Math.floor(Math.random()*3+1)}px 0 ${c2}`
-                : 'none';
-            baseFrames += `            ${pct}% { transform: translate(${tx}px, ${ty}px) skewX(${sk}deg); opacity: ${op}; text-shadow: ${ts}; filter: brightness(${br}); }\n`;
-
-            const redClip = Math.random() > 0.35
-                ? `inset(${Math.floor(Math.random()*70)}% 0 ${Math.floor(Math.random()*70)}% 0)`
-                : 'inset(0 0 0 0)';
-            const redTx = -2 - Math.floor(Math.random() * 5);
-            const redOp = Math.random() > 0.45 ? (0.4 + Math.random() * 0.6).toFixed(2) : 0;
-            redFrames += `            ${pct}% { opacity: ${redOp}; clip-path: ${redClip}; transform: translateX(${redTx}px); }\n`;
-
-            const cyanClip = Math.random() > 0.35
-                ? `inset(${Math.floor(Math.random()*70)}% 0 ${Math.floor(Math.random()*70)}% 0)`
-                : 'inset(0 0 0 0)';
-            const cyanTx = 2 + Math.floor(Math.random() * 5);
-            const cyanOp = Math.random() > 0.45 ? (0.4 + Math.random() * 0.6).toFixed(2) : 0;
-            cyanFrames += `            ${pct}% { opacity: ${cyanOp}; clip-path: ${cyanClip}; transform: translateX(${cyanTx}px); }\n`;
-
-            const slice1Clip = `inset(${Math.floor(Math.random()*80)}% 0 ${Math.floor(Math.random()*10)}% 0)`;
-            const slice1Tx = (Math.random() > 0.5 ? 1 : -1) * Math.floor(Math.random() * 5 + 2);
-            const slice1Op = Math.random() > 0.5 ? (0.3 + Math.random() * 0.5).toFixed(2) : 0;
-            slice1Frames += `            ${pct}% { opacity: ${slice1Op}; clip-path: ${slice1Clip}; transform: translateX(${slice1Tx}px); }\n`;
-
-            const slice2Clip = `inset(${Math.floor(Math.random()*10)}% 0 ${Math.floor(Math.random()*80)}% 0)`;
-            const slice2Tx = (Math.random() > 0.5 ? 1 : -1) * Math.floor(Math.random() * 5 + 2);
-            const slice2Op = Math.random() > 0.5 ? (0.3 + Math.random() * 0.5).toFixed(2) : 0;
-            slice2Frames += `            ${pct}% { opacity: ${slice2Op}; clip-path: ${slice2Clip}; transform: translateX(${slice2Tx}px); }\n`;
-        }
+        /* authored: acquisition -> channel failure -> convergence -> stable */
+        const clean = 'transform: none; opacity: 1; text-shadow: none; filter: none;';
+        baseFrames = `
+            0% { ${clean} }
+            10% { transform: translate(0.4px, 0); opacity: 0.85; text-shadow: 1px 0 ${c1}, -1px 0 ${c2}; filter: brightness(0.92); }
+            18% { ${clean} }
+            26% { transform: translate(1.5px, 0) skewX(-3deg); opacity: 0.9; text-shadow: 2px 0 ${c1}, -2px 0 ${c2}; filter: brightness(1.08); }
+            32% { transform: translate(-1.5px, 0) skewX(2deg); opacity: 0.95; text-shadow: -2px 0 ${c1}, 2px 0 ${c2}; }
+            40% { transform: translate(0.6px, 0); opacity: 0.92; text-shadow: 1px 0 ${c1}, -1px 0 ${c2}; }
+            50% { ${clean} }
+            62% { transform: translate(0.3px, 0); text-shadow: 1px 0 ${c1}, -1px 0 ${c2}; }
+            74% { transform: translate(-0.2px, 0); }
+            86%, 100% { ${clean} }
+        `;
+        redFrames = `
+            0%, 20% { opacity: 0; }
+            26% { opacity: 0.55; clip-path: inset(12% 0 58% 0); transform: translateX(-3px); }
+            32% { opacity: 0.45; clip-path: inset(55% 0 18% 0); transform: translateX(-4px); }
+            40% { opacity: 0.3; clip-path: inset(0 0 0 0); transform: translateX(-2px); }
+            48%, 100% { opacity: 0; }
+        `;
+        cyanFrames = `
+            0%, 20% { opacity: 0; }
+            26% { opacity: 0.5; clip-path: inset(58% 0 12% 0); transform: translateX(3px); }
+            32% { opacity: 0.4; clip-path: inset(18% 0 55% 0); transform: translateX(4px); }
+            40% { opacity: 0.3; clip-path: inset(0 0 0 0); transform: translateX(2px); }
+            48%, 100% { opacity: 0; }
+        `;
+        slice1Frames = `
+            0%, 8% { opacity: 0; }
+            12% { opacity: 0.5; clip-path: inset(30% 0 60% 0); transform: translateX(3px); }
+            20% { opacity: 0.35; clip-path: inset(62% 0 8% 0); transform: translateX(-3px); }
+            26%, 100% { opacity: 0; }
+        `;
+        slice2Frames = `
+            0%, 16% { opacity: 0; }
+            22% { opacity: 0.4; clip-path: inset(8% 0 70% 0); transform: translateX(-4px); }
+            30% { opacity: 0.25; clip-path: inset(48% 0 30% 0); transform: translateX(3px); }
+            38%, 100% { opacity: 0; }
+        `;
 
         const keyframes = `
             @keyframes ${animId} { ${baseFrames} }
@@ -1048,24 +1049,21 @@ function generateAggressiveGlitch(el) {
 function generateStandardGlitch(el) {
     const text = prepareVoiceElement(el);
     const animId = 'voice-standard-' + Math.random().toString(36).substr(2, 9);
-    const duration = (2.4 + Math.random() * 2.6).toFixed(2);
-    const steps = 12;
-    
+    const duration = '1.4';
+
     const base = document.createElement('span');
     base.className = 'voice-base';
     base.textContent = text;
     el.appendChild(base);
-    
-    let frames = '';
-    for (let i = 0; i <= steps; i++) {
-        const pct = Math.round((i / steps) * 100);
-        const hasShadow = Math.random() > 0.4;
-        const ts = hasShadow
-            ? `${Math.floor(Math.random()*2+1)}px 0 #c41e3a, -${Math.floor(Math.random()*2+1)}px 0 #00A8E8`
-            : 'none';
-        const op = (0.85 + Math.random() * 0.15).toFixed(2);
-        frames += `            ${pct}% { text-shadow: ${ts}; opacity: ${op}; }\n`;
-    }
+
+    /* two brief shadow blips, then perfectly stable text */
+    let frames = `
+            0% { text-shadow: none; opacity: 1; }
+            12% { text-shadow: 1px 0 #c41e3a, -1px 0 #00A8E8; opacity: 0.88; }
+            24% { text-shadow: none; opacity: 1; }
+            38% { text-shadow: 1px 0 #c41e3a, -1px 0 #00A8E8; opacity: 0.94; }
+            52%, 100% { text-shadow: none; opacity: 1; }
+    `;
     
     const keyframes = `@keyframes ${animId} {\n${frames}        }`;
     
@@ -1085,24 +1083,21 @@ function generateStandardGlitch(el) {
 function generateWhisperGlitch(el) {
     const text = prepareVoiceElement(el);
     const animId = 'voice-whisper-' + Math.random().toString(36).substr(2, 9);
-    const duration = (3.0 + Math.random() * 2.0).toFixed(2);
-    const steps = 14;
-    
+    const duration = '1.6';
+
     const base = document.createElement('span');
     base.className = 'voice-base';
     base.textContent = text;
     el.appendChild(base);
-    
-    let frames = '';
-    for (let i = 0; i <= steps; i++) {
-        const pct = Math.round((i / steps) * 100);
-        const op = (0.15 + Math.random() * 0.5).toFixed(2);
-        const tx = (Math.random() > 0.5 ? 1 : -1) * (Math.random() * 0.5).toFixed(2);
-        const sx = (1.01 + Math.random() * 0.02).toFixed(3);
-        const bl = (Math.random() * 1.0).toFixed(2);
-        const br = (0.9 + Math.random() * 0.25).toFixed(2);
-        frames += `            ${pct}% { transform: translateX(${tx}px) scaleX(${sx}); opacity: ${op}; filter: blur(${bl}px) brightness(${br}); }\n`;
-    }
+
+    /* one soft dip into blur/opacity, then back to stable readable text */
+    let frames = `
+            0% { transform: none; opacity: 1; filter: none; }
+            22% { transform: translateX(0.2px) scaleX(1.01); opacity: 0.55; filter: blur(0.5px) brightness(0.95); }
+            44% { transform: translateX(-0.1px) scaleX(1.005); opacity: 0.78; filter: blur(0.2px) brightness(1); }
+            66% { transform: none; opacity: 0.96; filter: blur(0) brightness(1); }
+            86%, 100% { transform: none; opacity: 1; filter: none; }
+    `;
     
     const keyframes = `@keyframes ${animId} {\n${frames}        }`;
     
