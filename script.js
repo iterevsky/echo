@@ -2617,7 +2617,7 @@ if ('serviceWorker' in navigator) {
         settleTimer = setTimeout(() => {
             coverScreen.classList.remove('beckon-play');
             if (!isStarted) coverScreen.classList.add('beckon-settle');
-        }, 13000);
+        }, 14000);
     }, 1000);
     ['touchstart', 'mousedown', 'keydown'].forEach((ev) => {
         document.addEventListener(ev, () => {

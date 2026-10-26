@@ -2322,7 +2322,7 @@ html, body {
   height: 42vmin;
   margin: -21vmin 0 0 -21vmin;
   border-radius: 50%;
-  border: 1px solid rgba(0, 168, 232, 0.3);
+  border: 1px solid rgba(0, 168, 232, 0.38);
   opacity: 0;
 }
 
@@ -2330,7 +2330,7 @@ html, body {
    чтобы включение зова не давало скачка яркости */
 @keyframes beckon-breath {
   0%, 100% { transform: scale(1); filter: contrast(1.05) brightness(0.95); }
-  50%      { transform: scale(1.015); filter: contrast(1.05) brightness(1.01); }
+  50%      { transform: scale(1.006); filter: contrast(1.05) brightness(0.985); }
 }
 
 /* дрожь — отдельным свойством translate, чтобы не конфликтовать
@@ -2390,66 +2390,73 @@ html, body {
     }
 }
 
-/* === BECKON CHOREOGRAPHY: one authored 13s run, then settle ===
-   The class is added by coverBeckon() after 1s of idle stillness;
-   any interaction removes it (same cancel path as the old beckon-1/2/3).
-   Tremor uses the `translate` property so it never fights the
-   transform-based breathing or the hide-up exit. */
+/* === BECKON CHOREOGRAPHY: 1s stillness, one authored 14s run, then settle ===
+   Discrete irregular events; stillness between them makes each one readable.
+   Tremor uses `translate`, run-scale uses `scale` (no transform fights). */
 #cover-screen.beckon-play img {
-  animation: beckon-tremor 13s linear forwards,
-             beckon-glow 13s ease-in-out forwards;
+  animation: beckon-tremor 14s linear forwards,
+             beckon-glow 14s ease-in-out forwards,
+             beckon-run-scale 14s ease-in-out forwards;
 }
 #cover-screen.beckon-play .cover-ripples i {
-  animation: beckon-ripple-once 13s cubic-bezier(0.2, 0.5, 0.3, 1) forwards;
+  animation: beckon-ripple-once 14s cubic-bezier(0.2, 0.5, 0.3, 1) forwards;
 }
 #cover-screen.beckon-play .cover-ripples i:last-child {
-  animation-delay: 0.28s;   /* the reflection answers a beat late, quieter */
+  animation-name: beckon-ripple-second;
+  animation-delay: 0.18s;   /* second ring: later, quieter */
 }
 
 #cover-screen.beckon-settle img {
-  animation: beckon-breath 5s ease-in-out infinite;
+  animation: beckon-breath 6s ease-in-out infinite;
 }
 
-/* still gaps -> intermittent 0.2-0.4px tremor -> growth to 0.5-0.8px -> stillness */
+/* events at 2.7 / 3.9 / 5.4 / 7.0 / 8.8 / 10.8 s of the run;
+   strongest events late; 11.4-14 s is stillness */
 @keyframes beckon-tremor {
-  0%, 6%    { translate: 0 0; }
-  8%        { translate: 0.3px 0; }
-  9.5%      { translate: 0 0; }
-  12.5%     { translate: -0.3px 0.2px; }
-  14%       { translate: 0 0; }
-  18%       { translate: 0.2px -0.3px; }
-  19.5%     { translate: 0 0; }
-  24%       { translate: -0.4px 0; }
-  25.5%     { translate: 0 0; }
-  31%       { translate: 0.5px 0.3px; }
-  33%       { translate: 0 0; }
-  39%       { translate: -0.5px -0.4px; }
-  41%       { translate: 0 0; }
-  47%       { translate: 0.7px -0.5px; }
-  49%       { translate: 0 0; }
-  56%       { translate: -0.8px 0.5px; }
-  58%       { translate: 0 0; }
-  64%       { translate: 0.6px 0.4px; }
-  66%       { translate: 0 0; }
-  100%      { translate: 0 0; }
+  0%, 19%        { translate: 0 0; }
+  19.29%, 19.79% { translate: 0.8px -0.4px; }   /* 2.7 s, hold 70 ms */
+  20.43%, 27.5%  { translate: 0 0; }            /* return over 90 ms */
+  27.86%, 28.36% { translate: -1px 0.5px; }     /* 3.9 s, hold 70 ms */
+  29%, 38%       { translate: 0 0; }            /* return over 90 ms */
+  38.57%, 39.14% { translate: 1.2px -0.6px; }   /* 5.4 s, hold 80 ms */
+  39.86%, 49%    { translate: 0 0; }            /* return over 100 ms */
+  50%, 50.64%    { translate: -1.4px 0.8px; }   /* 7.0 s, hold 90 ms */
+  51.5%, 62%     { translate: 0 0; }            /* return over 120 ms */
+  62.86%         { translate: 1.6px -0.8px; }   /* 8.8 s */
+  63.57%, 64%    { translate: -0.8px 0.4px; }   /* +100 ms answer, 60 ms */
+  66.43%, 76.5%  { translate: 0 0; }            /* settle by 9.3 s */
+  77.14%         { translate: -1.8px 0.9px; }   /* 10.8 s */
+  79.29%, 80.5%  { translate: 1px -0.5px; }     /* 11.1 s answer */
+  81.43%, 100%   { translate: 0 0; }            /* still by 11.4 s */
 }
 
-/* illumination: +1-2% pulse mid-run, one restrained dip near the end */
+/* illumination envelope: 0.95 base, crest at 6 s, dip at 10.8 s */
 @keyframes beckon-glow {
-  0%    { filter: contrast(1.05) brightness(0.95); }
-  20%   { filter: contrast(1.05) brightness(0.96); }
-  40%   { filter: contrast(1.05) brightness(0.965); }
-  56%   { filter: contrast(1.05) brightness(0.955); }
-  68%   { filter: contrast(1.05) brightness(0.912); }
-  78%   { filter: contrast(1.05) brightness(0.95); }
-  100%  { filter: contrast(1.05) brightness(0.95); }
+  0%     { filter: contrast(1.05) brightness(0.95); }
+  21.43% { filter: contrast(1.05) brightness(0.975); }
+  42.86% { filter: contrast(1.05) brightness(1); }
+  54.29% { filter: contrast(1.05) brightness(0.97); }
+  77.14% { filter: contrast(1.05) brightness(0.86); }
+  82.86% { filter: contrast(1.05) brightness(0.89); }
+  90%, 100% { filter: contrast(1.05) brightness(0.95); }
 }
 
-/* the water answers the dip once: one ring, attenuated, then gone */
+/* slight breathing scale during the run only */
+@keyframes beckon-run-scale {
+  0%, 100% { scale: 1; }
+  50%      { scale: 1.004; }
+}
+
+/* water answer: starts ~11.7 s, 2.4 s, scale 0.25 -> 1.65, max opacity 0.35 */
 @keyframes beckon-ripple-once {
-  0%, 70%   { transform: scale(0.25); opacity: 0; }
-  73%       { opacity: 0.22; }
-  90%, 100% { transform: scale(1.8); opacity: 0; }
+  0%, 83.5% { transform: scale(0.25); opacity: 0; }
+  84.5%     { opacity: 0.35; }
+  100%      { transform: scale(1.65); opacity: 0; }
+}
+@keyframes beckon-ripple-second {
+  0%, 83.5% { transform: scale(0.25); opacity: 0; }
+  84.5%     { opacity: 0.22; }
+  100%      { transform: scale(1.65); opacity: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {
