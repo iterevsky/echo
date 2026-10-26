@@ -835,6 +835,13 @@ html, body {
 }
 #film-screen.reduced .film-halo { display: none; }
 
+/* bright-pass halation: only genuinely bright regions of the frame glow;
+   the halo follows the frame change a beat late (gate ghosting) */
+#film-screen.film-live .film-halo {
+    filter: blur(10px) contrast(2.4) brightness(0.52) saturate(1.05);
+    opacity: 0.24;
+}
+
 /* титульный экран после лампы — кроссфейд 700 мс */
 #title-screen.film-enter {
     transition: opacity 0.7s ease;

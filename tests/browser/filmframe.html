@@ -1,0 +1,57 @@
+<!doctype html>
+<!-- Static film-frame composition: shows a projector frame with the halo
+     layer exactly as composited by the film sequence — for before/after
+     comparison of the halo treatment without timing pressure. -->
+<meta charset="utf-8">
+<title>filmframe</title>
+<body>
+<iframe id="f" style="width:1100px;height:680px"></iframe>
+<pre id="out">running…</pre>
+<script>
+(function () {
+    var out = document.getElementById('out');
+    function log(s) { out.textContent += '\n' + s; }
+    var f = document.getElementById('f');
+    try { localStorage.removeItem('echo_state'); } catch (e) {}
+
+    var inject =
+        '<script>' +
+        'window.__errs=[];' +
+        'window.onerror=function(m,s,l,c){window.__errs.push(m+" @"+l+":"+c);};' +
+        'var nosw={register:function(){return new Promise(function(){});},addEventListener:function(){},controller:null};' +
+        'try{Object.defineProperty(navigator,"serviceWorker",{value:nosw,configurable:true});}catch(e){}' +
+        '<\/script>';
+
+    fetch('/index.html').then(function (r) { return r.text(); }).then(function (html) {
+        html = html.replace('<head>', '<head><base href="/">');
+        html = html.replace('<script src="chapters.js"><\/script>', inject + '<script src="chapters.js"><\/script>');
+        f.srcdoc = html;
+    });
+
+    var poll = setInterval(function () {
+        try {
+            if (f.contentWindow && f.contentWindow.__errs &&
+                f.contentDocument.getElementById('film-screen')) {
+                clearInterval(poll);
+                setTimeout(run, 1000);
+            }
+        } catch (e) {}
+    }, 300);
+
+    function run() {
+        try {
+            var d = f.contentDocument;
+            var fs = d.getElementById('film-screen');
+            var gate = fs.querySelector('.film-gate');
+            var img = gate.querySelector('.film-image');
+            var halo = gate.querySelector('.film-halo');
+            fs.classList.add('visible', 'film-live');
+            gate.classList.add('filming');
+            img.src = 'images/frame/frame-03.jpg';
+            halo.src = 'images/frame/frame-03.jpg';
+            img.onload = function () { log('FRAME COMPOSED'); };
+            setTimeout(function () { log('FRAME COMPOSED (t/o)'); }, 3000);
+        } catch (e) { log('RUN ERROR: ' + e.message); }
+    }
+})();
+</script>
