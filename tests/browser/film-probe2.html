@@ -1,0 +1,57 @@
+<!doctype html>
+<!-- Film probe: real page in srcdoc iframe (SW disabled, error hook),
+     preloads frames, then runs the projector sequence directly. -->
+<meta charset="utf-8">
+<title>film-probe2</title>
+<body>
+<iframe id="f" style="width:1100px;height:660px"></iframe>
+<pre id="out">running…</pre>
+<script>
+(function () {
+    var out = document.getElementById('out');
+    function log(s) { out.textContent += '\n' + s; }
+    var f = document.getElementById('f');
+
+    try { localStorage.removeItem('echo_state'); } catch (e) {}
+
+    var inject =
+        '<script>' +
+        'window.__errs=[];' +
+        'window.onerror=function(m,s,l,c){window.__errs.push(m+" @"+l+":"+c);};' +
+        'var nosw={register:function(){return new Promise(function(){});},addEventListener:function(){},controller:null};' +
+        'try{Object.defineProperty(navigator,"serviceWorker",{value:nosw,configurable:true});}catch(e){}' +
+        '<\/script>';
+
+    fetch('/index.html').then(function (r) { return r.text(); }).then(function (html) {
+        html = html.replace('<head>', '<head><base href="/">');
+        html = html.replace('<script src="chapters.js"><\/script>', inject + '<script src="chapters.js"><\/script>');
+        f.srcdoc = html;
+    });
+
+    var poll = setInterval(function () {
+        try {
+            if (f.contentWindow && f.contentWindow.__errs &&
+                typeof f.contentWindow.preloadFilmFrames === 'function') {
+                clearInterval(poll);
+                setTimeout(run, 800);
+            }
+        } catch (e) {}
+    }, 300);
+
+    function run() {
+        try {
+            var w = f.contentWindow;
+            if (w.__errs.length) log('page errors: ' + w.__errs.join(' || '));
+            w.preloadFilmFrames().then(function (ok) {
+                log('preload ok=' + ok);
+                w.runFilmSequence();
+                log('sequence started');
+                setTimeout(function () {
+                    log('errors at end: ' + (w.__errs.length ? w.__errs.join(' || ') : 'none'));
+                    log('DONE');
+                }, 13000);
+            });
+        } catch (e) { log('RUN ERROR: ' + e.message); }
+    }
+})();
+</script>

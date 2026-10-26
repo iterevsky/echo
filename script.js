@@ -1892,7 +1892,8 @@ function runFilmSequence() {
     const setFrame = (i) => {
         const src = filmFrameSrc(i);
         filmImage.src = src;
-        if (filmHalo) filmHalo.src = src;
+        // gate ghosting: the halo follows the frame change a beat late
+        if (filmHalo) later(() => { filmHalo.src = src; }, 110);
         filmImage.style.setProperty('--frame-hue', (Math.random() * 10 - 8).toFixed(1) + 'deg');
         filmImage.style.setProperty('--frame-bright', (Math.random() * 0.05 - 0.02).toFixed(3));
     };
