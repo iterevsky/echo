@@ -1,0 +1,253 @@
+<!doctype html>
+<!-- EFFECTS LAB (development only): replays each effect independently in a
+     srcdoc iframe running the REAL index.html + script.js.
+     - Cover: beckon replay on demand (production timeline mirrored).
+     - Contents: resets ONLY seenContentsBoot (progress preserved).
+     - Film: replay after all 7 frames are preloaded/decoded.
+     - Voice: short 1-line and long (>=6 lines) synthetic passages.
+     - Afterglow: genuine first crossing of 85% via the real scroll path.
+     Records active classes + computed animationName/translate/transform/
+     filter/opacity. Query: ?suite=cover|boot|film|voice|afterglow
+     &rm=1 (reduced-motion stub) &ret=1 (returning-reader storage) -->
+<meta charset="utf-8">
+<title>effects-lab</title>
+<body>
+<div style="display:flex;gap:12px;align-items:flex-start">
+  <div>
+    <button onclick="location.search='?suite=cover'">cover</button>
+    <button onclick="location.search='?suite=boot'">boot</button>
+    <button onclick="location.search='?suite=film'">film</button>
+    <button onclick="location.search='?suite=voice'">voice</button>
+    <button onclick="location.search='?suite=afterglow'">afterglow</button>
+    <div><a href="?suite=cover&rm=1">cover + reduced motion</a></div>
+    <div><a href="?suite=cover&ret=1">cover + returning reader</a></div>
+  </div>
+  <iframe id="f" style="width:1100px;height:640px;flex:1"></iframe>
+</div>
+<pre id="out">running…</pre>
+<script>
+(function () {
+    var p = new URLSearchParams(location.search);
+    var suite = p.get('suite') || 'cover';
+    var RM = p.get('rm') === '1';
+    var out = document.getElementById('out');
+    function log(s) { out.textContent += '\n' + s; }
+    var f = document.getElementById('f');
+
+    // fresh or returning storage
+    try {
+        localStorage.removeItem('echo_state');
+        localStorage.removeItem('echo_state_backup');
+        if (p.get('ret') === '1') {
+            localStorage.setItem('echo_state', JSON.stringify({
+                lastChapter: 0, lastVisit: '2026-10-25T10:00:00.000Z',
+                readPos: { 0: 0.4 }
+            }));
+        }
+    } catch (e) {}
+
+    var inject =
+        '<script>' +
+        'window.__errs=[];' +
+        'window.onerror=function(m,s,l,c){window.__errs.push(m+" @"+l+":"+c);};' +
+        'var nosw={register:function(){return new Promise(function(){});},addEventListener:function(){},controller:null};' +
+        'try{Object.defineProperty(navigator,"serviceWorker",{value:nosw,configurable:true});}catch(e){}' +
+        'try{HTMLImageElement.prototype.decode=function(){return Promise.resolve();};}catch(e){}' +
+        (RM ?
+        'var om=window.matchMedia;' +
+        'window.matchMedia=function(q){' +
+        '  if(q.indexOf("prefers-reduced-motion")!==-1){' +
+        '    return {matches:true,media:q,addEventListener:function(){},removeEventListener:function(){},addListener:function(){},removeListener:function(){}};' +
+        '  } return om(q);};' +
+        'var rmstyle=document.createElement("style");' +
+        'rmstyle.textContent="#cover-screen.beckon-play img,#cover-screen.beckon-settle img,#cover-screen.beckon-play .cover-ripples i,.crt-noise,.crt-rolling,.contents-item.revealed,.contents-item.electric-glitch,.voice-shock-prev,.voice-shock-next{animation:none !important;}";' +
+        'document.addEventListener("DOMContentLoaded",function(){document.head.appendChild(rmstyle);});' : '') +
+        '<\/script>';
+
+    fetch('/index.html').then(function (r) { return r.text(); }).then(function (html) {
+        html = html.replace('<head>', '<head><base href="/">');
+        html = html.replace('<script src="chapters.js"><\/script>', inject + '<script src="chapters.js"><\/script>');
+        f.srcdoc = html;
+    });
+
+    var poll = setInterval(function () {
+        try {
+            if (f.contentWindow && f.contentWindow.__errs &&
+                typeof f.contentWindow.openChapter === 'function') {
+                clearInterval(poll);
+                setTimeout(start, 600);
+            }
+        } catch (e) {}
+    }, 300);
+
+    function W() { return f.contentWindow; }
+    function D() { return f.contentDocument; }
+    function errs() { return W().__errs.length ? 'ERRORS: ' + W().__errs.join(' || ') : 'no errors'; }
+
+    function report(el, extra) {
+        if (!el) { log('  (element missing)'); return; }
+        var cs = getComputedStyle(el);
+        log('  animationName=' + cs.animationName);
+        log('  translate=' + cs.translate + ' transform=' + cs.transform);
+        log('  filter=' + cs.filter);
+        log('  opacity=' + cs.opacity + (extra || ''));
+    }
+    function classes(el) { log('  classes: "' + el.className + '"'); }
+
+    function start() {
+        log('SUITE=' + suite + ' RM=' + RM + ' ret=' + p.get('ret') +
+            ' DPR=' + window.devicePixelRatio + ' iframeWidth=' + f.clientWidth);
+        if (W().__errs.length) log(errs());
+        ({ cover: suiteCover, boot: suiteBoot, film: suiteFilm,
+           voice: suiteVoice, afterglow: suiteAfterglow })[suite]();
+    }
+
+    // ---- COVER: replay the beckon on the production timeline ----
+    function coverReplay() {
+        var cover = D().getElementById('cover-screen');
+        cover.classList.remove('beckon-play', 'beckon-settle');
+        void cover.offsetWidth;
+        // production: 1s stillness, then beckon-play for 13s, then settle
+        setTimeout(function () {
+            cover.classList.add('beckon-play');
+            setTimeout(function () {
+                cover.classList.remove('beckon-play');
+                cover.classList.add('beckon-settle');
+            }, 13000);
+        }, 1000);
+    }
+
+    function suiteCover() {
+        if (RM) {
+            // production under reduce: the IIFE never arms the beckon
+            var cover0 = D().getElementById('cover-screen');
+            log('before replay (JS early return):');
+            classes(cover0);
+            coverReplay();
+            setTimeout(function () {
+                var cover = D().getElementById('cover-screen');
+                classes(cover);
+                var img = cover.querySelector('img');
+                log('with forced replay: animationName must be none (CSS guard)');
+                report(img);
+                log('DONE');
+            }, 2200);
+            return;
+        }
+        coverReplay();
+        var times = [1.0, 2.1, 5.1, 8.3, 9.9, 11.0, 14.1];
+        times.forEach(function (t) {
+            setTimeout(function () {
+                log('t=' + t + 's:');
+                classes(D().getElementById('cover-screen'));
+                report(D().querySelector('#cover-screen img'));
+            }, t * 1000);
+        });
+        setTimeout(function () { log(errs()); log('DONE'); }, 15000);
+    }
+
+    // ---- CONTENTS: reset only seenContentsBoot, then run the boot ----
+    function suiteBoot() {
+        var w = W(), d = D();
+        var s = w.loadState();
+        delete s.seenContentsBoot;                       // only this field
+        w.localStorage.setItem('echo_state', JSON.stringify(s));
+        var progressBefore = JSON.stringify(s.readPos || {});
+        w.showContents();
+        setTimeout(function () {
+            var cs = d.getElementById('contents-screen');
+            log('after showContents:');
+            classes(cs);
+            var s2 = w.loadState();
+            log('progress preserved: ' + (JSON.stringify(s2.readPos || {}) === progressBefore));
+            log('seenContentsBoot now: ' + !!s2.seenContentsBoot);
+            setTimeout(function () {
+                w.showContents();                        // must not re-boot
+                setTimeout(function () {
+                    log('second entry:');
+                    classes(cs);
+                    log(errs()); log('DONE');
+                }, 500);
+            }, 8000);
+        }, 2000);
+    }
+
+    // ---- FILM: replay with all frames already decoded ----
+    function suiteFilm() {
+        var w = W();
+        w.preloadFilmFrames().then(function (ok) {
+            log('all frames decoded: ' + ok);
+            w.runFilmSequence();
+            setTimeout(function () {
+                var fs = D().getElementById('film-screen');
+                classes(fs);
+                classes(fs.querySelector('.film-gate'));
+                report(fs.querySelector('.film-image'));
+                log('halo (bright-pass expected):');
+                report(fs.querySelector('.film-halo'));
+                setTimeout(function () { log(errs()); log('DONE'); }, 4000);
+            }, 2600);
+        });
+    }
+
+    // ---- VOICE: short + long passages ----
+    function suiteVoice() {
+        var w = W(), d = D();
+        var wrap = d.createElement('div');
+        wrap.style.cssText = 'width:320px;font-size:18px';
+        d.body.appendChild(wrap);
+        var shortEl = d.createElement('span');
+        shortEl.className = 'voice-glitch';
+        shortEl.dataset.voiceMode = 'aggressive';
+        shortEl.textContent = 'Short passage.';
+        var longEl = d.createElement('span');
+        longEl.className = 'voice-glitch';
+        longEl.dataset.voiceMode = 'standard';
+        longEl.textContent = 'Long passage line one. Line two follows here. ' +
+            'Third line keeps the thought. Fourth line stays readable. ' +
+            'Fifth line is calm again. Sixth line ends the passage. ' +
+            'Seventh line only wraps the text.';
+        wrap.appendChild(shortEl);
+        wrap.appendChild(longEl);
+        w.generateGlitchAnimation(shortEl);
+        w.generateGlitchAnimation(longEl);
+        setTimeout(function () {
+            log('short passage:');
+            report(shortEl.querySelector('.voice-base'));
+            log('long passage:');
+            report(longEl.querySelector('.voice-base'));
+        }, 600);
+        setTimeout(function () {
+            log('after run: keyframes left=' + d.querySelectorAll('style[data-voice-glitch]').length);
+            log('short animation=' + shortEl.querySelector('.voice-base').style.animation +
+                ' long animation=' + longEl.querySelector('.voice-base').style.animation);
+            log(errs()); log('DONE');
+        }, 2800);
+    }
+
+    // ---- AFTERGLOW: genuine first crossing of 85% ----
+    function suiteAfterglow() {
+        var w = W(), d = D();
+        w.openChapter(0);
+        setTimeout(function () {
+            var cs = d.getElementById('chapter-screen');
+            cs.scrollTop = (cs.scrollHeight - cs.clientHeight) * 0.92;
+            cs.dispatchEvent(new w.Event('scroll'));
+            setTimeout(function () {
+                w.doExitChapterToContents();
+                setTimeout(function () {
+                    var prog = d.querySelector('.contents-progress');
+                    log('counter: ' + prog.textContent);
+                    classes(prog);
+                    report(prog);
+                    setTimeout(function () {
+                        log('after pulse:');
+                        classes(prog);
+                        log(errs()); log('DONE');
+                    }, 2200);
+                }, 800);
+            }, 900);
+        }, 900);
+    }
+})();
+</script>
