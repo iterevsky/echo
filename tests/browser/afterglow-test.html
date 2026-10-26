@@ -1,0 +1,78 @@
+<!doctype html>
+<!-- Read-afterglow test: genuine read crossing -> counter increments and a
+     short read-pulse class appears; no pulse on later plain re-entry. -->
+<meta charset="utf-8">
+<title>afterglow-test</title>
+<body>
+<iframe id="f" style="width:1000px;height:500px"></iframe>
+<pre id="out">running…</pre>
+<script>
+(function () {
+    var out = document.getElementById('out');
+    function log(s) { out.textContent += '\n' + s; }
+    var f = document.getElementById('f');
+    try { localStorage.removeItem('echo_state'); } catch (e) {}
+
+    var inject =
+        '<script>' +
+        'window.__errs=[];' +
+        'window.onerror=function(m,s,l,c){window.__errs.push(m+" @"+l+":"+c);};' +
+        'var nosw={register:function(){return new Promise(function(){});},addEventListener:function(){},controller:null};' +
+        'try{Object.defineProperty(navigator,"serviceWorker",{value:nosw,configurable:true});}catch(e){}' +
+        '<\/script>';
+
+    fetch('/index.html').then(function (r) { return r.text(); }).then(function (html) {
+        html = html.replace('<head>', '<head><base href="/">');
+        html = html.replace('<script src="chapters.js"><\/script>', inject + '<script src="chapters.js"><\/script>');
+        f.srcdoc = html;
+    });
+
+    var poll = setInterval(function () {
+        try {
+            if (f.contentWindow && f.contentWindow.__errs &&
+                typeof f.contentWindow.openChapter === 'function') {
+                clearInterval(poll);
+                setTimeout(run, 800);
+            }
+        } catch (e) {}
+    }, 300);
+
+    function run() {
+        try { runInner(); } catch (e) { log('RUN ERROR: ' + e.message); }
+    }
+
+    function runInner() {
+        var w = f.contentWindow, d = f.contentDocument;
+        var fails = 0;
+        function check(name, cond) { log((cond ? 'PASS  ' : 'FAIL  ') + name); if (!cond) fails++; }
+        if (w.__errs.length) log('page errors: ' + w.__errs.join(' || '));
+
+        w.openChapter(0);
+        setTimeout(function () {
+            var cs = d.getElementById('chapter-screen');
+            var total = cs.scrollHeight - cs.clientHeight;
+            cs.scrollTop = total * 0.92;
+            cs.dispatchEvent(new w.Event('scroll'));
+            setTimeout(function () {
+                w.doExitChapterToContents();
+                setTimeout(function () {
+                    var prog = d.querySelector('.contents-progress');
+                    check('counter incremented', prog.textContent.indexOf('Прочитано 1 из 77') !== -1);
+                    check('read-pulse active', prog.classList.contains('read-pulse'));
+                    setTimeout(function () {
+                        check('pulse removed after run', !prog.classList.contains('read-pulse'));
+                        w.doExitChapterToContents();
+                        setTimeout(function () {
+                            check('no pulse on plain re-entry', !prog.classList.contains('read-pulse'));
+                            if (new URLSearchParams(location.search).get('holdpulse')) {
+                                prog.classList.add('read-pulse');  // hold for screenshot
+                            }
+                            log(fails ? 'RESULT: FAILED (' + fails + ')' : 'RESULT: OK');
+                        }, 700);
+                    }, 2200);
+                }, 800);
+            }, 900);
+        }, 900);
+    }
+})();
+</script>
