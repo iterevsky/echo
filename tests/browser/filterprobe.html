@@ -1,0 +1,28 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>filterprobe</title>
+<style>
+div.t { width:100px; height:60px; margin:6px; }
+#x { background:#123456; filter: contrast(1.05) brightness(0.95); }
+#y { background:#654321; }
+#z { background:#333333; }
+@keyframes btest { 0% { filter: brightness(0.5); } 100% { filter: brightness(1.5); } }
+@keyframes otest { 0% { opacity: 0; } 100% { opacity: 1; } }
+#x { animation: btest 4s linear forwards; }
+#y { animation: btest 4s linear forwards; }
+#z { animation: otest 4s linear forwards; }
+</style>
+<body>
+<div id="x" class="t"></div>
+<div id="y" class="t"></div>
+<div id="z" class="t"></div>
+<pre id="out"></pre>
+<script>
+setInterval(function () {
+    document.getElementById('out').textContent =
+        'x=' + getComputedStyle(document.getElementById('x')).filter +
+        ' | y=' + getComputedStyle(document.getElementById('y')).filter +
+        ' | z=' + getComputedStyle(document.getElementById('z')).opacity +
+        ' @' + (performance.now() / 1000).toFixed(1) + 's';
+}, 500);
+</script>
