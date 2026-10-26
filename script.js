@@ -1593,8 +1593,8 @@ function initProgress() {
             <div class="progress-title" id="progress-title">Вы остановились на главе ${chapter.number}</div>
             <div class="progress-subtitle">${chapter.title}</div>
             <div class="progress-actions">
-                <span class="progress-continue" role="button" tabindex="0">Продолжить</span>
-                <span class="progress-restart" role="button" tabindex="0">Начать сначала</span>
+                <button type="button" class="progress-continue"><span class="pa-label">Продолжить</span><span class="pa-arrow" aria-hidden="true">→</span></button>
+                <button type="button" class="progress-restart">Начать сначала</button>
             </div>
         </div>
     `;
@@ -1602,16 +1602,6 @@ function initProgress() {
     overlay.classList.add('visible');
     contentsScreen.inert = true;   // dimmed contents stays out of the Tab order
     overlay.querySelector('.progress-continue').focus();
-
-    /* role=button: Enter/Space активируют */
-    overlay.querySelectorAll('[role="button"]').forEach((el) => {
-        el.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                el.click();
-            }
-        });
-    });
 
     overlay.querySelector('.progress-continue').addEventListener('click', () => {
         overlay.classList.remove('visible');
