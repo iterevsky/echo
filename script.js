@@ -471,6 +471,16 @@ contentsScreen.addEventListener('click', (e) => {
 });
 
 // === КЛАВИАТУРА ===
+/* image gestures: cancel dragstart and contextmenu on images and their
+   dedicated containers only — not site-wide, not text selection */
+document.addEventListener('dragstart', (e) => {
+    if (e.target && e.target.tagName === 'IMG') e.preventDefault();
+});
+document.addEventListener('contextmenu', (e) => {
+    if (e.target && e.target.closest('img, .cover-stage, .film-gate, #photo-container')) {
+        e.preventDefault();
+    }
+});
 document.addEventListener('keydown', (e) => {
     // сначала — закрытие оверлеев в порядке приоритета, независимо от видимого экрана
     if (e.key === 'Escape') {

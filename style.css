@@ -2554,3 +2554,14 @@ html, body {
 @media (prefers-reduced-motion: reduce) {
   .contents-progress.read-pulse { animation: none; }
 }
+
+/* image gestures: no drag/save affordances on displayed images
+   (clicks pass through to the document/viewer close controls) */
+#cover-screen img,
+#film-screen img,
+#photo-overlay img {
+    pointer-events: none;
+    user-select: none;
+    -webkit-user-drag: none;
+    -webkit-touch-callout: none;
+}
