@@ -1,0 +1,76 @@
+<!doctype html>
+<!-- Voice choreography test: drives the real generateGlitchAnimation for all
+     three modes in the real page (srcdoc iframe, SW disabled, error hook).
+     Asserts: keyframes injected, cleaned after the run, final text stable,
+     no lingering animations, xray-flash removed. -->
+<meta charset="utf-8">
+<title>voice-test</title>
+<body>
+<iframe id="f" style="width:900px;height:300px"></iframe>
+<pre id="out">running…</pre>
+<script>
+(function () {
+    var out = document.getElementById('out');
+    function log(s) { out.textContent += '\n' + s; }
+    var f = document.getElementById('f');
+
+    var inject =
+        '<script>' +
+        'window.__errs=[];' +
+        'window.onerror=function(m,s,l,c){window.__errs.push(m+" @"+l+":"+c);};' +
+        'var nosw={register:function(){return new Promise(function(){});},addEventListener:function(){},controller:null};' +
+        'try{Object.defineProperty(navigator,"serviceWorker",{value:nosw,configurable:true});}catch(e){}' +
+        '<\/script>';
+
+    fetch('/index.html').then(function (r) { return r.text(); }).then(function (html) {
+        html = html.replace('<head>', '<head><base href="/">');
+        html = html.replace('<script src="chapters.js"><\/script>', inject + '<script src="chapters.js"><\/script>');
+        f.srcdoc = html;
+    });
+
+    var poll = setInterval(function () {
+        try {
+            if (f.contentWindow && f.contentWindow.__errs &&
+                typeof f.contentWindow.generateGlitchAnimation === 'function') {
+                clearInterval(poll);
+                setTimeout(run, 800);
+            }
+        } catch (e) {}
+    }, 300);
+
+    function run() {
+        try { runInner(); } catch (e) { log('RUN ERROR: ' + e.message); }
+    }
+
+    function runInner() {
+        var w = f.contentWindow, d = f.contentDocument;
+        var fails = 0;
+        function check(name, cond) { log((cond ? 'PASS  ' : 'FAIL  ') + name); if (!cond) fails++; }
+        if (w.__errs.length) log('page errors: ' + w.__errs.join(' || '));
+
+        var els = [];
+        ['aggressive', 'standard', 'whisper'].forEach(function (mode) {
+            var el = d.createElement('span');
+            el.className = 'voice-glitch';
+            el.dataset.voiceMode = mode;
+            el.textContent = 'probe ' + mode;
+            d.body.appendChild(el);
+            els.push(el);
+            w.generateGlitchAnimation(el);
+        });
+        check('keyframes injected', d.querySelectorAll('style[data-voice-glitch]').length >= 2);
+        setTimeout(function () {
+            check('keyframes cleaned after run', d.querySelectorAll('style[data-voice-glitch]').length === 0);
+            check('no xray-flash left', !d.getElementById('chapter-screen').classList.contains('xray-flash'));
+            var stable = els.every(function (el) {
+                var base = el.querySelector('.voice-base');
+                return base && base.style.animation === '';
+            });
+            check('final text stable (no animation left)', stable);
+            var texts = els.map(function (el) { return el.querySelector('.voice-base').textContent; }).join('|');
+            check('final text intact', texts === 'probe aggressive|probe standard|probe whisper');
+            log(fails ? 'RESULT: FAILED (' + fails + ')' : 'RESULT: OK');
+        }, 2600);
+    }
+})();
+</script>
