@@ -433,6 +433,10 @@ function applyInitialRoute() {
         }
     } catch (e) {}
 
+    // decision is made: remove the pending state now so the applied route
+    // (including the progress overlay's focused button) is actually visible
+    document.documentElement.classList.remove('routing-pending');
+
     if (swRoute && typeof swRoute.chapter === 'number' &&
         chapters[swRoute.chapter] && !chapters[swRoute.chapter].empty) {
         hideIntroScreens();
@@ -440,7 +444,6 @@ function applyInitialRoute() {
     } else if (!handleDeepLink() && !handleHashLink()) {
         initProgress();
     }
-    document.documentElement.classList.remove('routing-pending');
 }
 applyInitialRoute();
 
