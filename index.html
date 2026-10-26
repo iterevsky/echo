@@ -22,6 +22,17 @@
     <meta name="twitter:card" content="summary_large_image">
     <title>ЭХО</title>
 
+    <script>document.documentElement.classList.add('routing-pending');</script>
+    <style>
+    html.routing-pending #cover-screen,
+    html.routing-pending #text-screen,
+    html.routing-pending #final-screen,
+    html.routing-pending #film-screen,
+    html.routing-pending #title-screen,
+    html.routing-pending #contents-screen,
+    html.routing-pending #chapter-screen,
+    html.routing-pending #progress-overlay { visibility: hidden !important; }
+    </style>
     <link rel="stylesheet" href="style.css">
 <style>
 .install-overlay.visible { opacity: 1 !important; visibility: visible !important; pointer-events: auto !important; transition: opacity 0.4s ease, visibility 0s !important; }

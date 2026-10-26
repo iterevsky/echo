@@ -421,7 +421,28 @@ function updateContentsMemory() {
 }
 updateContentsMemory();
 
-if (!handleDeepLink() && !handleHashLink()) initProgress();
+/* single initial-route decision: SW-reload flag first, then deep/hash links,
+   then saved-progress overlay, else the cover. Nothing paints before this. */
+function applyInitialRoute() {
+    let swRoute = null;
+    try {
+        const raw = sessionStorage.getItem('echo_sw_route');
+        if (raw) {
+            swRoute = JSON.parse(raw);
+            sessionStorage.removeItem('echo_sw_route');   // one-shot, consumed now
+        }
+    } catch (e) {}
+
+    if (swRoute && typeof swRoute.chapter === 'number' &&
+        chapters[swRoute.chapter] && !chapters[swRoute.chapter].empty) {
+        hideIntroScreens();
+        openChapter(swRoute.chapter, { restore: !!swRoute.restore });
+    } else if (!handleDeepLink() && !handleHashLink()) {
+        initProgress();
+    }
+    document.documentElement.classList.remove('routing-pending');
+}
+applyInitialRoute();
 
 // === ОБРАБОТЧИКИ НАВИГАЦИИ ВНУТРИ ГЛАВЫ ===
 document.querySelector('.nav-prev').addEventListener('click', () => {
@@ -2356,7 +2377,16 @@ if ('serviceWorker' in navigator) {
         if (swReloaded) return;                    // at most one reload per page
         if (Date.now() - swLastReloadTs < 15000) return; // loop guard
         swReloaded = true;
-        try { sessionStorage.setItem('echo_sw_reload_ts', String(Date.now())); } catch (e) {}
+        try {
+            const openChapterState = history.state && history.state.echoChapter !== undefined;
+            if (openChapterState) {
+                // the chapter route is active (visible or opening): preserve it
+                sessionStorage.setItem('echo_sw_route', JSON.stringify({
+                    chapter: history.state.echoChapter, restore: true
+                }));
+            }
+            sessionStorage.setItem('echo_sw_reload_ts', String(Date.now()));
+        } catch (e) {}
         location.reload();
     });
 
