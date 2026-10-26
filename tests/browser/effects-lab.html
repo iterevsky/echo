@@ -137,14 +137,14 @@
         var cover = D().getElementById('cover-screen');
         cover.classList.remove('beckon-play', 'beckon-settle');
         void cover.offsetWidth;
-        // production: 1s stillness, then beckon-play for 14s, then settle
+        // production: 600ms stillness, then beckon-play for 7.5s, then settle
         setTimeout(function () {
             cover.classList.add('beckon-play');
             setTimeout(function () {
                 cover.classList.remove('beckon-play');
                 cover.classList.add('beckon-settle');
-            }, 14000);
-        }, 1000);
+            }, 7500);
+        }, 600);
     }
 
     function suiteCover() {
@@ -165,7 +165,7 @@
             return;
         }
         coverReplay();
-        var times = [1.0, 2.1, 5.1, 8.3, 9.9, 11.0, 11.8, 14.1];
+        var times = [0.6, 1.5, 2.8, 4.2, 5.7, 6.2, 7.5, 8.5];
         times.forEach(function (t) {
             setTimeout(function () {
                 log('t=' + t + 's:');
@@ -174,12 +174,7 @@
                 report(D().querySelector('#cover-screen img'));
             }, t * 1000);
         });
-        setTimeout(function () {
-            log('t=15.5s (settle expected):');
-            classes(D().getElementById('cover-screen'));
-            report(D().querySelector('#cover-screen img'));
-        }, 15500);
-        setTimeout(function () { log(errs()); log('DONE'); }, 16000);
+        setTimeout(function () { log(errs()); log('DONE'); }, 9500);
     }
 
     // ---- CONTENTS: reset only seenContentsBoot, then run the boot ----

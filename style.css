@@ -2322,7 +2322,7 @@ html, body {
   height: 42vmin;
   margin: -21vmin 0 0 -21vmin;
   border-radius: 50%;
-  border: 1px solid rgba(0, 168, 232, 0.38);
+  border: 1px solid rgba(0, 168, 232, 0.5);
   opacity: 0;
 }
 
@@ -2330,7 +2330,7 @@ html, body {
    чтобы включение зова не давало скачка яркости */
 @keyframes beckon-breath {
   0%, 100% { transform: scale(1); filter: contrast(1.05) brightness(0.95); }
-  50%      { transform: scale(1.006); filter: contrast(1.05) brightness(0.985); }
+  50%      { transform: scale(1.004); filter: contrast(1.05) brightness(0.99); }
 }
 
 /* дрожь — отдельным свойством translate, чтобы не конфликтовать
@@ -2390,21 +2390,21 @@ html, body {
     }
 }
 
-/* === BECKON CHOREOGRAPHY: 1s stillness, one authored 14s run, then settle ===
-   Discrete irregular events; stillness between them makes each one readable.
-   Tremor uses `translate`, run-scale uses `scale` (no transform fights). */
+/* === BECKON CHOREOGRAPHY: 600ms stillness, one authored 7.5s run, then settle ===
+   Four irregular events; stillness between them makes each one readable.
+   Wrapper = displacement, image = scale/filter (no transform fights). */
 .cover-tremor {
   display: inline-flex;   /* exactly the image's box: no layout shift */
 }
 #cover-screen.beckon-play .cover-tremor {
-  animation: beckon-tremor 14s linear forwards;
+  animation: beckon-tremor 7.5s linear forwards;
 }
 #cover-screen.beckon-play img {
-  animation: beckon-glow 14s ease-in-out forwards,
-             beckon-run-scale 14s ease-in-out forwards;
+  animation: beckon-glow 7.5s ease-in-out forwards,
+             beckon-run-scale 7.5s ease-in-out forwards;
 }
 #cover-screen.beckon-play .cover-ripples i {
-  animation: beckon-ripple-once 14s cubic-bezier(0.2, 0.5, 0.3, 1) forwards;
+  animation: beckon-ripple-once 7.5s cubic-bezier(0.2, 0.5, 0.3, 1) forwards;
 }
 #cover-screen.beckon-play .cover-ripples i:last-child {
   animation-name: beckon-ripple-second;
@@ -2412,55 +2412,51 @@ html, body {
 }
 
 #cover-screen.beckon-settle img {
-  animation: beckon-breath 6s ease-in-out infinite;
+  animation: beckon-breath 7s ease-in-out infinite;
 }
 
-/* events at 2.7 / 3.9 / 5.4 / 7.0 / 8.8 / 10.8 s of the run;
-   strongest events late; 11.4-14 s is stillness */
+/* events at 1.2 / 2.4 / 4.0 / 5.6 s of the run; strongest last; then stillness */
 @keyframes beckon-tremor {
-  0%, 19%        { transform: translateX(0px) translateY(0px); }
-  19.29%, 19.79% { transform: translateX(0.8px) translateY(-0.4px); }   /* 2.7 s, hold 70 ms */
-  20.43%, 27.5%  { transform: translateX(0px) translateY(0px); }            /* return over 90 ms */
-  27.86%, 28.36% { transform: translateX(-1px) translateY(0.5px); }     /* 3.9 s, hold 70 ms */
-  29%, 38%       { transform: translateX(0px) translateY(0px); }            /* return over 90 ms */
-  38.57%, 39.14% { transform: translateX(1.2px) translateY(-0.6px); }   /* 5.4 s, hold 80 ms */
-  39.86%, 49%    { transform: translateX(0px) translateY(0px); }            /* return over 100 ms */
-  50%, 50.64%    { transform: translateX(-1.4px) translateY(0.8px); }   /* 7.0 s, hold 90 ms */
-  51.5%, 62%     { transform: translateX(0px) translateY(0px); }            /* return over 120 ms */
-  62.86%         { transform: translateX(1.6px) translateY(-0.8px); }   /* 8.8 s */
-  63.57%, 64%    { transform: translateX(-0.8px) translateY(0.4px); }   /* +100 ms answer, 60 ms */
-  66.43%, 76.5%  { transform: translateX(0px) translateY(0px); }            /* settle by 9.3 s */
-  77.14%         { transform: translateX(-1.8px) translateY(0.9px); }   /* 10.8 s */
-  79.29%, 80.5%  { transform: translateX(1px) translateY(-0.5px); }     /* 11.1 s answer */
-  81.43%, 100%   { transform: translateX(0px) translateY(0px); }            /* still by 11.4 s */
+  0%, 15.5%      { transform: translateX(0px) translateY(0px); }
+  16%, 16.8%     { transform: translateX(1.6px) translateY(-0.8px); }  /* 1.2 s, hold 60 ms */
+  18.4%, 31.5%   { transform: translateX(0px) translateY(0px); }       /* return over 120 ms */
+  32%, 32.93%    { transform: translateX(-2.4px) translateY(1.2px); }  /* 2.4 s, hold 70 ms */
+  34%, 36%       { transform: translateX(1.2px) translateY(-0.5px); }  /* 2.55 s answer */
+  37.33%, 52.5%  { transform: translateX(0px) translateY(0px); }       /* still by 2.8 s */
+  53.33%, 54.4%  { transform: translateX(3.2px) translateY(-1.6px); }  /* 4.0 s, hold 80 ms */
+  55.33%, 58%    { transform: translateX(-1.6px) translateY(0.8px); }  /* 4.15 s answer */
+  60%, 73.5%     { transform: translateX(0px) translateY(0px); }       /* return by 4.5 s */
+  74.67%, 75.87% { transform: translateX(-4.2px) translateY(2px); }    /* 5.6 s, hold 90 ms */
+  76.8%, 79%     { transform: translateX(2.2px) translateY(-1px); }    /* answer, 70 ms */
+  81.33%, 100%   { transform: translateX(0px) translateY(0px); }       /* zero by 6.1 s */
 }
 
-/* illumination envelope: 0.95 base, crest at 6 s, dip at 10.8 s */
+/* illumination: base 0.95, crest 1.06 at 2.8 s, failure dip 0.72 at 5.6 s */
 @keyframes beckon-glow {
   0%     { filter: contrast(1.05) brightness(0.95); }
-  21.43% { filter: contrast(1.05) brightness(0.975); }
-  42.86% { filter: contrast(1.05) brightness(1); }
-  54.29% { filter: contrast(1.05) brightness(0.97); }
-  77.14% { filter: contrast(1.05) brightness(0.86); }
-  82.86% { filter: contrast(1.05) brightness(0.89); }
-  90%, 100% { filter: contrast(1.05) brightness(0.95); }
+  37.33% { filter: contrast(1.05) brightness(1.06); }
+  56%    { filter: contrast(1.05) brightness(0.94); }
+  74.67% { filter: contrast(1.05) brightness(0.72); }
+  81.33% { filter: contrast(1.05) brightness(0.82); }
+  96%, 100% { filter: contrast(1.05) brightness(0.95); }
 }
 
-/* slight breathing scale during the run only */
+/* slow scale envelope, not a zoom: 1.000 -> 1.008 by 4.5 s, 1.003 by 7.5 s */
 @keyframes beckon-run-scale {
-  0%, 100% { scale: 1; }
-  50%      { scale: 1.004; }
+  0%   { scale: 1; }
+  60%  { scale: 1.008; }
+  100% { scale: 1.003; }
 }
 
-/* water answer: starts ~11.7 s, 2.4 s, scale 0.25 -> 1.65, max opacity 0.35 */
+/* water answer: starts ~5.9 s, 2 s, scale 0.25 -> 1.65, max opacity 0.50 */
 @keyframes beckon-ripple-once {
-  0%, 83.5% { transform: scale(0.25); opacity: 0; }
-  84.5%     { opacity: 0.35; }
+  0%, 78.6% { transform: scale(0.25); opacity: 0; }
+  80%       { opacity: 0.5; }
   100%      { transform: scale(1.65); opacity: 0; }
 }
 @keyframes beckon-ripple-second {
-  0%, 83.5% { transform: scale(0.25); opacity: 0; }
-  84.5%     { opacity: 0.22; }
+  0%, 78.6% { transform: scale(0.25); opacity: 0; }
+  80%       { opacity: 0.3; }
   100%      { transform: scale(1.65); opacity: 0; }
 }
 

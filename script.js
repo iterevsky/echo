@@ -2608,7 +2608,7 @@ if ('serviceWorker' in navigator) {
 (function coverBeckon() {
     if (!coverScreen) return;
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    /* authored single run: 1s stillness, then a 13s choreography
+    /* authored single run: 600ms stillness, then a 7.5s choreography
        (beckon-play), then faint breathing (beckon-settle) */
     let settleTimer = null;
     const startTimer = setTimeout(() => {
@@ -2617,8 +2617,8 @@ if ('serviceWorker' in navigator) {
         settleTimer = setTimeout(() => {
             coverScreen.classList.remove('beckon-play');
             if (!isStarted) coverScreen.classList.add('beckon-settle');
-        }, 14000);
-    }, 1000);
+        }, 7500);
+    }, 600);
     ['touchstart', 'mousedown', 'keydown'].forEach((ev) => {
         document.addEventListener(ev, () => {
             clearTimeout(startTimer);
