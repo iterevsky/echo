@@ -1826,6 +1826,7 @@ const filmGate = filmScreen ? filmScreen.querySelector('.film-gate') : null;
 const filmImage = filmGate ? filmGate.querySelector('.film-image') : null;
 const filmGrain = filmScreen ? filmScreen.querySelector('.film-grain') : null;
 const filmHalo = filmGate ? filmGate.querySelector('.film-halo') : null;
+const filmHint = document.getElementById('film-hint');
 
 let filmReady = false;
 let filmRunning = false;
@@ -1924,9 +1925,17 @@ if (!isStarted) {
     }
 }
 
+function showFilmHint() {
+    if (!filmHint) return;
+    filmHint.classList.remove('visible');
+    void filmHint.offsetWidth;
+    filmHint.classList.add('visible');
+}
+
 function runFilmSequence() {
     if (filmRunning || !filmScreen || !filmGate || !filmImage) return;
     filmRunning = true;
+    filmScreen.style.pointerEvents = 'auto';
 
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const timers = [];
@@ -1950,16 +1959,49 @@ function runFilmSequence() {
     const onVisibilityHidden = () => {
         if (document.hidden) endToTitle();
     };
+    let filmPointer = null;
+    let lastFilmTap = 0;
+    const resetFilmGesture = () => {
+        filmPointer = null;
+        lastFilmTap = 0;
+    };
+    const onFilmPointerDown = (e) => {
+        if (!filmRunning || !e.isPrimary || !['touch', 'pen', 'mouse'].includes(e.pointerType)) return;
+        filmPointer = { id: e.pointerId, x: e.clientX, y: e.clientY, at: performance.now() };
+    };
+    const onFilmPointerUp = (e) => {
+        if (!filmRunning || !filmPointer || filmPointer.id !== e.pointerId) return;
+        const start = filmPointer;
+        filmPointer = null;
+        const duration = performance.now() - start.at;
+        const movement = Math.hypot(e.clientX - start.x, e.clientY - start.y);
+        if (duration > 300 || movement > 10) { lastFilmTap = 0; return; }
+        const now = performance.now();
+        if (lastFilmTap && now - lastFilmTap <= 300) {
+            lastFilmTap = 0;
+            endToTitle();
+        } else {
+            lastFilmTap = now;
+        }
+    };
+    const onFilmPointerCancel = () => resetFilmGesture();
 
-    /* выход из серии: снять классы, таймеры, клоны; довести до названия */
+    /* pointerup is the only tap channel; synthetic clicks are never consumed */
     const endToTitle = () => {
         if (finished) return;
         finished = true;
         clearAllTimers();
+        resetFilmGesture();
         document.removeEventListener('visibilitychange', onVisibilityHidden);
+        filmScreen.removeEventListener('pointerdown', onFilmPointerDown);
+        filmScreen.removeEventListener('pointerup', onFilmPointerUp);
+        filmScreen.removeEventListener('pointercancel', onFilmPointerCancel);
+        window.removeEventListener('blur', onFilmPointerCancel);
 
         filmScreen.classList.remove('film-live');
         filmScreen.classList.remove('visible');
+        filmScreen.style.pointerEvents = '';
+        if (filmHint) filmHint.classList.remove('visible');
         filmGate.classList.remove('filming', 'film-flick', 'film-tear', 'film-zoom', 'film-slip', 'film-gap', 'film-gap-dip', 'film-drift', 'film-breathe', 'film-jam', 'film-push', 'film-catch', 'film-lamp-stutter', 'film-lamp-die');
         filmGate.style.visibility = '';
         filmGate.style.clipPath = '';
@@ -1973,7 +2015,7 @@ function runFilmSequence() {
         titleScreen.classList.add('visible');
         titleScreen.addEventListener('click', showContents, { once: true });
 
-        setTimeout(() => {
+        later(() => {
             filmScreen.classList.remove('reduced', 'film-flick', 'film-breathe', 'film-hit-light', 'film-lamp-stutter', 'film-lamp-die', 'film-startup', 'film-catch-light', 'film-lamp-ignite');
             filmScreen.style.transition = '';
             removeClones();
@@ -1981,12 +2023,17 @@ function runFilmSequence() {
         }, 450);
     };
 
+    filmScreen.addEventListener('pointerdown', onFilmPointerDown);
+    filmScreen.addEventListener('pointerup', onFilmPointerUp);
+    filmScreen.addEventListener('pointercancel', onFilmPointerCancel);
+    window.addEventListener('blur', onFilmPointerCancel);
     document.addEventListener('visibilitychange', onVisibilityHidden);
 
     /* --- reduced-motion: плавные кроссфейды без эффектов --- */
     if (reduced) {
         filmScreen.classList.add('visible');
         filmScreen.classList.add('reduced');
+        showFilmHint();
 
         const buffer = document.createElement('img');
         buffer.className = 'film-image film-clone';
@@ -2125,6 +2172,7 @@ function runFilmSequence() {
     filmGate.classList.add('filming');
     void filmScreen.offsetWidth;
     filmScreen.classList.add('film-lamp-ignite');
+    showFilmHint();
 
     // пыль и царапины видны в пустом свете до появления кадра
     later(runScratch, 260);

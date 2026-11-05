@@ -446,6 +446,36 @@ html, body {
     opacity: 1;
 }
 
+.film-hint {
+    position: absolute;
+    left: 50%;
+    bottom: calc(28px + env(safe-area-inset-bottom));
+    z-index: 8;
+    transform: translateX(-50%);
+    color: #b8b5b0;
+    font-family: 'Golos Text', sans-serif;
+    font-size: 13px;
+    letter-spacing: 0.03em;
+    text-align: center;
+    opacity: 0;
+    pointer-events: none;
+    white-space: nowrap;
+}
+.film-hint.visible {
+    opacity: 1;
+    animation: film-hint-fade 0.4s ease 2s forwards;
+}
+@keyframes film-hint-fade {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .film-hint.visible {
+        animation: none;
+        opacity: 1;
+    }
+}
+
 /* окно проектора: чёрная колодка по периметру */
 .film-gate {
     position: absolute;
