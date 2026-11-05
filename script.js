@@ -590,15 +590,52 @@ document.addEventListener('touchend', (e) => {
     if (!isStarted && diffY > 50 && Math.abs(diffX) < 40) {
         startSequence();
     }
-    
-    // Свайп справа налево в главе — открыть меню
-    if (chapterScreen.classList.contains('visible') 
-        && Math.abs(diffX) > Math.abs(diffY) * 1.8 
-        && diffX > 70 
-        && touchStartX > window.innerWidth * 0.82) {
-        openMenu();
-    }
 }, { passive: true });
+
+(function initMenuSwipeRecognizer() {
+    let gesture = null;
+    const cancel = () => { gesture = null; };
+    const overlayActive = () => document.querySelector(
+        '#photo-overlay.active, #reader-sheet.open, #install-overlay.visible, #progress-overlay.visible'
+    );
+
+    document.addEventListener('touchstart', (e) => {
+        if (e.touches.length !== 1 || e.target.closest('.photo-link')) { cancel(); return; }
+        const t = e.touches[0];
+        gesture = { id: t.identifier, x: t.clientX, y: t.clientY, at: performance.now(), axis: null };
+    }, { passive: true });
+
+    document.addEventListener('touchmove', (e) => {
+        if (!gesture) return;
+        if (e.touches.length !== 1) { cancel(); return; }
+        const t = e.touches[0];
+        const dx = t.clientX - gesture.x;
+        const dy = t.clientY - gesture.y;
+        if (gesture.axis) return;
+        if (Math.abs(dy) >= 10 && Math.abs(dy) > Math.abs(dx)) gesture.axis = 'vertical';
+        else if (Math.abs(dx) >= 10 && Math.abs(dx) > Math.abs(dy) * 1.2) gesture.axis = 'horizontal';
+    }, { passive: true });
+
+    document.addEventListener('touchend', (e) => {
+        if (!gesture) return;
+        const start = gesture;
+        gesture = null;
+        const t = Array.from(e.changedTouches).find((point) => point.identifier === start.id);
+        if (!t || start.axis !== 'horizontal') return;
+        const dx = t.clientX - start.x;
+        const dy = t.clientY - start.y;
+        if (performance.now() - start.at > 600 || Math.abs(dx) < 64 || Math.abs(dx) <= 1.5 * Math.abs(dy)) return;
+        if (overlayActive()) return;
+        const onMenuSurface = chapterScreen.classList.contains('visible') || contentsScreen.classList.contains('visible');
+        if (!onMenuSurface) return;
+        if (isMenuOpen && dx > 0) closeMenu();
+        else if (!isMenuOpen && dx < 0) openMenu();
+    }, { passive: true });
+
+    /* no preventDefault: vertical scrolling and text selection keep ownership */
+    document.addEventListener('touchcancel', cancel, { passive: true });
+    window.addEventListener('blur', cancel);
+})();
 
 
 
