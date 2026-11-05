@@ -2836,30 +2836,126 @@ if ('serviceWorker' in navigator) {
 })();
 
 
-/* === ЗАСТАВКА: ЗОВ БЕЗДЕЙСТВИЯ ===
-   Нет тапа ~1с — обложка дышит, ~5с — подрагивает, ~10.5с — круги.
-   Любое касание снимает зов навсегда. Если интро пропущено
-   (дип-линк/прогресс: isStarted уже true) — таймеры срабатывают вхолостую. */
-(function coverBeckon() {
-    if (!coverScreen) return;
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    /* authored single run: 600ms stillness, then a 7.5s choreography
-       (beckon-play), then faint breathing (beckon-settle) */
-    let settleTimer = null;
-    const startTimer = setTimeout(() => {
-        if (isStarted) return;
-        coverScreen.classList.add('beckon-play');
-        settleTimer = setTimeout(() => {
-            coverScreen.classList.remove('beckon-play');
-            if (!isStarted) coverScreen.classList.add('beckon-settle');
-        }, 7500);
-    }, 600);
-    ['touchstart', 'mousedown', 'keydown'].forEach((ev) => {
-        document.addEventListener(ev, () => {
-            clearTimeout(startTimer);
-            clearTimeout(settleTimer);
-            coverScreen.classList.remove('beckon-play', 'beckon-settle');
-        }, { once: true, passive: true });
+function coverSurgeHook() {
+    /* W-8 integration point: emit the water impulse burst on SURGE. */
+}
+
+(function coverIdleRhythm() {
+    if (!coverScreen || isStarted) return;
+    const img = coverScreen.querySelector('img');
+    const tremor = coverScreen.querySelector('.cover-tremor');
+    if (!img || !tremor) return;
+    const entryEvents = ['touchstart', 'mousedown', 'keydown', 'click'];
+
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        const hint = document.createElement('div');
+        hint.className = 'cover-idle-static';
+        hint.setAttribute('role', 'note');
+        hint.textContent = 'Коснитесь, чтобы войти';
+        coverScreen.appendChild(hint);
+        entryEvents.forEach((eventName) => {
+            document.addEventListener(eventName, () => hint.remove(), { once: true, passive: true });
+        });
+        return;
+    }
+
+    const ring = document.createElement('div');
+    ring.className = 'cover-beckon-ring';
+    ring.setAttribute('aria-hidden', 'true');
+    ring.innerHTML = '<i></i><i></i>';
+    coverScreen.appendChild(ring);
+
+    let phase = 'IDLE';
+    let timer = null;
+    let tremorAnimation = null;
+    let stopped = false;
+    const ringObserver = new ResizeObserver(positionRing);
+
+    function positionRing() {
+        const rect = img.getBoundingClientRect();
+        const size = Math.max(76, Math.min(132, Math.min(rect.width, rect.height) * 0.18));
+        ring.style.width = size + 'px';
+        ring.style.height = size + 'px';
+        ring.style.left = (rect.left + rect.width / 2 - size / 2) + 'px';
+        ring.style.top = (rect.top + rect.height * 0.43 - size / 2) + 'px';
+    }
+
+    function cancelSurge() {
+        if (tremorAnimation) {
+            tremorAnimation.cancel();
+            tremorAnimation = null;
+        }
+        coverScreen.classList.remove('surge');
+        ring.classList.remove('visible');
+    }
+
+    function schedulePhase() {
+        if (stopped || document.hidden) return;
+        const delay = phase === 'IDLE' ? 8000 : phase === 'SURGE' ? 3000 : 12000;
+        timer = setTimeout(() => {
+            if (phase === 'IDLE') enterPhase('SURGE');
+            else if (phase === 'SURGE') enterPhase('LULL');
+            else enterPhase('IDLE');
+        }, delay);
+    }
+
+    function enterPhase(next) {
+        if (stopped) return;
+        clearTimeout(timer);
+        timer = null;
+        phase = next;
+        coverScreen.dataset.idlePhase = phase;
+        coverScreen.classList.toggle('lull', phase === 'LULL');
+        cancelSurge();
+        if (phase === 'SURGE') {
+            positionRing();
+            coverScreen.classList.add('surge');
+            ring.classList.add('visible');
+            const frames = Array.from({ length: 24 }, () => ({
+                transform: `translate(${(Math.random() * 1.5 - 0.75).toFixed(2)}px, ${(Math.random() * 1.5 - 0.75).toFixed(2)}px)`,
+                easing: 'steps(1, jump-start)'
+            }));
+            frames.push({ transform: 'translate(0, 0)', easing: 'steps(1, jump-start)' });
+            tremorAnimation = tremor.animate(frames, { duration: 3000 });
+            coverSurgeHook();
+        }
+        schedulePhase();
+    }
+
+    function stopRhythm() {
+        stopped = true;
+        clearTimeout(timer);
+        timer = null;
+        cancelSurge();
+        coverScreen.classList.remove('lull');
+        delete coverScreen.dataset.idlePhase;
+        ringObserver.disconnect();
+        ring.remove();
+    }
+
+    function rearmOnVisibility() {
+        if (stopped) return;
+        clearTimeout(timer);
+        timer = null;
+        cancelSurge();
+        coverScreen.classList.remove('lull');
+        phase = 'IDLE';
+        coverScreen.dataset.idlePhase = phase;
+        if (!document.hidden) {
+            positionRing();
+            enterPhase('IDLE');
+        }
+    }
+
+    positionRing();
+    enterPhase('IDLE');
+    img.addEventListener('load', positionRing);
+    ringObserver.observe(img);
+    window.addEventListener('resize', positionRing);
+    window.addEventListener('orientationchange', positionRing);
+    document.addEventListener('visibilitychange', rearmOnVisibility);
+    entryEvents.forEach((eventName) => {
+        document.addEventListener(eventName, stopRhythm, { once: true, passive: true });
     });
 })();
 

@@ -2367,46 +2367,47 @@ html, body {
     .share-fab-wrap.share-fab-in .share-fab { animation: none; }
 }
 
-/* === ЗАСТАВКА: ЗОВ БЕЗДЕЙСТВИЯ (нарастающий) === */
-/* ступень 1 (~1.2с): обложка чуть дышит */
-#cover-screen.beckon-1 img {
-  animation: beckon-breath 5s ease-in-out infinite;
+/* === COVER: image-anchored double-outline beckon ring === */
+.cover-beckon-ring {
+  position: fixed;
+  z-index: 6;
+  border: 2px solid #e8e6e3;
+  outline: 2px solid #101214;
+  outline-offset: 4px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.08);
+  box-shadow: 0 0 20px rgba(0, 168, 232, 0.28);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.35s ease;
 }
-
-/* ступень 2 (~5с): дыхание чаще + едва заметная дрожь */
-#cover-screen.beckon-2 img {
-  animation: beckon-breath 3.6s ease-in-out infinite,
-             beckon-jitter-soft 0.7s steps(2) infinite;
-}
-
-/* ступень 3 (~10.5с): дрожь заметнее + круги на воде из центра */
-#cover-screen.beckon-3 img {
-  animation: beckon-breath 2.6s ease-in-out infinite,
-             beckon-jitter-hard 0.45s steps(2) infinite;
-}
-#cover-screen.beckon-3 .cover-ripples i {
-  animation: beckon-ripple 3.2s cubic-bezier(0.2, 0.5, 0.3, 1) infinite;
-}
-#cover-screen.beckon-3 .cover-ripples i:last-child {
-  animation-delay: 1.6s;
-}
-
-.cover-ripples {
+.cover-beckon-ring.visible { opacity: 1; }
+.cover-beckon-ring i {
   position: absolute;
-  inset: 0;
-  overflow: hidden;
+  inset: -10px;
+  border: 1px solid rgba(0, 168, 232, 0.62);
+  border-radius: 50%;
+  opacity: 0;
   pointer-events: none;
 }
-.cover-ripples i {
-  position: absolute;
+.cover-beckon-ring.visible i {
+  animation: cover-beckon-ripple 1.4s ease-out infinite;
+}
+.cover-beckon-ring.visible i:nth-child(2) { animation-delay: 0.7s; }
+
+.cover-idle-static {
+  position: fixed;
   left: 50%;
-  top: 50%;
-  width: 42vmin;
-  height: 42vmin;
-  margin: -21vmin 0 0 -21vmin;
-  border-radius: 50%;
-  border: 1px solid rgba(0, 168, 232, 0.5);
-  opacity: 0;
+  bottom: calc(30px + env(safe-area-inset-bottom));
+  z-index: 6;
+  transform: translateX(-50%);
+  color: #d8d5cf;
+  font-family: 'Golos Text', sans-serif;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  text-align: center;
+  pointer-events: none;
+  white-space: nowrap;
 }
 
 /* дыхание сохраняет базовую степень картинки (contrast/brightness обложки),
@@ -2414,40 +2415,6 @@ html, body {
 @keyframes beckon-breath {
   0%, 100% { transform: scale(1); filter: contrast(1.05) brightness(0.95); }
   50%      { transform: scale(1.004); filter: contrast(1.05) brightness(0.99); }
-}
-
-/* дрожь — отдельным свойством translate, чтобы не конфликтовать
-   ни с transform дыхания, ни с анимацией ухода обложки (hide-up) */
-@keyframes beckon-jitter-soft {
-  0%   { transform: translateX(0px) translateY(0px); }
-  25%  { transform: translateX(0.8px) translateY(-0.5px); }
-  50%  { transform: translateX(-0.7px) translateY(0.5px); }
-  75%  { transform: translateX(0.4px) translateY(0.8px); }
-  100% { transform: translateX(0px) translateY(0px); }
-}
-
-@keyframes beckon-jitter-hard {
-  0%   { transform: translateX(0px) translateY(0px); }
-  20%  { transform: translateX(2px) translateY(-1.2px); }
-  40%  { transform: translateX(-1.8px) translateY(1px); }
-  60%  { transform: translateX(1px) translateY(1.8px); }
-  80%  { transform: translateX(-1px) translateY(-1.6px); }
-  100% { transform: translateX(0px) translateY(0px); }
-}
-
-@keyframes beckon-ripple {
-  0%   { transform: scale(0.25); opacity: 0; }
-  15%  { opacity: 0.5; }
-  100% { transform: scale(2); opacity: 0; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  #cover-screen.beckon-1 img,
-  #cover-screen.beckon-2 img,
-  #cover-screen.beckon-3 img,
-  #cover-screen.beckon-3 .cover-ripples i {
-    animation: none !important;
-  }
 }
 
 /* === REDUCED MOTION: remaining nonessential motion becomes static === */
@@ -2473,45 +2440,15 @@ html, body {
     }
 }
 
-/* === BECKON CHOREOGRAPHY: 600ms stillness, one authored 7.5s run, then settle ===
-   Four irregular events; stillness between them makes each one readable.
-   Wrapper = displacement, image = scale/filter (no transform fights). */
+/* === COVER: IDLE → SURGE → LULL === */
 .cover-tremor {
   display: inline-flex;   /* exactly the image's box: no layout shift */
 }
-#cover-screen.beckon-play .cover-tremor {
-  animation: beckon-tremor 7.5s linear forwards;
+#cover-screen.surge img {
+  animation: beckon-glow 3s ease-in-out;
 }
-#cover-screen.beckon-play img {
-  animation: beckon-glow 7.5s ease-in-out forwards,
-             beckon-run-scale 7.5s ease-in-out forwards;
-}
-#cover-screen.beckon-play .cover-ripples i {
-  animation: beckon-ripple-once 7.5s cubic-bezier(0.2, 0.5, 0.3, 1) forwards;
-}
-#cover-screen.beckon-play .cover-ripples i:last-child {
-  animation-name: beckon-ripple-second;
-  animation-delay: 0.18s;   /* second ring: later, quieter */
-}
-
-#cover-screen.beckon-settle img {
+#cover-screen.lull img {
   animation: beckon-breath 7s ease-in-out infinite;
-}
-
-/* events at 1.2 / 2.4 / 4.0 / 5.6 s of the run; strongest last; then stillness */
-@keyframes beckon-tremor {
-  0%, 15.5%      { transform: translateX(0px) translateY(0px); }
-  16%, 16.8%     { transform: translateX(1.6px) translateY(-0.8px); }  /* 1.2 s, hold 60 ms */
-  18.4%, 31.5%   { transform: translateX(0px) translateY(0px); }       /* return over 120 ms */
-  32%, 32.93%    { transform: translateX(-2.4px) translateY(1.2px); }  /* 2.4 s, hold 70 ms */
-  34%, 36%       { transform: translateX(1.2px) translateY(-0.5px); }  /* 2.55 s answer */
-  37.33%, 52.5%  { transform: translateX(0px) translateY(0px); }       /* still by 2.8 s */
-  53.33%, 54.4%  { transform: translateX(3.2px) translateY(-1.6px); }  /* 4.0 s, hold 80 ms */
-  55.33%, 58%    { transform: translateX(-1.6px) translateY(0.8px); }  /* 4.15 s answer */
-  60%, 73.5%     { transform: translateX(0px) translateY(0px); }       /* return by 4.5 s */
-  74.67%, 75.87% { transform: translateX(-4.2px) translateY(2px); }    /* 5.6 s, hold 90 ms */
-  76.8%, 79%     { transform: translateX(2.2px) translateY(-1px); }    /* answer, 70 ms */
-  81.33%, 100%   { transform: translateX(0px) translateY(0px); }       /* zero by 6.1 s */
 }
 
 /* illumination: base 0.95, crest 1.06 at 2.8 s, failure dip 0.72 at 5.6 s */
@@ -2524,30 +2461,17 @@ html, body {
   96%, 100% { filter: contrast(1.05) brightness(0.95); }
 }
 
-/* slow scale envelope, not a zoom: 1.000 -> 1.008 by 4.5 s, 1.003 by 7.5 s */
-@keyframes beckon-run-scale {
-  0%   { scale: 1; }
-  60%  { scale: 1.008; }
-  100% { scale: 1.003; }
-}
-
-/* water answer: starts ~5.9 s, 2 s, scale 0.25 -> 1.65, max opacity 0.50 */
-@keyframes beckon-ripple-once {
-  0%, 78.6% { transform: scale(0.25); opacity: 0; }
-  80%       { opacity: 0.5; }
-  100%      { transform: scale(1.65); opacity: 0; }
-}
-@keyframes beckon-ripple-second {
-  0%, 78.6% { transform: scale(0.25); opacity: 0; }
-  80%       { opacity: 0.3; }
-  100%      { transform: scale(1.65); opacity: 0; }
+@keyframes cover-beckon-ripple {
+  0%   { transform: scale(0.96); opacity: 0; }
+  20%  { opacity: 0.55; }
+  100% { transform: scale(1.25); opacity: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  #cover-screen.beckon-play .cover-tremor,
-  #cover-screen.beckon-play img,
-  #cover-screen.beckon-settle img,
-  #cover-screen.beckon-play .cover-ripples i {
+  #cover-screen.surge img,
+  #cover-screen.lull img,
+  .cover-beckon-ring,
+  .cover-beckon-ring i {
     animation: none !important;
   }
 }
