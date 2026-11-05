@@ -95,8 +95,12 @@ try {
     $swBase = git show "${BaseRef}:sw.js" 2>$null | Out-String
     $baseV = [int]([regex]::Match($swBase, "echo-v(\d+)").Groups[1].Value)
     $swNow = [System.IO.File]::ReadAllText((Join-Path $root 'sw.js'))
-    $nowV = [int]([regex]::Match($swNow, "CACHE_VERSION\s*=\s*'echo-v(\d+)'").Groups[1].Value)
-    Check 'CACHE_VERSION parseable' ($nowV -gt 0)
+    $versionNow = [System.IO.File]::ReadAllText((Join-Path $root 'version.js'))
+    $echoVersion = [regex]::Match($versionNow, "\bvar\s+ECHO_VERSION\s*=\s*'(v\d+)'").Groups[1].Value
+    $nowV = [int]([regex]::Match($echoVersion, '^v(\d+)$').Groups[1].Value)
+    $derivedCache = [regex]::IsMatch($swNow, "importScripts\('version\.js'\)\s*;") -and
+                    [regex]::IsMatch($swNow, "const\s+CACHE_VERSION\s*=\s*'echo-'\s*\+\s*ECHO_VERSION\s*;")
+    Check 'CACHE_VERSION is echo-<ECHO_VERSION> from version.js' ($derivedCache -and $nowV -gt 0)
     if (@($servedChanged).Count -gt 0) {
         Check "CACHE_VERSION bumped vs $BaseRef (v$baseV -> v$nowV; served files changed)" ($nowV -gt $baseV)
     } else {
