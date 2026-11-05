@@ -278,7 +278,14 @@ body.install-open { overflow: hidden; }
             <a class="contents-item" data-chapter="74" href="?ch=74">75 <span class="dot"></span> Несколько дней после</a>
             <a class="contents-item" data-chapter="75" href="?ch=75">76 <span class="dot"></span> В субботу Костя предложил</a>
             <a class="contents-item" data-chapter="76" href="?ch=76">77 <span class="dot"></span> Мы шли по району</a>
-            <a class="contents-item" data-chapter="77" href="?ch=77">78 <span class="dot"></span> В воскресенье</a>
+            <a class="contents-item" data-chapter="77" href="?ch=77">78 <span class="dot"></span> В воскресенье утром</a>
+            <a class="contents-item" data-chapter="78" href="?ch=78">79 <span class="dot"></span> Я даже невольно оглянулся</a>
+            <a class="contents-item" data-chapter="79" href="?ch=79">80 <span class="dot"></span> — Вот тут я вышел из банка</a>
+            <a class="contents-item" data-chapter="80" href="?ch=80">81 <span class="dot"></span> После школы мы пошли провожать</a>
+            <a class="contents-item" data-chapter="81" href="?ch=81">82 <span class="dot"></span> Отец попросил после школы</a>
+            <a class="contents-item" data-chapter="82" href="?ch=82">83 <span class="dot"></span> Я шёл, не особо разбирая дорогу</a>
+            <a class="contents-item" data-chapter="83" href="?ch=83">84 <span class="dot"></span> Следующая наша встреча</a>
+
         </div>
     </div>
     <button class="menu-trigger" id="menu-trigger" aria-label="Меню" inert>
@@ -348,7 +355,7 @@ body.install-open { overflow: hidden; }
                 <div class="about-label">О проекте</div>
                 <div class="about-text">
                     <p>«ЭХО» — книга Итеревского-Кочетова Ивана.</p>
-                    <p>Книга выходит по главам и живёт прямо здесь, в браузере: без регистрации и рекламы. Новые главы — по мере написания, примерно раз в две недели.</p>
+                    <p>Книга выходит по главам и живёт прямо здесь, в браузере: без регистрации и рекламы. Новые главы — по мере написания, примерно раз в неделю.</p>
                     <p>Если книга отзывается, её можно поддержать — реквизиты выше.</p>
                     <p>Написать автору: <a href="https://t.me/iterevsky" target="_blank" rel="noopener" class="contacts-link">t.me/iterevsky</a></p>
                 </div>
@@ -399,6 +406,7 @@ body.install-open { overflow: hidden; }
   <div class="tear-top" style="position:absolute;top:0;left:0;width:100%;height:55%;background:transparent;pointer-events:none;"></div>
   <div class="tear-bottom" style="position:absolute;bottom:0;left:0;width:100%;height:55%;background:transparent;pointer-events:none;"></div>
   <div class="tear-line" style="position:absolute;top:0;left:0;width:100%;height:1px;background:rgba(232,230,227,0.3);box-shadow:0 0 8px rgba(232,230,227,0.2);opacity:0;"></div>
+  <canvas id="tear-static"></canvas>
 </div>
 <!-- PHOTO overlay -->
 <div id="photo-overlay" role="dialog" aria-modal="true" aria-label="Фото" inert>
@@ -440,7 +448,9 @@ body.install-open { overflow: hidden; }
     </div>
     <div id="reader-dim"></div>
 
+    <script src="version.js"></script>
     <script src="chapters.js"></script>
+    <script src="glyph-utils.js"></script>
 <script src="script.js"></script>
 
 </body>

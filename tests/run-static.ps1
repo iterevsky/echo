@@ -11,8 +11,9 @@ function Check($name, $cond) {
     else { Write-Host "FAIL  $name"; $script:failures++ }
 }
 
-# files served by the website — changing any of them requires a CACHE_VERSION bump
+# files served by the website — changing any of them requires an ECHO_VERSION bump
 $served = @('index.html','style.css','script.js','chapters.js','sw.js','chapters-meta.js',
+            'version.js','glyph-utils.js',
             'Zastavka.jpg','icons/','fonts/','images/')
 
 Push-Location $root
@@ -21,7 +22,7 @@ try {
     $dirty = git status --porcelain -- chapters.js
     Check 'chapters.js unmodified vs git' ([string]::IsNullOrWhiteSpace($dirty))
 
-    # --- CACHE_VERSION bump iff served files changed vs BaseRef ---
+    # --- ECHO_VERSION bump iff served files changed vs BaseRef ---
     $changed = @()
     try { $changed = git diff --name-only $BaseRef HEAD 2>$null } catch { $changed = @() }
     try { $changed += git diff --name-only $BaseRef 2>$null } catch {}  # uncommitted vs BaseRef
@@ -30,20 +31,28 @@ try {
         $p = $_ -replace '\\','/'
         ($served | Where-Object { $p -eq $_ -or ($_.EndsWith('/') -and $p.StartsWith($_)) })
     }
-    $swBase = git show "${BaseRef}:sw.js" 2>$null | Out-String
-    $baseV = [int]([regex]::Match($swBase, "echo-v(\d+)").Groups[1].Value)
+    # единая версия сайта живёт в version.js; sw.js строит из неё CACHE_VERSION.
+    # На старых ревизиях version.js ещё не было — читаем номер из sw.js.
+    $verNow = [System.IO.File]::ReadAllText((Join-Path $root 'version.js'))
+    $nowV = [int]([regex]::Match($verNow, "ECHO_VERSION\s*=\s*'v(\d+)'").Groups[1].Value)
+    Check 'ECHO_VERSION parseable (version.js)' ($nowV -gt 0)
+    $baseV = 0
+    $verBase = git show "${BaseRef}:version.js" 2>$null | Out-String
+    if ($verBase) { $baseV = [int]([regex]::Match($verBase, "ECHO_VERSION\s*=\s*'v(\d+)'").Groups[1].Value) }
+    if (-not $baseV) {
+        $swBase = git show "${BaseRef}:sw.js" 2>$null | Out-String
+        $baseV = [int]([regex]::Match($swBase, "echo-v(\d+)").Groups[1].Value)
+    }
     $swNow = [System.IO.File]::ReadAllText((Join-Path $root 'sw.js'))
-    $nowV = [int]([regex]::Match($swNow, "CACHE_VERSION\s*=\s*'echo-v(\d+)'").Groups[1].Value)
-    Check 'CACHE_VERSION parseable' ($nowV -gt 0)
     if (@($servedChanged).Count -gt 0) {
-        Check "CACHE_VERSION bumped vs $BaseRef (v$baseV -> v$nowV; served files changed)" ($nowV -gt $baseV)
+        Check "ECHO_VERSION bumped vs $BaseRef (v$baseV -> v$nowV; served files changed)" ($nowV -gt $baseV)
     } else {
-        Write-Host "SKIP  CACHE_VERSION bump (no served files changed vs $BaseRef)"
+        Write-Host "SKIP  ECHO_VERSION bump (no served files changed vs $BaseRef)"
     }
 } finally { Pop-Location }
 
 # --- required served files exist ---
-foreach ($f in 'index.html','style.css','script.js','chapters.js','chapters-meta.js','sw.js') {
+foreach ($f in 'index.html','style.css','script.js','chapters.js','chapters-meta.js','sw.js','version.js','glyph-utils.js') {
     Check "exists: $f" (Test-Path (Join-Path $root $f))
 }
 
@@ -83,7 +92,7 @@ foreach ($listName in 'CORE_FILES', 'EXTRA_FILES') {
 # --- JS syntax gate: node --check when Node.js is installed ---
 $node = Get-Command node -ErrorAction SilentlyContinue
 if ($node) {
-    foreach ($js in 'script.js','sw.js') {
+    foreach ($js in 'script.js','sw.js','version.js','glyph-utils.js') {
         node --check (Join-Path $root $js) 2>$null
         Check "node --check $js" ($LASTEXITCODE -eq 0)
     }

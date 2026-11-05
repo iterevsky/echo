@@ -388,6 +388,7 @@ html, body {
 .book-title .h-char {
     text-shadow: 0 0 18px rgba(0, 168, 232, 0.28), 0 0 40px rgba(0, 168, 232, 0.12);
     animation: h-breathe 6s ease-in-out 3s infinite;
+    transition: text-shadow 0.4s ease;  /* fade-in свечения после лока «Х» */
 }
 @keyframes h-breathe {
     0%, 100% { text-shadow: 0 0 18px rgba(0, 168, 232, 0.28), 0 0 40px rgba(0, 168, 232, 0.12); }
@@ -419,6 +420,23 @@ html, body {
     filter: blur(0);
     text-shadow: 0 0 24px rgba(232, 230, 227, 0.06);
     transition: opacity 1.3s ease 0.45s, transform 1.6s ease 0.45s, filter 1.7s ease 0.45s;
+}
+
+/* сборка названия из символов (decodeText): пока идёт decode,
+   свечение «Х» погашено; снятие .decoding возвращает glow
+   через transition 0.4s. Обёртка .h-char в DOM сохраняется. */
+#title-screen.decoding .h-char {
+    animation: none;
+    text-shadow: none;
+}
+
+/* без плёнки decode — сам вход титула: штатные fade'ы отключаем;
+   с плёнкой (film-enter) фокус-пул продолжается поверх decode */
+#title-screen.decoding:not(.film-enter) .author,
+#title-screen.decoding:not(.film-enter) .book-title {
+    opacity: 1;
+    transform: none;
+    transition: none;
 }
 
 /* === ПРОЕКТОРНАЯ ПЛЁНКА === */
@@ -638,6 +656,17 @@ html, body {
 /* чёрные провалы между кадрами */
 .film-gap .film-image {
     opacity: 0;
+}
+
+/* треск символов в жёстких провалах: кадры заранее в canvas */
+#film-crackle {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 2;
 }
 
 /* дрейф окна кадра: только ключевые кадры, правила собираются у film-live-комбинаций ниже */
@@ -1053,6 +1082,27 @@ html, body {
     pointer-events: all;
 }
 
+/* заголовки главы: вход из расфокуса одновременно со сборкой из символов.
+   heading-focus ставится при назначении текста, heading-sharp — следующим
+   кадром; номер резче за 700 мс, название — на 130 мс позже, за 800 мс.
+   Текст главы никогда не блюрится. */
+#chapter-screen.heading-focus .chapter-number,
+#chapter-screen.heading-focus .chapter-title {
+    filter: blur(8px);
+    opacity: 0.15;
+}
+#chapter-screen.heading-focus .chapter-number {
+    transition: filter 0.7s ease-out, opacity 0.7s ease-out;
+}
+#chapter-screen.heading-focus .chapter-title {
+    transition: filter 0.8s ease-out 0.13s, opacity 0.8s ease-out 0.13s;
+}
+#chapter-screen.heading-focus.heading-sharp .chapter-number,
+#chapter-screen.heading-focus.heading-sharp .chapter-title {
+    filter: blur(0);
+    opacity: 1;
+}
+
 @keyframes tear-top-shift {
     0% { transform: translateX(0); }
     40% { transform: translateX(-4px); }
@@ -1082,8 +1132,27 @@ html, body {
     100% { filter: brightness(1); }
 }
 
+/* символьный статик в полосе разрыва: кадр заранее отрисован в canvas */
+#tear-static {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* яркость экрана под статиком: 1.0 → 1.15 → 1.0 в окне 40–150 мс;
+   в паре с tear-flash: пока оба активны, поздний (этот) побеждает */
+@keyframes tear-static-bright {
+    0% { filter: brightness(1); }
+    50% { filter: brightness(1.15); }
+    100% { filter: brightness(1); }
+}
+
 #chapter-screen.tear-flash {
-    animation: tear-flash 0.15s ease-out forwards;
+    animation: tear-flash 0.15s ease-out forwards,
+               tear-static-bright 0.11s linear 0.04s forwards;
 }
 
 #chapter-screen::before {
@@ -2061,7 +2130,19 @@ html, body {
     }
     #title-screen.film-enter .author,
     #title-screen.film-enter .book-title { filter: none; }
+    /* reduced-motion: титул готов сразу, свечение «Х» проявляется один раз */
+    #title-screen .author,
+    #title-screen .book-title,
+    #title-screen.film-enter.visible .author,
+    #title-screen.film-enter.visible .book-title { transition-delay: 0s; transition-duration: 0.01s; }
     .book-title .h-char { animation: none; }
+    #title-screen.visible .book-title .h-char { animation: h-glow-once 0.4s ease 1; }
+}
+
+/* разовое проявление свечения «Х» (reduced-motion вместо h-breathe) */
+@keyframes h-glow-once {
+    from { text-shadow: none; }
+    to { text-shadow: 0 0 18px rgba(0, 168, 232, 0.28), 0 0 40px rgba(0, 168, 232, 0.12); }
 }
 
 /* ============================================================
@@ -2513,35 +2594,6 @@ html, body {
   }
 }
 
-/* === CONTENTS: first-entry signal acquisition (once, transient) ===
-   a glyph blip layered over each item at its own reveal moment;
-   the item text itself is never modified */
-#contents-screen.signal-boot .contents-item::after {
-  content: '▓▒░';
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  font-size: 0.62em;
-  letter-spacing: 0.25em;
-  color: rgba(0, 168, 232, 0.55);
-  text-shadow: 0 0 8px rgba(0, 168, 232, 0.35);
-  opacity: 0;
-  pointer-events: none;
-  animation: boot-blip 0.65s steps(1) forwards;
-  animation-delay: var(--boot-delay, 0ms);
-}
-
-@keyframes boot-blip {
-  0%   { opacity: 0; }
-  18%  { opacity: 1; }
-  55%  { opacity: 0.55; }
-  100% { opacity: 0; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  #contents-screen.signal-boot .contents-item::after { animation: none; }
-}
 
 /* counter afterglow: one short phosphor pulse on a genuine read */
 .contents-progress.read-pulse {
@@ -2564,4 +2616,35 @@ html, body {
     user-select: none;
     -webkit-user-drag: none;
     -webkit-touch-callout: none;
+}
+
+/* === CONTENTS: coloured acquisition on every entry (transient overlay) ===
+   the real labels and accessible text are never modified */
+.contents-header { position: relative; }
+.acq-overlay {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  pointer-events: none;
+  background: #000;
+  color: inherit;
+  white-space: nowrap;
+  z-index: 2;
+  transition: opacity 120ms ease, filter 120ms ease, transform 120ms ease;
+}
+.acq-overlay .acq-cyan,
+.acq-overlay .acq-red,
+.acq-overlay .acq-slice {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+.acq-overlay .acq-cyan { color: #00A8E8; opacity: 0; }
+.acq-overlay .acq-red { color: #c41e3a; opacity: 0; }
+.acq-overlay .acq-slice { opacity: 0; clip-path: inset(35% 0 35% 0); }
+
+@media (prefers-reduced-motion: reduce) {
+  .acq-overlay { display: none; }
 }

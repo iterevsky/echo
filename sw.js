@@ -14,9 +14,11 @@
       с кнопкой «Повторить», а не мёртвый экран.
 
    ПЕРЕД ЛЮБЫМ КОММИТОМ, который меняет хоть один файл сайта,
-   подними CACHE_VERSION на +1 — старые кэши удалятся при активации.
+   подними ECHO_VERSION в version.js на +1 — старые кэши удалятся
+   при активации, а страница и SW всегда видят одну версию.
    ============================================================ */
-const CACHE_VERSION = 'echo-v66';
+importScripts('version.js');
+const CACHE_VERSION = 'echo-' + ECHO_VERSION;
 
 /* все кэши «ЭХО» начинаются с этого префикса; чужие кэши не трогаем */
 const CACHE_PREFIX = 'echo-';
@@ -29,7 +31,9 @@ const CORE_FILES = [
     './index.html',
     './style.css',
     './script.js',
-    './chapters.js'
+    './chapters.js',
+    './glyph-utils.js',
+    './version.js'
 ];
 
 /* nonessential: cached best-effort, refilled on demand at runtime */
@@ -52,7 +56,7 @@ const EXTRA_FILES = [
 const PRECACHE = CORE_FILES.concat(EXTRA_FILES);
 
 /* файлы, которые всегда сначала спрашивают у сети */
-const CODE_FILES = ['index.html', 'style.css', 'script.js', 'chapters.js'];
+const CODE_FILES = ['index.html', 'style.css', 'script.js', 'chapters.js', 'glyph-utils.js', 'version.js'];
 
 /* потолок ожидания сети — потом кэш или заглушка */
 const NETWORK_TIMEOUT = 8000;

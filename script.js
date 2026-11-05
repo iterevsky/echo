@@ -445,6 +445,35 @@ function applyInitialRoute() {
         initProgress();
     }
 }
+/* символьный статик на разрыве глав: два кадра шума в полосе
+   45–55% высоты экрана, отрисовываются заранее в простое.
+   Объявление стоит ДО applyInitialRoute(): дип-линк ?ch=N зовёт
+   openChapter на этапе первичного eval, до поздних let. */
+let tearStaticFrames = null;
+(function initTearStatic() {
+    if (typeof makeStaticFrames !== 'function') return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    echoWhenIdle(() => {
+        tearStaticFrames = makeStaticFrames(window.innerWidth, window.innerHeight, {
+            frames: 2,
+            glyphs: 40,
+            band: [0.45, 0.55],
+            colors: ['rgba(232,230,227,0.5)', 'rgba(0,168,232,0.4)']
+        });
+    });
+})();
+
+/* заголовки глав: сборка из символов на фоне расфокуса.
+   finish() у decodeText хранится здесь, чтобы смена/выход главы
+   мгновенно вернула чистый текст (элементы заголовков переиспользуются).
+   Объявление ДО applyInitialRoute(): дип-линк зовёт openChapter на eval. */
+let headingFinishers = [];
+function cancelHeadingEffects() {
+    headingFinishers.forEach((f) => f());
+    headingFinishers = [];
+    chapterScreen.classList.remove('heading-focus', 'heading-sharp');
+}
+
 applyInitialRoute();
 
 // === ОБРАБОТЧИКИ НАВИГАЦИИ ВНУТРИ ГЛАВЫ ===
@@ -563,6 +592,29 @@ document.addEventListener('click', () => {
 
 // === ФУНКЦИИ ===
 
+/* название собирается из символов: автор — слева направо (700 мс),
+   ЭХО — к центру (900 мс, «Х» последней), после лока «Х» её свечение
+   проявляется fade'ом. Только полное интро; при reduced-motion —
+   мгновенный титул (разовый glow делает CSS). */
+let titleDecodePlayed = false;
+function playTitleDecode() {
+    if (titleDecodePlayed) return;
+    titleDecodePlayed = true;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const authorEl = titleScreen.querySelector('.author');
+    const titleEl = titleScreen.querySelector('.book-title');
+    if (!authorEl || !titleEl || typeof decodeText !== 'function') return;
+    titleScreen.classList.add('decoding');
+    decodeText(authorEl, { duration: 700, order: 'ltr' });
+    setTimeout(() => {
+        decodeText(titleEl, {
+            duration: 900,
+            order: 'center',
+            onDone: () => titleScreen.classList.remove('decoding')
+        });
+    }, 250);
+}
+
 function startSequence() {
     if (isStarted) return;
     isStarted = true;
@@ -614,6 +666,7 @@ function startSequence() {
 
                         // Показываем название
                         titleScreen.classList.add('visible');
+                        playTitleDecode();
 
                         // Ждём клик для перехода к оглавлению
                         titleScreen.addEventListener('click', showContents, { once: true });
@@ -632,6 +685,7 @@ function startSequence() {
 function showContents() {
     updateContentsMemory();
     titleScreen.classList.remove('film-enter');
+    titleScreen.classList.remove('decoding');  /* клик в середине decode — melt не блокируем */
     // Буквы растают
     titleScreen.classList.add('melting');
 
@@ -646,32 +700,9 @@ function showContents() {
             if (menuTrigger) menuTrigger.classList.add('visible');
             scrollContentsToCurrent();
             revealContentsItems();
-            bootContentsOnce();
         }, 300);
 
     }, 1200);
-}
-
-/* signal-acquisition boot: only the first full contents entry, started when
-   fonts are actually ready; the real labels are never touched — the glyphs
-   are a separate transient layer */
-function bootContentsOnce() {
-    const s = loadState();
-    if (s.seenContentsBoot) return;
-    saveState({ seenContentsBoot: true });
-    const start = () => {
-        if (!contentsScreen.classList.contains('visible')) return;
-        document.querySelectorAll('.contents-item').forEach((item, i) => {
-            item.style.setProperty('--boot-delay', (200 + i * 80) + 'ms');
-        });
-        contentsScreen.classList.add('signal-boot');
-        setTimeout(() => contentsScreen.classList.remove('signal-boot'), 7500);
-    };
-    if (document.fonts && document.fonts.ready) {
-        document.fonts.ready.then(start);
-    } else {
-        start();
-    }
 }
 
 function openChapter(index, opts = {}) {
@@ -691,10 +722,23 @@ function openChapter(index, opts = {}) {
         tearOverlay.querySelector('.tear-line').style.animation = 'tear-line-fly 0.1s linear forwards';
         chScreen.classList.add('tear-flash');
 
+        /* статик-вспышка: +40 мс от начала разрыва, 110 мс, один swap кадров */
+        const tearStatic = tearOverlay.querySelector('#tear-static');
+        if (tearStatic && tearStaticFrames) {
+            const stx = tearStatic.getContext('2d');
+            setTimeout(() => {
+                stx.drawImage(tearStaticFrames[0], 0, 0);
+                tearStatic.style.opacity = '0.45';
+                setTimeout(() => stx.drawImage(tearStaticFrames[1], 0, 0), 55);
+            }, 40);
+        }
+
         setTimeout(() => {
             chScreen.classList.remove('tear-flash');
             tearOverlay.style.display = 'none';
             tearOverlay.querySelectorAll('*').forEach(el => el.style.animation = '');
+            const st = tearOverlay.querySelector('#tear-static');
+            if (st) st.style.opacity = '0';
         }, 150);
     }
 
@@ -737,6 +781,29 @@ function openChapter(index, opts = {}) {
 
     numberEl.textContent = 'Глава ' + chapter.number;
     titleEl.textContent = chapter.title;
+
+    /* заголовки: сборка из символов на фоне расфокуса (фича 9+19).
+       reduced-motion — сразу чистый текст; смена/выход из главы
+       возвращает финальный текст через cancelHeadingEffects() */
+    cancelHeadingEffects();
+    if (!reducedMotion && typeof decodeText === 'function') {
+        const gen = readerGeneration;
+        chapterScreen.classList.add('heading-focus');
+        void chapterScreen.offsetWidth;  /* reflow: переход blur→0 должен стартовать */
+        chapterScreen.classList.add('heading-sharp');
+        setTimeout(() => {
+            if (gen !== readerGeneration) return;
+            headingFinishers.push(decodeText(numberEl, { duration: 450, order: 'ltr' }));
+        }, 300);
+        setTimeout(() => {
+            if (gen !== readerGeneration) return;
+            headingFinishers.push(decodeText(titleEl, { duration: 650, order: 'center' }));
+        }, 450);
+        setTimeout(() => {
+            if (gen !== readerGeneration) return;
+            chapterScreen.classList.remove('heading-focus', 'heading-sharp');
+        }, 1250);
+    }
         // Парсим {{PHOTO:слово:файл}} и {{VOICE}}
     let processedText = chapter.text
       .replace(
@@ -1580,6 +1647,270 @@ function revealContentsItems() {
     });
 }
 
+/* contents acquisition: coloured sequence on every hidden->visible entry.
+   Real labels and accessible text are untouched; corruption is transient. */
+let contentsAcqTimers = [];
+let contentsAcqActive = false;
+const CONTENTS_ACQ_ALPHABET = ['Э', 'Х', 'Ξ', 'Δ', 'Ø', '0', '1', '/', '▓', '▒'];
+
+function contentsAcqSchedule(fn, ms) {
+    const id = setTimeout(fn, ms);
+    contentsAcqTimers.push(id);
+    return id;
+}
+
+function cancelContentsAcquisition() {
+    contentsAcqTimers.forEach(clearTimeout);
+    contentsAcqTimers = [];
+    contentsAcqActive = false;
+    document.querySelectorAll('.acq-overlay').forEach((el) => el.remove());
+}
+
+/* === ПОЛНЫЙ КАСКАД ОГЛАВЛЕНИЯ (большой ярус, раз на версию) ===
+   Ключ записывается на СТАРТЕ: обрыв не перезапускает каскад.
+   Анимируются видимое окно + 6 пунктов вперёд; остальные ждут
+   статичным скремблом и декодируются IntersectionObserver'ом
+   по мере скролла. Одновременно в decode — не больше 3 пунктов. */
+const CASCADE_KEY = 'echo_cascade_version';
+let cascadeActive = false;
+let cascadeObserver = null;
+let cascadeTimer = null;
+let cascadeRunning = 0;
+const cascadeQueue = [];
+const cascadePreRestore = new Map();   // item -> restore() статичного скрембла
+const cascadeFinishers = new Map();    // item -> finish() активного decode
+
+function contentsCascadeDue() {
+    if (typeof ECHO_VERSION === 'undefined' || typeof decodeText !== 'function') return false;
+    try { return localStorage.getItem(CASCADE_KEY) !== ECHO_VERSION; }
+    catch (e) { return false; }
+}
+
+function cascadePump() {
+    while (cascadeRunning < 3 && cascadeQueue.length) {
+        const item = cascadeQueue.shift();
+        const pre = cascadePreRestore.get(item);
+        if (pre) { pre(); cascadePreRestore.delete(item); }
+        cascadeRunning++;
+        cascadeFinishers.set(item, decodeText(item, {
+            duration: 300,
+            order: 'ltr',
+            onDone: () => {
+                cascadeRunning--;
+                cascadeFinishers.delete(item);
+                cascadePump();
+            }
+        }));
+    }
+    if (!cascadeQueue.length && !cascadeRunning && !cascadePreRestore.size) {
+        cascadeActive = false;
+        if (cascadeTimer) { clearInterval(cascadeTimer); cascadeTimer = null; }
+        if (cascadeObserver) { cascadeObserver.disconnect(); cascadeObserver = null; }
+    }
+}
+
+function runContentsCascade() {
+    try { localStorage.setItem(CASCADE_KEY, ECHO_VERSION); } catch (e) {}
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    if (cascadeActive) return;
+    cascadeActive = true;
+
+    const items = Array.from(document.querySelectorAll('.contents-item:not(.empty)'));
+    const vh = window.innerHeight;
+    const laterItems = [];
+    items.forEach((item) => {
+        const r = item.getBoundingClientRect();
+        if (r.top < vh && r.bottom > 0) cascadeQueue.push(item);
+        else laterItems.push(item);
+    });
+    /* 6 пунктов за окном анимируются сразу, остальные — по скроллу */
+    laterItems.splice(0, 6).forEach((item) => cascadeQueue.push(item));
+
+    if (laterItems.length && typeof IntersectionObserver === 'function') {
+        laterItems.forEach((item) => cascadePreRestore.set(item, scrambleStatic(item)));
+        cascadeObserver = new IntersectionObserver((entries) => {
+            entries.forEach((en) => {
+                if (!en.isIntersecting) return;
+                cascadeObserver.unobserve(en.target);
+                cascadeQueue.push(en.target);
+                cascadePump();
+            });
+        }, { root: null, rootMargin: '0px 0px 25% 0px' });
+        laterItems.forEach((item) => cascadeObserver.observe(item));
+    }
+
+    cascadeTimer = setInterval(cascadePump, 25);  /* стаггер 25 мс */
+    cascadePump();
+}
+
+/* обрыв (уход из оглавления): ожидающие пункты — сразу финальный текст */
+function cancelContentsCascade() {
+    if (cascadeTimer) { clearInterval(cascadeTimer); cascadeTimer = null; }
+    if (cascadeObserver) { cascadeObserver.disconnect(); cascadeObserver = null; }
+    cascadeQueue.length = 0;
+    cascadePreRestore.forEach((restore) => restore());
+    cascadePreRestore.clear();
+    cascadeFinishers.forEach((finish) => finish());
+    cascadeFinishers.clear();
+    cascadeRunning = 0;
+    cascadeActive = false;
+}
+
+/* единая точка показа/скрытия оглавления: большой ярус по версии,
+   иначе — короткое приобретение на каждый вход */
+let contentsEntryFxDone = false;  /* не более одного входного эффекта за сессию видимости */
+function onContentsShown() {
+    if (contentsEntryFxDone) return;  /* analog-drop и др. дёргают class без реального входа */
+    if (contentsCascadeDue()) {
+        contentsEntryFxDone = true;
+        cancelContentsAcquisition();
+        runContentsCascade();
+    } else if (!contentsAcqActive) {
+        contentsEntryFxDone = true;
+        startContentsAcquisition();
+    }
+}
+function onContentsHidden() {
+    contentsEntryFxDone = false;
+    cancelContentsAcquisition();
+    cancelContentsCascade();
+}
+
+function acqCorruptPositions(label) {
+    const letters = [];
+    for (let i = 0; i < label.length; i++) {
+        if (/[А-Яа-яA-Za-z0-9]/.test(label[i])) letters.push(i);
+    }
+    if (!letters.length) return [];
+    const count = Math.min(5, Math.max(1, Math.round(letters.length * 0.3)));
+    const positions = [];
+    const step = Math.max(1, Math.floor(letters.length / count));
+    for (let i = 0; i < count; i++) positions.push(letters[i * step]);
+    return positions;
+}
+
+function acqCorrupt(label, positions, salt) {
+    const chars = [...label];
+    positions.forEach((pos, i) => {
+        chars[pos] = CONTENTS_ACQ_ALPHABET[(salt + i * 3 + pos) % CONTENTS_ACQ_ALPHABET.length];
+    });
+    return chars.join('');
+}
+
+function startContentsAcquisition() {
+    document.title = 'acq-defined';
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    cancelContentsAcquisition();
+    contentsAcqActive = true;
+
+    const header = document.querySelector('.contents-header');
+    if (header) {
+        const ov = document.createElement('span');
+        ov.className = 'acq-overlay acq-header-overlay';
+        ov.setAttribute('aria-hidden', 'true');
+        ov.innerHTML = '<span class="acq-base"></span><span class="acq-cyan"></span><span class="acq-red"></span>';
+        header.appendChild(ov);
+        const base = ov.querySelector('.acq-base');
+        const cyan = ov.querySelector('.acq-cyan');
+        const red = ov.querySelector('.acq-red');
+        base.textContent = cyan.textContent = red.textContent = header.textContent;
+        ov.style.opacity = '0.25';
+        ov.style.filter = 'blur(2px)';
+        ov.style.transform = 'translate(-4px, -50%)';
+        contentsAcqSchedule(() => {
+            cyan.style.transform = 'translate(-3px, 0)';
+            cyan.style.opacity = '0.7';
+        }, 125);
+        contentsAcqSchedule(() => {
+            red.style.transform = 'translate(3px, 0)';
+            red.style.opacity = '0.5';
+            ov.style.filter = 'blur(2px) brightness(0.7)';
+        }, 210);
+        contentsAcqSchedule(() => {
+            ov.style.opacity = '0.9';
+            ov.style.filter = 'blur(0.5px)';
+            ov.style.transform = 'translate(0, -50%)';
+            cyan.style.opacity = '0';
+            red.style.opacity = '0';
+        }, 325);
+        contentsAcqSchedule(() => ov.remove(), 500);
+    }
+
+    const items = Array.from(document.querySelectorAll('.contents-item:not(.empty)'));
+    const vh = window.innerHeight;
+    const visible = items.filter((item) => {
+        const r = item.getBoundingClientRect();
+        return r.top < vh && r.bottom > 0;
+    });
+    const nextTwo = items.filter((item) => item.getBoundingClientRect().top >= vh).slice(0, 2);
+    const targets = visible.concat(nextTwo);
+
+    targets.forEach((item, idx) => {
+        const label = item.textContent;
+        const positions = acqCorruptPositions(label);
+        const corrupted1 = acqCorrupt(label, positions, 0);
+        const corrupted2 = acqCorrupt(label, positions.slice(0, 3), 1);
+        const ov = document.createElement('span');
+        ov.className = 'acq-overlay';
+        ov.setAttribute('aria-hidden', 'true');
+        ov.innerHTML = '<span class="acq-base"></span><span class="acq-cyan"></span><span class="acq-red"></span><span class="acq-slice"></span>';
+        item.appendChild(ov);
+        const base = ov.querySelector('.acq-base');
+        const cyan = ov.querySelector('.acq-cyan');
+        const red = ov.querySelector('.acq-red');
+        const slice = ov.querySelector('.acq-slice');
+        const setText = (t) => { base.textContent = cyan.textContent = red.textContent = slice.textContent = t; };
+        setText(label);
+        const delay = 180 + idx * 45;
+        ov.style.opacity = '0.12';
+        ov.style.filter = 'blur(1.8px) brightness(0.75)';
+        ov.style.transform = 'translate(0, calc(-50% + 3px))';
+        contentsAcqSchedule(() => {
+            setText(corrupted1);
+            ov.style.opacity = '0.35';
+            cyan.style.transform = 'translate(-3px, 0)';
+            cyan.style.opacity = '0.85';
+            ov.style.filter = 'blur(1.8px) brightness(1.25)';
+        }, delay + 78);
+        contentsAcqSchedule(() => {
+            setText(corrupted2);
+            red.style.transform = 'translate(3px, 0)';
+            red.style.opacity = '0.55';
+            ov.style.transform = 'translate(2px, calc(-50% + 3px))';
+            slice.style.transform = 'translate(3px, 0)';
+            slice.style.opacity = '1';
+        }, delay + 166);
+        contentsAcqSchedule(() => {
+            setText(label);
+            ov.style.opacity = '0.85';
+            ov.style.filter = 'blur(0.6px) brightness(1)';
+            ov.style.transform = 'translate(0, -50%)';
+            cyan.style.opacity = '0';
+            red.style.opacity = '0';
+            slice.style.opacity = '0';
+        }, delay + 250);
+        contentsAcqSchedule(() => {
+            ov.style.opacity = '1';
+            ov.style.filter = 'blur(0) brightness(1)';
+            ov.style.transform = 'translate(0, -50%)';
+        }, delay + 374);
+        contentsAcqSchedule(() => ov.remove(), delay + 520);
+    });
+}
+
+document.title = 'observer-registered';
+new MutationObserver(() => {
+    if (contentsScreen.classList.contains('visible')) {
+        onContentsShown();
+    } else {
+        onContentsHidden();
+    }
+}).observe(contentsScreen, { attributes: true, attributeFilter: ['class'] });
+document.title = 'setup-visible:' + contentsScreen.classList.contains('visible');
+if (contentsScreen.classList.contains('visible')) {
+    onContentsShown();
+    document.title = 'acq:' + document.querySelectorAll('.acq-overlay').length;
+}
 function initProgress() {
     const saved = loadState();
     if (saved.lastChapter === undefined || saved.lastChapter < 0) return;
@@ -1846,12 +2177,24 @@ function runFilmSequence() {
         filmGate.style.webkitClipPath = '';
         filmGate.style.transition = '';
         filmImage.style.opacity = '';
+        filmScreen.style.filter = '';
+        const crackleEl = filmScreen.querySelector('#film-crackle');
+        if (crackleEl) crackleEl.style.opacity = '0';
 
         const scratch = filmGate.querySelector('.film-scratch');
         if (scratch) scratch.remove();
 
         titleScreen.classList.add('visible');
         titleScreen.addEventListener('click', showContents, { once: true });
+
+        /* после плёнки фокус-пул титула: blur 12→0 за 1.7 с с задержкой
+           0.45 с; декод стартует в середине размытия (1.25 с), чтобы
+           лок символов и наводка резкости завершились вместе */
+        if (titleScreen.classList.contains('film-enter')) {
+            setTimeout(playTitleDecode, 1250);
+        } else {
+            playTitleDecode();
+        }
 
         setTimeout(() => {
             filmScreen.classList.remove('reduced', 'film-flick', 'film-breathe', 'film-hit-light', 'film-lamp-stutter', 'film-lamp-die', 'film-startup', 'film-catch-light', 'film-lamp-ignite');
@@ -1902,6 +2245,37 @@ function runFilmSequence() {
     }
 
     /* --- обычная серия --- */
+
+    /* треск символов в жёстких провалах: один переиспользуемый canvas,
+       кадры пересобираются на старте каждой серии */
+    let crackle = filmScreen.querySelector('#film-crackle');
+    if (!crackle) {
+        crackle = document.createElement('canvas');
+        crackle.id = 'film-crackle';
+        filmScreen.appendChild(crackle);
+    }
+    crackle.width = window.innerWidth;
+    crackle.height = window.innerHeight;
+    const crackleCtx = crackle.getContext('2d');
+    const crackleFrames = makeStaticFrames(window.innerWidth, window.innerHeight, {
+        frames: 2,
+        glyphs: 30,
+        colors: ['rgba(232,230,227,0.55)', 'rgba(0,168,232,0.5)']
+    });
+
+    /* показ на длину провала (60–120 мс), один swap кадров на 40 мс,
+       экран на время окна темнее (0.85) */
+    const crackleBurst = (ms) => {
+        const dur = Math.min(120, Math.max(60, ms));
+        crackleCtx.drawImage(crackleFrames[0], 0, 0);
+        crackle.style.opacity = '1';
+        filmScreen.style.filter = 'brightness(0.85)';
+        later(() => crackleCtx.drawImage(crackleFrames[1], 0, 0), 40);
+        later(() => {
+            crackle.style.opacity = '0';
+            filmScreen.style.filter = '';
+        }, dur);
+    };
 
     const pulse = (cls, ms) => {
         filmGate.classList.remove(cls);
@@ -2040,6 +2414,7 @@ function runFilmSequence() {
                 pulse('film-gap-dip', 160);
             } else {
                 filmGate.classList.add('film-gap');
+                crackleBurst(GAPS[gapIndex]);
             }
             if (nextFrame === 3) {
                 pulse('film-slip', 140);
@@ -2243,6 +2618,7 @@ function doExitChapterToContents() {
     readerGeneration++;            // leaving the reader invalidates pending writes
     clearTimeout(readPosTimer);
     readPosTimer = null;
+    cancelHeadingEffects();        /* если ушли в середине сборки — чистый текст */
     releaseReaderWakeLock();
     updateContentsMemory();
     cleanupVoiceObserver();

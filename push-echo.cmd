@@ -80,21 +80,16 @@ if errorlevel 1 (
     echo без node --check публикация невозможна. Такова политика проекта.
     goto :fail
 )
-node --check script.js >nul 2>&1
-if errorlevel 1 (
-    echo.
-    echo ОШИБКА СИНТАКСИСА в script.js:
-    node --check script.js
-    goto :fail
+for %%f in (script.js sw.js version.js glyph-utils.js) do (
+    node --check %%f >nul 2>&1
+    if errorlevel 1 (
+        echo.
+        echo ОШИБКА СИНТАКСИСА в %%f:
+        node --check %%f
+        goto :fail
+    )
 )
-node --check sw.js >nul 2>&1
-if errorlevel 1 (
-    echo.
-    echo ОШИБКА СИНТАКСИСА в sw.js:
-    node --check sw.js
-    goto :fail
-)
-echo node --check: script.js и sw.js — синтаксис в порядке.
+echo node --check: script.js, sw.js, version.js, glyph-utils.js — синтаксис в порядке.
 
 set "BASEREF=HEAD"
 if defined HAS_UPSTREAM set "BASEREF=@{u}"
@@ -102,8 +97,9 @@ pwsh -NoProfile -File "tests\run-static.ps1" -BaseRef "%BASEREF%"
 if errorlevel 1 (
     echo.
     echo Проверки НЕ пройдены. Если менялись файлы сайта (index.html, style.css,
-    echo script.js, sw.js, chapters.js, картинки, шрифты, иконки) — подними
-    echo CACHE_VERSION в начале sw.js ^(echo-vNN -^> следующий номер^) и повтори.
+    echo script.js, sw.js, chapters.js, version.js, glyph-utils.js, картинки,
+    echo шрифты, иконки) — подними ECHO_VERSION в version.js ^(vNN -^> следующий
+    echo номер^) и повтори.
     goto :fail
 )
 

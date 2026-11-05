@@ -1,0 +1,50 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>glyph-check</title>
+<body style="background:#111;margin:0;color:#9a9a9a;font:12px monospace">
+<div style="display:flex;gap:16px;padding:16px;align-items:flex-start">
+  <div>
+    <div>rasterized cover:</div>
+    <canvas id="c1" style="background:#000"></canvas>
+  </div>
+  <div>
+    <div>static frame 0 (over dark):</div>
+    <canvas id="c2" style="background:#000"></canvas>
+    <div>band frame 1 (45–55%):</div>
+    <canvas id="c3" style="background:#000"></canvas>
+  </div>
+  <div>
+    <div>original:</div>
+    <img src="/Zastavka.jpg" style="width:240px;display:block">
+  </div>
+</div>
+<pre id="out" style="padding:0 16px">pending</pre>
+<script src="/glyph-utils.js"></script>
+<script>
+var out = document.getElementById('out');
+window.onerror = function (m) { out.textContent = 'ERR ' + m; };
+var img = new Image();
+img.onload = function () {
+    echoWhenIdle(function () {
+        try {
+            var r = rasterizeToGlyphs(img, 96);
+            drawGlyphField(document.getElementById('c1'), r.cells, {
+                cols: r.cols, rows: r.rows, cellW: 7, cellH: 13,
+                color: '#d8d5d0', alphaJitter: 0.25, jitter: 1.2
+            });
+            var frames = makeStaticFrames(320, 180, {});
+            document.getElementById('c2').getContext('2d').drawImage(frames[0], 0, 0);
+            var bandFrames = makeStaticFrames(320, 180, { frames: 2, glyphs: 40, band: [0.45, 0.55] });
+            document.getElementById('c3').getContext('2d').drawImage(bandFrames[1], 0, 0);
+            out.textContent = 'OK cols=' + r.cols + ' rows=' + r.rows +
+                ' cellW=' + r.cellW.toFixed(1) + ' cellH=' + r.cellH.toFixed(1) +
+                ' frames=' + frames.length +
+                ' typeof fns=' + [typeof rasterizeToGlyphs, typeof drawGlyphField, typeof makeStaticFrames].join(',');
+        } catch (e) {
+            out.textContent = 'ERR ' + e.message;
+        }
+    });
+};
+img.onerror = function () { out.textContent = 'ERR image load'; };
+img.src = '/Zastavka.jpg';
+</script>

@@ -1,0 +1,105 @@
+<!doctype html>
+<!-- Acquisition diagnostic: open chapter 0, exit to contents, count overlays. -->
+<meta charset="utf-8">
+<title>acqdiag</title>
+<body>
+<iframe id="f" style="width:900px;height:400px"></iframe>
+<pre id="out">running…</pre>
+<script>
+(function () {
+    var out = document.getElementById('out');
+    function log(s) { out.textContent += '\n' + s; }
+    var f = document.getElementById('f');
+    var mode0 = new URLSearchParams(location.search).get('mode') || 'chapter';
+    try {
+        if (mode0 === 'progress') {
+            localStorage.setItem('echo_state', JSON.stringify({
+                lastChapter: 0, lastVisit: '2026-10-25T10:00:00.000Z'
+            }));
+        } else {
+            localStorage.removeItem('echo_state');
+        }
+    } catch (e) {}
+
+    var inject =
+        '<script>' +
+        'window.__errs=[];' +
+        'window.onerror=function(m,s,l,c){window.__errs.push(m+" @"+l+":"+c);};' +
+        'var nosw={register:function(){return new Promise(function(){});},addEventListener:function(){},controller:null};' +
+        'try{Object.defineProperty(navigator,"serviceWorker",{value:nosw,configurable:true});}catch(e){}' +
+        '<\/script>';
+
+    fetch('/index.html').then(function (r) { return r.text(); }).then(function (html) {
+        html = html.replace('<head>', '<head><base href="/">');
+        html = html.replace('<script src="chapters.js"><\/script>', inject + '<script src="chapters.js"><\/script>');
+        f.srcdoc = html;
+    });
+
+    var poll = setInterval(function () {
+        try {
+            if (f.contentWindow && f.contentWindow.__errs &&
+                typeof f.contentWindow.openChapter === 'function') {
+                clearInterval(poll);
+                setTimeout(run, 800);
+            }
+        } catch (e) {}
+    }, 300);
+
+    function run() {
+        try {
+            var w = f.contentWindow, d = f.contentDocument;
+            if (w.__errs.length) log('page errors: ' + w.__errs.join(' || '));
+            var mode = new URLSearchParams(location.search).get('mode') || 'chapter';
+            if (mode === 'direct') {
+                try {
+                    var obs = new w.MutationObserver(function () {});
+                    obs.observe(d.getElementById('contents-screen'), { attributes: true, attributeFilter: ['class'] });
+                    log('observer constructed and observing');
+                } catch (e) { log('OBSERVE ERROR: ' + e.message); }
+                try {
+                    w.startContentsAcquisition();
+                    log('direct call returned; overlays=' + d.querySelectorAll('.acq-overlay').length);
+                } catch (e) { log('START ERROR: ' + e.message); }
+                setTimeout(function () {
+                    log('after sequence: overlay count=' + d.querySelectorAll('.acq-overlay').length);
+                    log('DONE');
+                }, 2000);
+            } else if (mode === 'progress') {
+                // saved-progress entry: setup-time acquisition call
+                setTimeout(function () {
+                    log('progress entry: overlay count=' + d.querySelectorAll('.acq-overlay').length);
+                    log('contents class: "' + d.getElementById('contents-screen').className + '"');
+                    setTimeout(function () {
+                        log('after sequence: overlay count=' + d.querySelectorAll('.acq-overlay').length);
+                        log('DONE');
+                    }, 2000);
+                }, 800);
+            } else if (mode === 'title') {
+                w.showContents();
+                setTimeout(function () {
+                    log('title entry: overlay count=' + d.querySelectorAll('.acq-overlay').length);
+                    setTimeout(function () {
+                        log('after sequence: overlay count=' + d.querySelectorAll('.acq-overlay').length);
+                        log('DONE');
+                    }, 2000);
+                }, 2000);
+            } else {
+                w.openChapter(0);
+                setTimeout(function () {
+                    w.doExitChapterToContents();
+                    setTimeout(function () {
+                        log('after exit: overlay count=' + d.querySelectorAll('.acq-overlay').length);
+                        log('contentsAcqActive=' + w.contentsAcqActive);
+                        log('errors now: ' + (w.__errs.length ? w.__errs.join(' || ') : 'none'));
+                        setTimeout(function () {
+                            log('after sequence: overlay count=' + d.querySelectorAll('.acq-overlay').length);
+                            log('errors end: ' + (w.__errs.length ? w.__errs.join(' || ') : 'none'));
+                            log('DONE');
+                        }, 2000);
+                    }, 800);
+                }, 800);
+            }
+        } catch (e) { log('RUN ERROR: ' + e.message); }
+    }
+})();
+</script>
