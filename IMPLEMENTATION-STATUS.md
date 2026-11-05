@@ -22,11 +22,11 @@ A commit can never contain its own hash. Therefore:
 - **Target branch:** work/echo-step4-implementation — **CREATED AND VERIFIED**; descends from the pinned commit
 - **Actual current branch:** work/echo-step4-implementation
 - **Baseline commit (pinned):** e2acadbf5f2d07c03701dc7c002cd30161d3e1e1
-- **HEAD immediately before this commit** 〔field renamed v1.2 — the file is edited BEFORE the current commit exists; it never asserts the current commit's final SHA〕**:** 85e9e4e2a33cb35380bc9e994948d38e911e7b5d (`docs: Step-4 implementation package`)
-- **Working tree state immediately before staging** 〔field renamed v1.2 — the post-commit clean-tree state belongs to Kimi's completion report, not to this pre-commit file〕**:** only new `tests/BASELINE.md` and this B-0 update to `IMPLEMENTATION-STATUS.md`
-- **Current task:** B-0 — record the actual pre-implementation test baseline
-- **Last completed checkpoint:** B-0 — actual pre-implementation baseline recorded; **COMPLETE IN THIS COMMIT**
-- **Exact next action:** playbook §7.5 / §8 T1 — remove the dead `glyph-utils.js` script tag (the canonical earliest runnable Track-1 task; W-1 is also eligible for later sequential interleaving)
+- **HEAD immediately before this commit** 〔field renamed v1.2 — the file is edited BEFORE the current commit exists; it never asserts the current commit's final SHA〕**:** 5ce8140b5d7d4be563d610554c79412a1c1f86da (`test: record pre-implementation baseline (B-0)`)
+- **Working tree state immediately before staging** 〔field renamed v1.2 — the post-commit clean-tree state belongs to Kimi's completion report, not to this pre-commit file〕**:** only the one-line `index.html` T1 change and this T1 update to `IMPLEMENTATION-STATUS.md`
+- **Current task:** T1 — remove the dead `glyph-utils.js` script tag
+- **Last completed checkpoint:** T1 — dead script tag removed and regression-checked; **COMPLETE IN THIS COMMIT**
+- **Exact next action:** playbook §7.5 / §8 T2 — repair the 10 broken CSS declarations and add the full-file parse check
 - **Current stop/blocker reason:** none
 
 ## Task ledger
@@ -35,8 +35,8 @@ Ledger rows are grouped by their canonical workstream/reference order (ROADMAP v
 
 | Task | Status | Commit | Checks run | Result summary | Limitations / notes |
 | --- | --- | --- | --- | --- | --- |
-| B-0 | COMPLETE IN THIS COMMIT | pending post-commit resolution | `pwsh tests/run-static.ps1`; `unit-state.html`; `effects-lab.html` (default cover suite); `focusprobe.html` | Static: 33 PASS, exit 0; unit-state: 17 PASS / `RESULT: OK`; effects-lab: `no errors` / `DONE`; focusprobe: progress-continue button active / `DONE` | Expected chapters-meta mismatch NOT reproduced; no other failure observed in the executed checks; full record in `tests/BASELINE.md`; PA items remain pending |
-| T1 | NOT STARTED | — | — | — | |
+| B-0 | COMPLETE | 5ce8140b5d7d4be563d610554c79412a1c1f86da | `pwsh tests/run-static.ps1`; `unit-state.html`; `effects-lab.html` (default cover suite); `focusprobe.html` | Static: 33 PASS, exit 0; unit-state: 17 PASS / `RESULT: OK`; effects-lab: `no errors` / `DONE`; focusprobe: progress-continue button active / `DONE` | Expected chapters-meta mismatch NOT reproduced; no other failure observed in the executed checks; full record in `tests/BASELINE.md`; PA items remain pending |
+| T1 | COMPLETE IN THIS COMMIT | pending post-commit resolution | Direct `/` load + intro/TOC/chapter; HTTP status log; `errprobe.html?clear=1`; SW status probe; `pwsh tests/run-static.ps1`; `git diff --check` | Cover→title→TOC and chapter 01 opened; runtime errors none; direct `/` responses all 200 with no glyph-utils request; SW activated/controller=true/cache echo-v66; static 33 PASS | WebView2 local only. Auxiliary harness pages emitted favicon/srcdoc-relative 404s outside the direct `/` load; no application source path implicated. |
 | T2 | NOT STARTED | — | — | — | |
 | T4 | NOT STARTED | — | — | — | |
 | T3 | NOT STARTED | — | — | — | |
@@ -119,3 +119,4 @@ This table is a summary only. Canonical detail lives in `lab/ascii-water/perform
 | 2026-11-05 | Step-4 final reconciliation (documentation) | ROADMAP v2.1, TASKS v4.1, DECISIONS v4.1, PLAYBOOK v1.1, STATUS v1.1 — one-task-lag SHA rule, dependency classification, diagnostic-vs-gate performance split, 32 self-contained prompts | — (not yet committed to repo) |
 | 2026-11-05 | Step-4 final CORRECTIVE reconciliation (documentation) | ROADMAP v2.2, TASKS v4.2, DECISIONS v4.2, PLAYBOOK v1.2, STATUS v1.2 + new ИНСТРУКЦИЯ АГА.md — dynamic predecessor SHA, real Track-2 interleaving, S3/PENDING-AUTHOR split, B-0-based baseline logic, STATUS file-scope exception, executable S1, W-8 conditional splash, T6 self-containment, ИНСТРУКЦИЯ АГА author guide | — (not yet committed to repo) |
 | 2026-11-05 | B-0 | Preceding commit read from Git history: Step-4 documentation `85e9e4e2a33cb35380bc9e994948d38e911e7b5d`. Captured the actual static and three-page browser baseline in `tests/BASELINE.md`; expected chapters-meta mismatch not reproduced; no code changed. | pending post-commit resolution |
+| 2026-11-05 | T1 | Actual predecessor: B-0 `5ce8140b5d7d4be563d610554c79412a1c1f86da`. Removed only the dead `glyph-utils.js` tag from `index.html`; direct intro/chapter flow, runtime-error probe, SW activation, HTTP status log, and static checks completed. | pending post-commit resolution |
