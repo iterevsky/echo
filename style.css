@@ -1481,7 +1481,7 @@ html, body {
     color: #c41e3a;
 }
 
-/* === VOICE: STANDARD — мягкое мерцание === */
+/* === VOICE: STANDARD — stepped jitter + slice bursts === */
 .voice-glitch[data-voice-mode="standard"] {
     color: #b8b5b0;
     transition: color 0.3s ease;
