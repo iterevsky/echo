@@ -22,11 +22,11 @@ A commit can never contain its own hash. Therefore:
 - **Target branch:** work/echo-step4-implementation — **CREATED AND VERIFIED**; descends from the pinned commit
 - **Actual current branch:** work/echo-step4-implementation
 - **Baseline commit (pinned):** e2acadbf5f2d07c03701dc7c002cd30161d3e1e1
-- **HEAD immediately before this commit** 〔field renamed v1.2 — the file is edited BEFORE the current commit exists; it never asserts the current commit's final SHA〕**:** bbc2529f113d4c23c24768b8ae954d43d9ad2418 (`fix: remove dead glyph-utils.js script tag (D1)`)
-- **Working tree state immediately before staging** 〔field renamed v1.2 — the post-commit clean-tree state belongs to Kimi's completion report, not to this pre-commit file〕**:** only the scoped `style.css` and `tests/run-static.ps1` T2 changes plus this T1/T2 ledger update
-- **Current task:** T2 — repair 10 broken CSS declarations and add a full-file parse check
-- **Last completed checkpoint:** T2 — CSS declarations repaired, parser gate and browser regression matrix passed; **COMPLETE IN THIS COMMIT**
-- **Exact next action:** playbook §7.5 / §8 T4 — remove both Vibration API call sites (D5)
+- **HEAD immediately before this commit** 〔field renamed v1.2 — the file is edited BEFORE the current commit exists; it never asserts the current commit's final SHA〕**:** 11094f7704ce4195820c55aa4405c8621a07105e (`fix: repair 10 broken CSS declarations + add full-file parse check (D3)`)
+- **Working tree state immediately before staging** 〔field renamed v1.2 — the post-commit clean-tree state belongs to Kimi's completion report, not to this pre-commit file〕**:** only the two scoped haptics removals in `script.js` plus this T2/T4 ledger update
+- **Current task:** T4 — remove both Vibration API call sites
+- **Last completed checkpoint:** T4 — haptics removed; VOICE, film-hit, reader, and static regressions passed; **COMPLETE IN THIS COMMIT**
+- **Exact next action:** playbook §7.5 / §8 T3 — unify `version.js` and `sw.js` into one version model (D2)
 - **Current stop/blocker reason:** none
 
 ## Task ledger
@@ -37,8 +37,8 @@ Ledger rows are grouped by their canonical workstream/reference order (ROADMAP v
 | --- | --- | --- | --- | --- | --- |
 | B-0 | COMPLETE | 5ce8140b5d7d4be563d610554c79412a1c1f86da | `pwsh tests/run-static.ps1`; `unit-state.html`; `effects-lab.html` (default cover suite); `focusprobe.html` | Static: 33 PASS, exit 0; unit-state: 17 PASS / `RESULT: OK`; effects-lab: `no errors` / `DONE`; focusprobe: progress-continue button active / `DONE` | Expected chapters-meta mismatch NOT reproduced; no other failure observed in the executed checks; full record in `tests/BASELINE.md`; PA items remain pending |
 | T1 | COMPLETE | bbc2529f113d4c23c24768b8ae954d43d9ad2418 | Direct `/` load + intro/TOC/chapter; HTTP status log; `errprobe.html?clear=1`; SW status probe; `pwsh tests/run-static.ps1`; `git diff --check` | Cover→title→TOC and chapter 01 opened; runtime errors none; direct `/` responses all 200 with no glyph-utils request; SW activated/controller=true/cache echo-v66; static 33 PASS | WebView2 local only. Auxiliary harness pages emitted favicon/srcdoc-relative 404s outside the direct `/` load; no application source path implicated. |
-| T2 | COMPLETE IN THIS COMMIT | pending post-commit resolution | Parser positive/negative test; computed keyframes/gaps; film + CRT; grain A/B; reader sheet at 320/390/430/768/1280 × sizes 0–3; `pwsh tests/run-static.ps1`; `git diff --check` | Pre-T2 fixture: 10 parse errors; current: 0; all computed/layout/film/CRT checks passed; grain visually shifted; static 34 PASS | Local WebView2 only; deterministic animation timestamps used for CRT and isolated visual grain frames; no physical-device checks. |
-| T4 | NOT STARTED | — | — | — | |
+| T2 | COMPLETE | 11094f7704ce4195820c55aa4405c8621a07105e | Parser positive/negative test; computed keyframes/gaps; film + CRT; grain A/B; reader sheet at 320/390/430/768/1280 × sizes 0–3; `pwsh tests/run-static.ps1`; `git diff --check` | Pre-T2 fixture: 10 parse errors; current: 0; all computed/layout/film/CRT checks passed; grain visually shifted; static 34 PASS | Local WebView2 only; deterministic animation timestamps used for CRT and isolated visual grain frames; no physical-device checks. |
+| T4 | COMPLETE IN THIS COMMIT | pending post-commit resolution | `vibrat` search; real `?ch=20` aggressive shock; `voice-test.html`; natural film frame-6 hit; `pwsh tests/run-static.ps1`; `git diff --check` | No vibration references; VOICE layers + prev/next shock and cleanup passed; frame-06 hit + hit-light fired; reader chapter rendered; static 34 PASS | Local WebView2; iframe observer did not fire under synthetic scroll, so the real generator was invoked directly; visual peaks held only for screenshots; no physical-device checks. |
 | T3 | NOT STARTED | — | — | — | |
 | T7 | NOT STARTED | — | — | — | |
 | T8 | NOT STARTED | — | — | — | D-10 B only; removes the known meta failure IF B-0 reproduced it — no blanket green-baseline promise |
@@ -121,3 +121,4 @@ This table is a summary only. Canonical detail lives in `lab/ascii-water/perform
 | 2026-11-05 | B-0 | Preceding commit read from Git history: Step-4 documentation `85e9e4e2a33cb35380bc9e994948d38e911e7b5d`. Captured the actual static and three-page browser baseline in `tests/BASELINE.md`; expected chapters-meta mismatch not reproduced; no code changed. | pending post-commit resolution |
 | 2026-11-05 | T1 | Actual predecessor: B-0 `5ce8140b5d7d4be563d610554c79412a1c1f86da`. Removed only the dead `glyph-utils.js` tag from `index.html`; direct intro/chapter flow, runtime-error probe, SW activation, HTTP status log, and static checks completed. | pending post-commit resolution |
 | 2026-11-05 | T2 | Actual predecessor: T1 `bbc2529f113d4c23c24768b8ae954d43d9ad2418`. Repaired exactly 10 CSS declarations; added dependency-free full-file CSS parsing; parser negative/positive, computed-style, film/CRT, visual grain, and 5-width × 4-size reader checks completed. | pending post-commit resolution |
+| 2026-11-05 | T4 | Actual predecessor: T2 `11094f7704ce4195820c55aa4405c8621a07105e`. Removed both Vibration API blocks and their only comment; verified real VOICE shock visuals/cleanup, natural frame-6 film hit, chapter rendering, and 34 static checks. | pending post-commit resolution |

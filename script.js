@@ -1074,11 +1074,6 @@ function generateAggressiveGlitch(el) {
             }
         }
 
-        // Вибрация
-        if (navigator.vibrate) {
-            navigator.vibrate([30, 60, 30]);
-        }
-
         setTimeout(() => {
             base.style.animation = '';
             red.style.animation = '';
@@ -2062,7 +2057,6 @@ function runFilmSequence() {
             if (nextFrame === 5) {
                 pulse('film-hit', 300);
                 pulseScreen('film-hit-light', 300);
-                if (navigator.vibrate) navigator.vibrate(30);
             }
             if (nextFrame === 6) {
                 filmGate.classList.add('film-push');
