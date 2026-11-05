@@ -116,6 +116,7 @@ html, body {
 #cover-screen img {
     max-width: 92%;
     max-height: 88vh;
+    max-height: 88dvh;
     object-fit: contain;
     -webkit-user-drag: none;
     user-select: none;
@@ -124,6 +125,13 @@ html, body {
         transparent 0%, black 10%, black 90%, transparent 100%);
     mask-image: linear-gradient(to bottom,
         transparent 0%, black 10%, black 90%, transparent 100%);
+}
+
+@media (max-width: 768px) {
+    #cover-screen img {
+        display: block;
+        margin-inline: auto;
+    }
 }
 
 /* дыхание разлома: тихая пульсация свечения в верхней трети по центру */
@@ -1266,6 +1274,7 @@ html, body {
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
     border-top: 1px solid #1a1a1a;
+    padding-bottom: env(safe-area-inset-bottom);
     transform: translateY(0);
     transition: transform 0.3s ease;
     user-select: none;
