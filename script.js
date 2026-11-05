@@ -322,10 +322,55 @@ const chapters = Array.from(items).map((item, index) => {
     const num = String(index + 1).padStart(2, '0');
     const raw = item.textContent.trim();
     const title = raw.replace(/^\d+\s*[•\s]*/, '').trim();
-    const rawText = chapterTexts[index];
-    const text = rawText || `<p class="placeholder">Глава в процессе написания…</p>`;
-    return { number: num, title, text, empty: !rawText };
+    return { number: num, title, text: '', empty: false };
 });
+
+let chaptersPromise = null;
+function applyChapterTexts() {
+    if (typeof chapterTexts === 'undefined' || !chapterTexts || typeof chapterTexts !== 'object' || Array.isArray(chapterTexts)) {
+        throw new Error('chapterTexts unavailable after load');
+    }
+    chapters.forEach((chapter, index) => {
+        const rawText = chapterTexts[index];
+        chapter.empty = typeof rawText !== 'string' || !rawText.trim();
+        chapter.text = chapter.empty ? `<p class="placeholder">Глава в процессе написания…</p>` : rawText;
+    });
+    updateContentsMemory();
+}
+
+function ensureChapters() {
+    if (chaptersPromise) return chaptersPromise;
+    if (typeof chapterTexts !== 'undefined') {
+        chaptersPromise = Promise.resolve().then(applyChapterTexts);
+        return chaptersPromise;
+    }
+    chaptersPromise = new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        const fail = () => {
+            script.onload = script.onerror = null;
+            script.remove();
+            chaptersPromise = null;
+            reject(new Error('Unable to load chapters.js'));
+        };
+        script.src = 'chapters.js';
+        script.async = true;
+        script.onload = () => {
+            try {
+                applyChapterTexts();
+                resolve();
+            } catch (error) {
+                fail();
+            }
+        };
+        script.onerror = fail;
+        document.head.appendChild(script);
+    });
+    return chaptersPromise;
+}
+
+function prefetchChapters() {
+    ensureChapters().catch(() => {});
+}
 
 /* --- обход пустых глав: «в работе» пропускаются всеми переходами --- */
 function nextReadableIndex(from) {
@@ -423,7 +468,7 @@ updateContentsMemory();
 
 /* single initial-route decision: SW-reload flag first, then deep/hash links,
    then saved-progress overlay, else the cover. Nothing paints before this. */
-function applyInitialRoute() {
+async function applyInitialRoute() {
     let swRoute = null;
     try {
         const raw = sessionStorage.getItem('echo_sw_route');
@@ -433,17 +478,17 @@ function applyInitialRoute() {
         }
     } catch (e) {}
 
-    // decision is made: remove the pending state now so the applied route
-    // (including the progress overlay's focused button) is actually visible
+    // reveal the cover immediately; chapter text loading must not block it
     document.documentElement.classList.remove('routing-pending');
 
-    if (swRoute && typeof swRoute.chapter === 'number' &&
-        chapters[swRoute.chapter] && !chapters[swRoute.chapter].empty) {
+    if (swRoute && typeof swRoute.chapter === 'number' && chapters[swRoute.chapter]) {
         hideIntroScreens();
-        openChapter(swRoute.chapter, { restore: !!swRoute.restore });
-    } else if (!handleDeepLink() && !handleHashLink()) {
-        initProgress();
+        await openChapter(swRoute.chapter, { restore: !!swRoute.restore });
+        return;
     }
+    if (await handleDeepLink()) return;
+    if (await handleHashLink()) return;
+    await initProgress();
 }
 applyInitialRoute();
 
@@ -566,6 +611,7 @@ document.addEventListener('click', () => {
 function startSequence() {
     if (isStarted) return;
     isStarted = true;
+    prefetchChapters();
     startFilmPreload();
 
     // 1. Убираем картинку
@@ -674,13 +720,64 @@ function bootContentsOnce() {
     }
 }
 
-function openChapter(index, opts = {}) {
-    if (index < 0 || index >= chapters.length) return;
-    if (chapters[index].empty) return;
-    // invalidate any pending position write from the previous chapter
-    readerGeneration++;
+function showChapterPending(index) {
+    const chapter = chapters[index];
+    if (!chapter) { openContentsFresh(); return; }
+    hideIntroScreens();
+    contentsScreen.classList.remove('visible');
+    contentsScreen.inert = true;
+    clearRevealTimers();
+    if (menuTrigger) menuTrigger.classList.remove('visible');
+    chapterScreen.querySelector('.chapter-number').textContent = 'Глава ' + chapter.number;
+    chapterScreen.querySelector('.chapter-title').textContent = chapter.title;
+    const textEl = chapterScreen.querySelector('.chapter-text');
+    textEl.innerHTML = '<p class="placeholder" role="status" style="margin:2em 0">Загрузка главы…</p>';
+    chapterScreen.classList.add('visible');
+    chapterScreen.inert = false;
+    chapterScreen.scrollTop = 0;
+    const pending = textEl.firstElementChild;
+    if (pending.animate && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        pending.animate([{ opacity: 0.3 }, { opacity: 0.85 }], {
+            duration: 650, direction: 'alternate', iterations: Infinity
+        });
+    }
+}
+
+function showChapterLoadError(index, retry) {
+    showChapterPending(index);
+    const textEl = chapterScreen.querySelector('.chapter-text');
+    textEl.innerHTML = '<p class="placeholder" role="alert">Не удалось загрузить главу. Проверьте соединение.</p>';
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = 'Повторить';
+    button.style.cssText = 'display:block;margin:1em 0;padding:10px 24px;background:none;border:1px solid #00A8E8;color:#00A8E8;font:inherit;cursor:pointer';
+    button.addEventListener('click', retry);
+    textEl.appendChild(button);
+    button.focus();
+}
+
+async function openChapter(index, opts = {}) {
+    if (!chapters[index]) { openContentsFresh(); return false; }
+    const generation = ++readerGeneration;
+    const wasChapterVisible = chapterScreen.classList.contains('visible');
     clearTimeout(readPosTimer);
     readPosTimer = null;
+    showChapterPending(index);
+    try {
+        await ensureChapters();
+    } catch (error) {
+        if (generation === readerGeneration) {
+            showChapterLoadError(index, () => openChapter(index, opts));
+        }
+        return null;
+    }
+    if (generation !== readerGeneration) return null;
+    if (chapters[index].empty) {
+        chapterScreen.classList.remove('visible');
+        chapterScreen.inert = true;
+        openContentsFresh();
+        return false;
+    }
     const tearOverlay = document.getElementById('tear-overlay');
     const chScreen = document.getElementById('chapter-screen');
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -702,7 +799,7 @@ function openChapter(index, opts = {}) {
     setBarHidden(false);
 
     // ушли «вперёд» из открытой главы — она считается прочитанной
-    if (chapterScreen.classList.contains('visible') && index > currentChapter) {
+    if (wasChapterVisible && index > currentChapter) {
         const sFwd = loadState();
         const posFwd = sFwd.readPos || {};
         if ((posFwd[currentChapter] || 0) < 0.85) {
@@ -1518,7 +1615,7 @@ function hideIntroScreens() {
 }
 
 /* deep-link ?ch=N: открыть главу сразу; пустая/невалидная — в оглавление */
-function handleDeepLink() {
+async function handleDeepLink() {
     const m = /[?&]ch=(\d+)/.exec(location.search);
     if (!m) return false;
     const idx = parseInt(m[1], 10);
@@ -1526,25 +1623,25 @@ function handleDeepLink() {
     hideIntroScreens();
     updateContentsMemory();
 
-    if (isNaN(idx) || idx < 0 || idx >= chapters.length || chapters[idx].empty) {
+    if (isNaN(idx) || idx < 0 || idx >= chapters.length) {
         openContentsFresh();
         return true;
     }
-    openChapter(idx);
+    await openChapter(idx);
     return true;
 }
 
 /* ссылка вида #ch-12: внешний переход (history.state пуст) — открыть главу сразу.
    Перезагрузка внутри сессии (history.state уже наш) — НЕ перехватываем:
    отдаём ход initProgress(), чтобы показать «Продолжить / Начать сначала» */
-function handleHashLink() {
+async function handleHashLink() {
     const m = (location.hash || '').match(/^#ch-(\d+)$/);
     if (!m) return false;
     if (history.state && history.state.echoChapter !== undefined) return false;
     const idx = chapters.findIndex((c) => String(c.number) === m[1]);
-    if (idx < 0 || chapters[idx].empty) return false; /* пустые главы («в работе») не открываем */
+    if (idx < 0) return false;
     hideIntroScreens(); /* новый читатель по ссылке — без заставки */
-    openChapter(idx);
+    await openChapter(idx);
     return true;
 }
 
@@ -1575,12 +1672,19 @@ function revealContentsItems() {
     });
 }
 
-function initProgress() {
+async function initProgress() {
     const saved = loadState();
     if (saved.lastChapter === undefined || saved.lastChapter < 0) return;
+    isStarted = true;
 
+    try {
+        await ensureChapters();
+    } catch (error) {
+        showChapterLoadError(saved.lastChapter, initProgress);
+        return;
+    }
     const chapter = chapters[saved.lastChapter];
-    if (!chapter || chapter.empty) return;
+    if (!chapter || chapter.empty) { openContentsFresh(); return; }
 
     hideIntroScreens();
 
@@ -1791,11 +1895,15 @@ buildFilmGrain();
 
 /* preload only when the intro will actually run: bypassed intro
    (deep link, hash link, saved progress) never plays the film */
+function prefetchIntroAssets() {
+    prefetchChapters();
+    startFilmPreload();
+}
 if (!isStarted) {
     if ('requestIdleCallback' in window) {
-        requestIdleCallback(startFilmPreload, { timeout: 8000 });
+        requestIdleCallback(prefetchIntroAssets, { timeout: 8000 });
     } else {
-        setTimeout(startFilmPreload, 4000);
+        setTimeout(prefetchIntroAssets, 4000);
     }
 }
 

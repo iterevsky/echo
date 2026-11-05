@@ -74,7 +74,7 @@ function Test-CssSyntax([string]$text) {
 }
 
 # files served by the website — changing any of them requires a CACHE_VERSION bump
-$served = @('index.html','style.css','script.js','chapters.js','sw.js','chapters-meta.js',
+$served = @('index.html','style.css','script.js','chapters.js','sw.js',
             'Zastavka.jpg','icons/','fonts/','images/')
 
 Push-Location $root
@@ -109,7 +109,7 @@ try {
 } finally { Pop-Location }
 
 # --- required served files exist ---
-foreach ($f in 'index.html','style.css','script.js','chapters.js','chapters-meta.js','sw.js') {
+foreach ($f in 'index.html','style.css','script.js','chapters.js','sw.js') {
     Check "exists: $f" (Test-Path (Join-Path $root $f))
 }
 
@@ -126,18 +126,6 @@ Check 'CSS full-file parse (0 errors)' (@($cssErrors).Count -eq 0)
 # --- viewport meta unchanged (zoom change is prohibited) ---
 $vp = Select-String -Path (Join-Path $root 'index.html') -Pattern 'name="viewport" content="([^"]+)"'
 Check 'viewport meta present and unchanged' ($vp -and $vp.Matches[0].Groups[1].Value -eq 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover')
-
-# --- chapters-meta.js consistent with index.html + chapters.js ---
-$meta = [System.IO.File]::ReadAllText((Join-Path $root 'chapters-meta.js'))
-$html = [System.IO.File]::ReadAllText((Join-Path $root 'index.html'))
-$htmlCount = [regex]::Matches($html, 'class="contents-item"').Count
-$metaCount = [int]([regex]::Match($meta, 'chapterCount:\s*(\d+)').Groups[1].Value)
-Check "chapterCount ($metaCount) == contents-item count ($htmlCount)" ($metaCount -eq $htmlCount)
-
-# regenerate meta and compare with committed file (line-ending insensitive)
-& pwsh -NoProfile -File (Join-Path $root 'tests/build-meta.ps1') | Out-Null
-$regen = [System.IO.File]::ReadAllText((Join-Path $root 'chapters-meta.js'))
-Check 'chapters-meta.js is up to date with chapters.js' (($regen -replace "`r`n", "`n") -eq ($meta -replace "`r`n", "`n"))
 
 # --- sw.js precache entries (CORE_FILES + EXTRA_FILES) reference existing files ---
 $swListsOk = $true
