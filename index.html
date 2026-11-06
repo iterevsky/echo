@@ -449,6 +449,23 @@ body.install-open { overflow: hidden; }
     </div>
     <div id="reader-dim"></div>
 
+    <noscript id="noscript-fallback">
+      <style>
+        html.routing-pending body > :not(#noscript-fallback) { visibility: hidden !important; }
+        #noscript-fallback { position: fixed; inset: 0; z-index: 4000; display: flex; align-items: center; justify-content: center; padding: 32px; background: #0c0c0c; color: #e8e6e3; font-family: 'PT Serif', serif; text-align: center; visibility: visible; }
+        #noscript-fallback main { max-width: 34rem; }
+        #noscript-fallback h1 { margin: 0 0 16px; color: #00A8E8; font-family: 'Golos Text', sans-serif; font-size: clamp(3rem, 15vw, 6rem); letter-spacing: 0.16em; }
+        #noscript-fallback p { color: #b8b5b0; line-height: 1.65; }
+        #noscript-fallback a { color: #00A8E8; }
+      </style>
+      <main>
+        <h1>ЭХО</h1>
+        <p>Итеревский-Кочетов Иван</p>
+        <p>Для чтения книги необходим JavaScript. Включите его в настройках браузера и обновите страницу.</p>
+        <p>Связаться с автором: <a href="https://t.me/iterevsky">t.me/iterevsky</a></p>
+      </main>
+    </noscript>
+
     <script src="version.js"></script>
 <script src="script.js"></script>
 
