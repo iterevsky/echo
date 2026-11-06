@@ -114,6 +114,7 @@ function loadState() {
         return {};
     }
     const clean = sanitizeState(parsed);
+    if (!('v' in clean)) clean.v = 1;
     if (!stateChecked) {
         stateChecked = true;
         if (JSON.stringify(clean) !== JSON.stringify(parsed)) {
@@ -129,6 +130,7 @@ function saveState(patch) {
     try {
         const s = loadState();
         Object.assign(s, patch);
+        s.v = 1;
         localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
     } catch (e) {}
 }
