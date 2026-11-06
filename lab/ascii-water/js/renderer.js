@@ -159,6 +159,10 @@
             this.context.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
             if (this.scene) this.scene.resize(this.cols, this.rows);
             else this.scene = new root.Scene(this.cols, this.rows);
+            if (this.waves) this.waves.resize(this.cols, this.rows);
+            else this.waves = new root.WaveField(this.cols, this.rows);
+            this.scene.waveField = this.waves;
+            this.scene.displaceReflection = (x, y, field) => field ? field.sampleDisplacement(x, y) : { x, y };
             this.buildAtlases();
             this.buildTreatment();
             this.render();
@@ -181,7 +185,11 @@
                 for (let col = 0; col < this.cols; col++) {
                     const index = row * this.cols + col;
                     const threshold = (root.BAYER[row % 4][col % 4] + 0.5) / 16 - 0.5;
-                    const quantized = clamp(this.scene.glyphLum[index] + threshold * 0.10);
+                    const x = col / Math.max(1, this.cols - 1);
+                    const y = row / Math.max(1, this.rows - 1);
+                    const modulation = y < 0.56 ? 1 : this.waves.sampleModulation(x, y);
+                    const modulated = clamp(this.scene.glyphLum[index] * modulation);
+                    const quantized = clamp(modulated + threshold * 0.10);
                     const rampIndex = this.scene.ramp[index];
                     const ramp = root.RAMPS[rampIndex];
                     const glyphIndex = Math.round(quantized * (ramp.length - 1));
@@ -223,6 +231,8 @@
         handleMotionChange() {
             if (this.motionQuery.matches) {
                 this.stop();
+                this.waves.reset();
+                this.waves.phase = 0;
                 this.render();
             } else {
                 this.start();
@@ -236,10 +246,13 @@
             }
             this.rafId = requestAnimationFrame(this.tick);
             const started = performance.now();
+            const elapsed = this.lastTimestamp === null ? 0 : (timestamp - this.lastTimestamp) / 1000;
+            this.waves.advance(elapsed);
             this.render();
             const renderMs = performance.now() - started;
             if (this.metrics) {
-                const cells = this.cols + ' × ' + this.rows + ' @ ' + this.cellPx + ' px';
+                const cells = this.cols + ' × ' + this.rows + ' @ ' + this.cellPx + ' px'
+                    + '\nWaves ' + this.waves.ambientCount + ' ambient, ' + this.waves.sources.length + ' active, ' + this.waves.resetCount + ' resets';
                 if (this.lastTimestamp !== null) this.metrics.record(timestamp - this.lastTimestamp, renderMs, cells);
                 else {
                     this.metrics.lastRenderMs = renderMs;
@@ -248,6 +261,11 @@
                 }
             }
             this.lastTimestamp = timestamp;
+        }
+
+        drop(x, y, strength, radius) {
+            if (this.motionQuery.matches) return null;
+            return this.waves.drop(x, y, strength, radius);
         }
 
         getDiagnostics() {
@@ -260,8 +278,10 @@
                 drawCalls: this.drawCalls,
                 running: this.rafId !== null,
                 reducedMotion: this.motionQuery.matches,
-                displacementIdentity: this.scene.displaceReflection(0.31, 0.72, null).x === 0.31
-                    && this.scene.displaceReflection(0.31, 0.72, null).y === 0.72
+                displacementHookConnected: this.scene.waveField === this.waves,
+                waveSources: this.waves.sources.map(source => source.id),
+                wavePhase: this.waves.phase,
+                waveResets: this.waves.resetCount
             };
         }
     }
