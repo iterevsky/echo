@@ -983,6 +983,17 @@ if (photoOverlay) {
     const GROUP_SIZE = 15;          // Каждые 15 глав = одна группа
     const INTERVAL_MS = 15000;      // Раз в 15 секунд
     const GLITCH_DURATION = 1200;   // Длительность дребезга одной главы
+    const GLITCH_VARIANTS = ['shear', 'chroma-walk', 'drop-frame'];
+    const variantHistory = new WeakMap();
+    let variantSeed = 0x4543484f;
+
+    function pickGlitchVariant(item) {
+        variantSeed = (1664525 * variantSeed + 1013904223) >>> 0;
+        let index = variantSeed % GLITCH_VARIANTS.length;
+        if (index === variantHistory.get(item)) index = (index + 1) % GLITCH_VARIANTS.length;
+        variantHistory.set(item, index);
+        return GLITCH_VARIANTS[index];
+    }
 
     const contentsScreen = document.getElementById('contents-screen');
     if (!contentsScreen) return;
@@ -1011,11 +1022,13 @@ if (photoOverlay) {
             // пустые главы не дребезжат
             if (item.classList.contains('empty')) continue;
 
+            item.dataset.glitchVariant = pickGlitchVariant(item);
             item.classList.add('electric-glitch');
 
             // Убираем эффект после окончания анимации
             setTimeout(() => {
                 item.classList.remove('electric-glitch');
+                delete item.dataset.glitchVariant;
             }, GLITCH_DURATION);
         }
     }

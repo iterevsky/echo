@@ -1382,30 +1382,53 @@ html, body {
     }
 }
 /* === ЭЛЕКТРИЧЕСКИЙ ДРЕБЕЗГ В ОГЛАВЛЕНИИ === */
-@keyframes electric-glitch {
-    0%   { transform: translate(0, 0) scaleX(1); opacity: 1; text-shadow: none; filter: brightness(1); clip-path: inset(0 0 0 0); }
-    6%   { transform: translate(-2px, 1px) scaleX(1.02); opacity: 0.3; text-shadow: 1px 0 #00A8E8, -1px 0 #c41e3a; filter: brightness(1.4); }
-    12%  { transform: translate(2px, -1px) scaleX(1); opacity: 1; text-shadow: -1px 0 #00A8E8, 1px 0 #c41e3a; filter: brightness(1); }
-    18%  { transform: translate(-1px, 2px) scaleX(1.02); opacity: 0.7; text-shadow: 2px 0 #00A8E8; }
-    24%  { transform: translate(1px, -2px) scaleX(1); opacity: 1; text-shadow: none; }
-    30%  { transform: translate(-2px, 0) scaleX(1.02); opacity: 0.9; text-shadow: -2px 0 #c41e3a; }
-    36%  { transform: translate(5px, 0) scaleX(1.02); opacity: 0.8; clip-path: inset(30% 0 40% 0); text-shadow: 1px 0 #00A8E8; }
-    42%  { transform: translate(0, -1px) scaleX(1); opacity: 1; text-shadow: none; clip-path: inset(0 0 0 0); }
-    48%  { transform: translate(-1px, 2px) scaleX(1.02); opacity: 0.7; text-shadow: 2px 0 #c41e3a; }
-    54%  { transform: translate(1px, -1px) scaleX(1); opacity: 1; text-shadow: none; }
-    60%  { transform: translate(-2px, 1px) scaleX(1.02); opacity: 0.9; text-shadow: -1px 0 #00A8E8; }
-    66%  { transform: translate(-4px, 0) scaleX(1.02); opacity: 0.85; clip-path: inset(50% 0 20% 0); text-shadow: 1px 0 #c41e3a; }
-    72%  { transform: translate(1px, 0) scaleX(1); opacity: 1; text-shadow: none; clip-path: inset(0 0 0 0); }
-    78%  { transform: translate(-1px, 1px) scaleX(1.02); opacity: 0.75; text-shadow: 2px 0 #00A8E8; }
-    84%  { transform: translate(2px, -1px) scaleX(1); opacity: 1; text-shadow: none; }
-    90%  { transform: translate(0, 0) scaleX(1.02); opacity: 0.9; text-shadow: -1px 0 #c41e3a; }
-    100% { transform: translate(0, 0) scaleX(1); opacity: 1; text-shadow: none; filter: brightness(1); clip-path: inset(0 0 0 0); }
+@keyframes electric-glitch-shear {
+    0%   { transform: translateX(0) skewX(0); text-shadow: none; clip-path: inset(0 0 0 0); }
+    12%  { transform: translateX(-3px) skewX(-6deg); text-shadow: 2px 0 #00A8E8, -2px 0 #c41e3a; clip-path: inset(12% 0 60% 0); }
+    24%  { transform: translateX(4px) skewX(7deg); text-shadow: -2px 0 #00A8E8, 2px 0 #c41e3a; clip-path: inset(55% 0 10% 0); }
+    36%  { transform: translateX(-2px) skewX(-4deg); text-shadow: 1px 0 #00A8E8, -1px 0 #c41e3a; clip-path: inset(25% 0 35% 0); }
+    48%  { transform: translateX(3px) skewX(5deg); text-shadow: -2px 0 #00A8E8, 2px 0 #c41e3a; clip-path: inset(65% 0 5% 0); }
+    60%  { transform: translateX(-4px) skewX(-7deg); text-shadow: 2px 0 #00A8E8, -2px 0 #c41e3a; clip-path: inset(35% 0 25% 0); }
+    72%  { transform: translateX(2px) skewX(3deg); text-shadow: -1px 0 #00A8E8, 1px 0 #c41e3a; clip-path: inset(8% 0 70% 0); }
+    84%  { transform: translateX(-1px) skewX(-2deg); text-shadow: 1px 0 #00A8E8, -1px 0 #c41e3a; clip-path: inset(45% 0 20% 0); }
+    100% { transform: translateX(0) skewX(0); text-shadow: none; clip-path: inset(0 0 0 0); }
+}
+
+@keyframes electric-glitch-chroma-walk {
+    0%   { transform: translateX(0); text-shadow: none; clip-path: inset(0 0 0 0); }
+    10%  { transform: translateX(-1px); text-shadow: -3px 0 #00A8E8, 3px 0 #c41e3a; clip-path: inset(0 0 0 0); }
+    20%  { transform: translateX(1px); text-shadow: -2px 0 #00A8E8, 2px 0 #c41e3a; clip-path: inset(20% 0 20% 0); }
+    30%  { transform: translateX(-1px); text-shadow: -1px 0 #00A8E8, 1px 0 #c41e3a; clip-path: inset(40% 0 10% 0); }
+    40%  { transform: translateX(1px); text-shadow: 1px 0 #00A8E8, -1px 0 #c41e3a; clip-path: inset(60% 0 5% 0); }
+    50%  { transform: translateX(-1px); text-shadow: 2px 0 #00A8E8, -2px 0 #c41e3a; clip-path: inset(40% 0 10% 0); }
+    60%  { transform: translateX(1px); text-shadow: 3px 0 #00A8E8, -3px 0 #c41e3a; clip-path: inset(20% 0 20% 0); }
+    70%  { transform: translateX(-1px); text-shadow: 2px 0 #00A8E8, -2px 0 #c41e3a; clip-path: inset(0 0 0 0); }
+    80%  { transform: translateX(1px); text-shadow: 1px 0 #00A8E8, -1px 0 #c41e3a; clip-path: inset(55% 0 15% 0); }
+    90%  { transform: translateX(-1px); text-shadow: -1px 0 #00A8E8, 1px 0 #c41e3a; clip-path: inset(25% 0 35% 0); }
+    100% { transform: translateX(0); text-shadow: none; clip-path: inset(0 0 0 0); }
+}
+
+@keyframes electric-glitch-drop-frame {
+    0%   { transform: translateX(0) scaleX(1); text-shadow: none; clip-path: inset(0 0 0 0); }
+    10%, 30% { transform: translateX(-4px) scaleX(1.02); text-shadow: 2px 0 #00A8E8, -2px 0 #c41e3a; clip-path: inset(15% 0 60% 0); }
+    31%, 32% { transform: translateX(4px) scaleX(1); text-shadow: -2px 0 #00A8E8, 2px 0 #c41e3a; clip-path: inset(50% 0 15% 0); }
+    50%, 70% { transform: translateX(-2px) scaleX(1.03); text-shadow: 1px 0 #00A8E8, -1px 0 #c41e3a; clip-path: inset(30% 0 35% 0); }
+    71%, 90% { transform: translateX(3px) scaleX(1); text-shadow: -1px 0 #00A8E8, 1px 0 #c41e3a; clip-path: inset(65% 0 5% 0); }
+    100% { transform: translateX(0) scaleX(1); text-shadow: none; clip-path: inset(0 0 0 0); }
 }
 
 .contents-item.electric-glitch {
-    animation: electric-glitch 1.2s steps(1) forwards;
+    animation: electric-glitch-shear 1.2s steps(1) forwards;
     color: #e8e6e3 !important;
     transform-origin: left center;
+}
+
+.contents-item.electric-glitch[data-glitch-variant="chroma-walk"] {
+    animation-name: electric-glitch-chroma-walk;
+}
+
+.contents-item.electric-glitch[data-glitch-variant="drop-frame"] {
+    animation-name: electric-glitch-drop-frame;
 }
 
 .contents-item.electric-glitch .dot {
