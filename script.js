@@ -1721,7 +1721,7 @@ function revealContentsItems() {
             item.classList.add('revealed');
             const at = revealTimers.indexOf(id);
             if (at !== -1) revealTimers.splice(at, 1);
-        }, 200 + i * 80);
+        }, 200 + i * 20);
         revealTimers.push(id);
     });
 }
