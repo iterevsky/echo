@@ -41,6 +41,28 @@ const menuOverlay = document.getElementById('menu-overlay');
 const menuClose = document.getElementById('menu-close');
 
 let isMenuOpen = false;
+const overlayOpenOrder = [];
+
+function markOverlayOpen(overlay) {
+    const existing = overlayOpenOrder.indexOf(overlay);
+    if (existing !== -1) overlayOpenOrder.splice(existing, 1);
+    overlayOpenOrder.push(overlay);
+}
+
+function markOverlayClosed(overlay) {
+    const existing = overlayOpenOrder.indexOf(overlay);
+    if (existing !== -1) overlayOpenOrder.splice(existing, 1);
+}
+
+function getTopmostOpenOverlay() {
+    for (let i = overlayOpenOrder.length - 1; i >= 0; i--) {
+        const overlay = overlayOpenOrder[i];
+        if (overlay.classList.contains('open') || overlay.classList.contains('active') || overlay.classList.contains('visible')) {
+            return overlay;
+        }
+    }
+    return null;
+}
 
 let currentChapter = 0;
 
@@ -480,6 +502,20 @@ contentsScreen.addEventListener('click', (e) => {
     openChapter(idx);
 });
 
+function closeProgress(restoreFocus = true) {
+    const overlay = document.getElementById('progress-overlay');
+    if (!overlay || !overlay.classList.contains('visible')) return;
+    overlay.classList.remove('visible');
+    overlay.inert = true;
+    contentsScreen.classList.remove('progress-dimmed');
+    contentsScreen.inert = false;
+    markOverlayClosed(overlay);
+    if (restoreFocus) {
+        const item = contentsScreen.querySelector('.contents-item.current') || contentsScreen.querySelector('.contents-item');
+        if (item) item.focus();
+    }
+}
+
 // === КЛАВИАТУРА ===
 /* image gestures: cancel dragstart and contextmenu on images and their
    dedicated containers only — not site-wide, not text selection */
@@ -492,20 +528,17 @@ document.addEventListener('contextmenu', (e) => {
     }
 });
 document.addEventListener('keydown', (e) => {
-    // сначала — закрытие оверлеев в порядке приоритета, независимо от видимого экрана
     if (e.key === 'Escape') {
-        e.preventDefault();
-        const progOverlay = document.getElementById('progress-overlay');
-        if (progOverlay && progOverlay.classList.contains('visible')) {
-            progOverlay.classList.remove('visible');
-            contentsScreen.classList.remove('progress-dimmed');
-            contentsScreen.inert = false;
+        const overlay = getTopmostOpenOverlay();
+        if (overlay) {
+            e.preventDefault();
+            if (overlay.id === 'progress-overlay') closeProgress();
+            else if (overlay.id === 'install-overlay') closeInstall();
+            else if (overlay.id === 'photo-overlay') closePhoto();
+            else if (overlay.id === 'menu-overlay') closeMenu();
+            else if (overlay.id === 'reader-sheet') toggleReaderSheet(false);
             return;
         }
-        if (installOverlay && installOverlay.classList.contains('visible')) { closeInstall(); return; }
-        if (photoOverlay && photoOverlay.classList.contains('active')) { closePhoto(); return; }
-        if (isMenuOpen) { closeMenu(); return; }
-        if (isReaderSheetOpen()) { toggleReaderSheet(false); return; }
     }
 
     if (!chapterScreen.classList.contains('visible')) return;
@@ -897,9 +930,11 @@ let photoTrigger = null;   // the photo-link that opened the overlay (focus rest
 
 function openPhoto(src) {
   photoImage.src = 'images/' + src;
+  photoImage.alt = photoTrigger && photoTrigger.textContent.trim() ? photoTrigger.textContent.trim() : 'Фотография из главы';
   photoOverlay.classList.add('active');
   photoOverlay.inert = false;
   document.body.style.overflow = 'hidden';
+  markOverlayOpen(photoOverlay);
   if (photoClose) photoClose.focus();
 }
 
@@ -908,6 +943,8 @@ function closePhoto() {
   photoOverlay.inert = true;
   document.body.style.overflow = '';
   photoImage.src = '';
+  photoImage.alt = '';
+  markOverlayClosed(photoOverlay);
   if (photoTrigger && document.contains(photoTrigger)) {
       photoTrigger.focus();
       photoTrigger = null;
@@ -1335,6 +1372,7 @@ function openMenu() {
         chapterScreen.classList.add('menu-dimmed');
     }
     if (menuTrigger) menuTrigger.classList.remove('visible');
+    markOverlayOpen(menuOverlay);
     if (menuClose) menuClose.focus();
 }
 
@@ -1345,9 +1383,14 @@ function closeMenu() {
     menuOverlay.inert = true;
     contentsScreen.classList.remove('menu-dimmed');
     chapterScreen.classList.remove('menu-dimmed');
+    markOverlayClosed(menuOverlay);
     if (contentsScreen.classList.contains('visible') && menuTrigger) {
         menuTrigger.classList.add('visible');
-        menuTrigger.focus();   // keyboard focus returns to the trigger
+        syncTriggerInert();
+        menuTrigger.focus();
+    } else if (chapterScreen.classList.contains('visible')) {
+        const contentsButton = chapterScreen.querySelector('.nav-contents');
+        if (contentsButton) contentsButton.focus();
     }
 }
 
@@ -1362,12 +1405,15 @@ if (menuClose) menuClose.addEventListener('click', closeMenu);
 function trapTab(container, e) {
     if (e.key !== 'Tab') return;
     const focusables = Array.from(container.querySelectorAll(
-        'a[href], button:not([disabled]), input, [tabindex="0"]'
-    )).filter((el) => el.getClientRects().length > 0);
+        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    )).filter((el) => !el.closest('[inert]') && el.getClientRects().length > 0);
     if (!focusables.length) return;
     const first = focusables[0];
     const last = focusables[focusables.length - 1];
-    if (e.shiftKey && document.activeElement === first) {
+    if (!container.contains(document.activeElement)) {
+        e.preventDefault();
+        (e.shiftKey ? last : first).focus();
+    } else if (e.shiftKey && document.activeElement === first) {
         e.preventDefault();
         last.focus();
     } else if (!e.shiftKey && document.activeElement === last) {
@@ -1481,6 +1527,7 @@ function openInstall() {
     installOverlay.classList.add('visible');
     installOverlay.inert = false;
     document.body.classList.add('install-open');
+    markOverlayOpen(installOverlay);
     if (installClose) installClose.focus();
 }
 
@@ -1488,7 +1535,14 @@ function closeInstall() {
     installOverlay.classList.remove('visible');
     installOverlay.inert = true;
     document.body.classList.remove('install-open');
-    if (installTrigger && installTrigger.classList.contains('visible')) installTrigger.focus();
+    markOverlayClosed(installOverlay);
+    if (installTrigger && installTrigger.classList.contains('visible')) {
+        syncTriggerInert();
+        installTrigger.focus();
+    } else if (chapterScreen.classList.contains('visible')) {
+        const contentsButton = chapterScreen.querySelector('.nav-contents');
+        if (contentsButton) contentsButton.focus();
+    }
 }
 
 if (installTrigger) installTrigger.addEventListener('click', openInstall);
@@ -1718,14 +1772,14 @@ async function initProgress() {
         </div>
     `;
     overlay.setAttribute('aria-labelledby', 'progress-title');
+    overlay.inert = false;
     overlay.classList.add('visible');
     contentsScreen.inert = true;   // dimmed contents stays out of the Tab order
+    markOverlayOpen(overlay);
     overlay.querySelector('.progress-continue').focus();
 
     overlay.querySelector('.progress-continue').addEventListener('click', () => {
-        overlay.classList.remove('visible');
-        contentsScreen.classList.remove('progress-dimmed');
-        contentsScreen.inert = false;
+        closeProgress(false);
         setTimeout(() => openChapter(saved.lastChapter, { restore: true }), 400);
     });
 
@@ -1740,9 +1794,7 @@ async function initProgress() {
         try {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
         } catch (err) {}
-        contentsScreen.classList.remove('progress-dimmed');
-        contentsScreen.inert = false;
-        overlay.classList.remove('visible');
+        closeProgress(false);
         location.reload();
     });
 }
@@ -2347,10 +2399,12 @@ function toggleReaderSheet(open) {
     backdrop.classList.toggle('open', open);
     if (open) {
         setBarHidden(false);
+        markOverlayOpen(sheet);
         const first = sheet.querySelector('button, input');
         if (first) first.focus();
-    } else if (navAaBtn) {
-        navAaBtn.focus();
+    } else {
+        markOverlayClosed(sheet);
+        if (navAaBtn) navAaBtn.focus();
     }
 }
 
@@ -2588,7 +2642,7 @@ if ('serviceWorker' in navigator) {
             fab.setAttribute('role', 'group');
             fab.setAttribute('aria-label', 'Поделиться цитатой');
             fab.innerHTML = '<span class="share-fab-label">Поделиться</span>' +
-                '<button type="button" class="share-fab">' + FAB_ICON + '</button>';
+                '<button type="button" class="share-fab" aria-label="Поделиться цитатой">' + FAB_ICON + '</button>';
             /* тап не сбрасывает выделение до генерации карточки;
                preventDefault на touchstart гасит синтезированный click,
                поэтому на тач-устройствах действие вызываем из touchend */
@@ -2913,6 +2967,6 @@ function coverSurgeHook() {
 })();
 
 /* focus containment hooks — registered last, after every overlay exists */
-[menuOverlay, installOverlay, photoOverlay].forEach((ov) => {
+[menuOverlay, installOverlay, photoOverlay, document.getElementById('reader-sheet'), document.getElementById('progress-overlay')].forEach((ov) => {
     if (ov) ov.addEventListener('keydown', (e) => trapTab(ov, e));
 });
