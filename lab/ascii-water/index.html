@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="dark">
+    <title>ASCII-WATER — rendering lab</title>
+    <style>
+        * { box-sizing: border-box; }
+        html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #06080a; }
+        body { color: #c9f7e8; font-family: monospace; }
+        main { width: 100%; height: 100%; }
+        .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+        #water { display: block; width: 100%; height: 100%; }
+        #metrics { position: fixed; top: 12px; left: 12px; z-index: 1; margin: 0; padding: 8px; background: rgba(0, 0, 0, 0.65); color: #c9f7e8; font: 12px/1.45 monospace; pointer-events: none; }
+        #cell-controls { position: fixed; top: 12px; right: 12px; z-index: 1; display: flex; align-items: center; gap: 4px; padding: 6px; background: rgba(0, 0, 0, 0.65); }
+        #cell-controls span { padding: 0 4px; color: #4b8f88; font-size: 12px; }
+        #cell-controls button { min-width: 48px; padding: 7px 6px; border: 1px solid #284743; background: #071315; color: #4b8f88; font: 12px monospace; cursor: pointer; }
+        #cell-controls button[aria-pressed="true"] { border-color: #c9f7e8; color: #c9f7e8; }
+        #cell-controls button:focus-visible { outline: 2px solid #c9f7e8; outline-offset: 2px; }
+        @media (max-width: 520px) {
+            #metrics { top: auto; bottom: 12px; }
+            #cell-controls span { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <main>
+        <h1 class="visually-hidden">ASCII-WATER procedural night landscape</h1>
+        <canvas id="water" role="img" aria-label="A sparse ASCII night sky, textured shoreline, distant cyan light column, and its mirrored character reflection on dark water.">Your browser needs Canvas 2D to render the ASCII-WATER lab.</canvas>
+    </main>
+    <pre id="metrics" aria-label="Live rendering metrics">Collecting rendering metrics…</pre>
+    <div id="cell-controls" role="group" aria-label="ASCII cell size">
+        <span>Cell size</span>
+        <button type="button" data-cell="8" aria-pressed="false">8 px</button>
+        <button type="button" data-cell="10" aria-pressed="false">10 px</button>
+        <button type="button" data-cell="12" aria-pressed="true">12 px</button>
+    </div>
+    <script src="js/scene.js"></script>
+    <script src="js/renderer.js"></script>
+    <script src="js/metrics.js"></script>
+    <script>
+        (function () {
+            window.addEventListener('error', event => {
+                document.getElementById('metrics').textContent = 'Runtime error\n' + event.message + '\n' + event.filename + ':' + event.lineno;
+            });
+            const metrics = new AsciiWater.MetricsOverlay(document.getElementById('metrics'));
+            const renderer = new AsciiWater.Renderer(document.getElementById('water'), { cellPx: 12, metrics });
+            const buttons = Array.from(document.querySelectorAll('[data-cell]'));
+            function syncControls() {
+                buttons.forEach(button => button.setAttribute('aria-pressed', String(Number(button.dataset.cell) === renderer.cellPx)));
+            }
+            buttons.forEach(button => button.addEventListener('click', () => {
+                renderer.setCellSize(Number(button.dataset.cell));
+                syncControls();
+            }));
+            window.waterLab = { renderer, metrics };
+            window.addEventListener('load', () => {
+                metrics.capturePayload();
+                setTimeout(() => metrics.capturePayload(), 250);
+            }, { once: true });
+        })();
+    </script>
+</body>
+</html>
