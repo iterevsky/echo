@@ -2284,17 +2284,10 @@ html, body {
     margin-left: 2px;
 }
 
-/* === БЕЙДЖ «НОВОЕ» НА ГЛАВАХ === */
-.contents-item.new .dot {
-    background: #00A8E8;
-    box-shadow: 0 0 6px rgba(0, 168, 232, 0.5);
-    animation: dot-pulse 2.4s ease-in-out infinite;
-}
 @keyframes dot-pulse {
     0%, 100% { box-shadow: 0 0 4px rgba(0, 168, 232, 0.35); }
     50% { box-shadow: 0 0 10px rgba(0, 168, 232, 0.75); }
 }
-.contents-item.new:not(.current) { color: #a8a8a8; }
 
 /* === ПОДЕЛИТЬСЯ ЦИТАТОЙ: ПЛАВАЮЩАЯ КНОПКА У ПРАВОГО КРАЯ === */
 .share-fab-wrap {
@@ -2434,8 +2427,7 @@ html, body {
     #contents-screen.analog-drop,
     #contents-screen.analog-drop::after,
     .voice-shock-prev,
-    .voice-shock-next,
-    .contents-item.new .dot {
+    .voice-shock-next {
         animation: none !important;
     }
 }

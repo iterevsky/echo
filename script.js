@@ -73,16 +73,6 @@ function normalizeChapterMap(obj, clamp) {
     return out;
 }
 
-function normalizeSeenNew(obj) {
-    const out = {};
-    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return out;
-    Object.keys(obj).forEach((k) => {
-        if (!/^\d+$/.test(k)) return;
-        if (obj[k]) out[parseInt(k, 10)] = true;
-    });
-    return out;
-}
-
 function sanitizeReaderSettings(rs) {
     if (!rs || typeof rs !== 'object' || Array.isArray(rs)) return undefined;
     const size = Number(rs.size);
@@ -94,17 +84,11 @@ function sanitizeReaderSettings(rs) {
     };
 }
 
-function sanitizeDateString(v) {
-    if (typeof v !== 'string') return undefined;
-    return isNaN(new Date(v).getTime()) ? undefined : v;
-}
-
 /* чистим известные поля, неизвестные поля и их порядок не трогаем */
 function sanitizeState(parsed) {
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
     const s = Object.assign({}, parsed);
     if ('readPos' in s) s.readPos = normalizeChapterMap(s.readPos, true);
-    if ('seenNew' in s) s.seenNew = normalizeSeenNew(s.seenNew);
     if ('readerSettings' in s) {
         const rs = sanitizeReaderSettings(s.readerSettings);
         if (rs) s.readerSettings = rs; else delete s.readerSettings;
@@ -114,12 +98,6 @@ function sanitizeState(parsed) {
         if (!isFinite(n) || n < 0 || Math.floor(n) !== n) delete s.lastChapter;
         else s.lastChapter = n;
     }
-    ['lastVisit', 'prevVisit'].forEach((k) => {
-        if (k in s) {
-            const d = sanitizeDateString(s[k]);
-            if (d === undefined) delete s[k]; else s[k] = d;
-        }
-    });
     return s;
 }
 
@@ -305,17 +283,6 @@ function cleanupSwipeHandlers() {
     resetSwipeHint();
 }
 
-/* --- ротация визитов: если с прошлого захода больше 12 часов,
-   lastVisit становится prevVisit — до того, как его перезапишет openChapter --- */
-(function rotateVisits() {
-    const s = loadState();
-    if (!s.lastVisit) return;
-    const age = Date.now() - new Date(s.lastVisit).getTime();
-    if (age > 12 * 3600 * 1000) {
-        saveState({ prevVisit: s.lastVisit });
-    }
-})();
-
 // === ПОСТРОЕНИЕ МАССИВА ГЛАВ ИЗ HTML ===
 const items = document.querySelectorAll('.contents-item');
 const chapters = Array.from(items).map((item, index) => {
@@ -392,8 +359,6 @@ function updateContentsMemory() {
     const s = loadState();
     const readPos = s.readPos || {};
     const last = (typeof s.lastChapter === 'number') ? s.lastChapter : -1;
-    const seenNew = s.seenNew || {};
-    const prevVisit = s.prevVisit || null;
 
     // общий прогресс книги — одна приглушённая строка под заголовком
     const totalPublished = chapters.filter((c) => !c.empty).length;
@@ -427,15 +392,10 @@ function updateContentsMemory() {
         const isEmpty = !!(chapters[i] && chapters[i].empty);
         const isRead = !isEmpty && (typeof frac === 'number') && frac >= 0.85;
         const isCurrent = (i === last) && !isRead && !isEmpty;
-        // «новое»: глава вышла после прошлого визита и ещё не открывалась
-        const isNew = !isEmpty && !isRead && !seenNew[i] && !!prevVisit &&
-            typeof PUBLISHED_AT !== 'undefined' && !!PUBLISHED_AT[i] &&
-            new Date(PUBLISHED_AT[i]).getTime() > new Date(prevVisit).getTime();
 
         item.classList.toggle('read', isRead);
         item.classList.toggle('current', isCurrent);
         item.classList.toggle('empty', isEmpty);
-        item.classList.toggle('new', isNew);
 
         if (isCurrent) item.setAttribute('aria-current', 'true');
         else item.removeAttribute('aria-current');
@@ -845,15 +805,6 @@ async function openChapter(index, opts = {}) {
         }
     }
 
-    // глава с бейджем «новое» увидена — метка гаснет
-    const sSeen = loadState();
-    if (sSeen.prevVisit && typeof PUBLISHED_AT !== 'undefined' && PUBLISHED_AT[index] &&
-        new Date(PUBLISHED_AT[index]).getTime() > new Date(sSeen.prevVisit).getTime()) {
-        const seen = sSeen.seenNew || {};
-        seen[index] = true;
-        saveState({ seenNew: seen });
-    }
-
     // точка «назад» системной кнопки Android (в ответ на popstate не пушим);
     // в адресе всегда ссылка на открытую главу — можно скопировать вручную
     if (!opts.fromPop) {
@@ -889,7 +840,7 @@ async function openChapter(index, opts = {}) {
     textEl.innerHTML = processedText;
     appendChapterEnd(textEl, index);
 
-   saveState({ lastChapter: index, lastVisit: new Date().toISOString(), chapterTitle: chapter.title });
+   saveState({ lastChapter: index, chapterTitle: chapter.title });
 
 
     prevBtn.classList.toggle('inactive', prevReadableIndex(index) === -1);
