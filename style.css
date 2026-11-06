@@ -49,7 +49,7 @@
 }
 @font-face {
     font-family: 'Golos Text';
-    src: url('fonts/golos-text-cyrillic.woff2') format('woff2');
+    src: url('fonts/golos-text-500.woff2') format('woff2');
     font-weight: 500;
     font-style: normal;
     font-display: swap;
@@ -57,7 +57,7 @@
 }
 @font-face {
     font-family: 'Golos Text';
-    src: url('fonts/golos-text-latin.woff2') format('woff2');
+    src: url('fonts/golos-text-500.woff2') format('woff2');
     font-weight: 500;
     font-style: normal;
     font-display: swap;
@@ -65,7 +65,7 @@
 }
 @font-face {
     font-family: 'Golos Text';
-    src: url('fonts/golos-text-cyrillic.woff2') format('woff2');
+    src: url('fonts/golos-text-700.woff2') format('woff2');
     font-weight: 700;
     font-style: normal;
     font-display: swap;
@@ -73,7 +73,7 @@
 }
 @font-face {
     font-family: 'Golos Text';
-    src: url('fonts/golos-text-latin.woff2') format('woff2');
+    src: url('fonts/golos-text-700.woff2') format('woff2');
     font-weight: 700;
     font-style: normal;
     font-display: swap;

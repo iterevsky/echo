@@ -41,7 +41,9 @@ const EXTRA_FILES = [
     './fonts/pt-serif-400-italic-cyrillic.woff2',
     './fonts/pt-serif-400-italic-latin.woff2',
     './fonts/golos-text-cyrillic.woff2',
-    './fonts/golos-text-latin.woff2'
+    './fonts/golos-text-latin.woff2',
+    './fonts/golos-text-500.woff2',
+    './fonts/golos-text-700.woff2'
 ];
 
 const PRECACHE = CORE_FILES.concat(EXTRA_FILES);
