@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ASCII-WATER — deferred-loading harness</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { margin: 0; min-height: 100vh; background: #06080a; color: #c9f7e8; font: 16px/1.5 monospace; }
+        main { max-width: 760px; margin: 0 auto; padding: 32px 20px; }
+        h1 { font-size: 22px; font-weight: 400; }
+        button { margin: 4px 8px 4px 0; padding: 12px 16px; border: 1px solid #4b8f88; background: #071315; color: #c9f7e8; font: inherit; cursor: pointer; }
+        button:focus-visible { outline: 2px solid #c9f7e8; outline-offset: 3px; }
+        #cover { padding: 24px; border: 1px solid #284743; }
+        #module-state, #entry-state { padding: 12px 0; }
+        #module { min-height: 64px; margin-top: 16px; padding: 16px; border: 1px dashed #284743; color: #4b8f88; }
+        #event-log { max-height: 300px; overflow: auto; padding: 12px; background: #071315; white-space: pre-wrap; }
+    </style>
+</head>
+<body>
+    <main>
+        <h1>Deferred optional module</h1>
+        <section id="cover" aria-label="Interactive shell fixture">
+            <div id="module-state">Module idle</div>
+            <button id="entry" type="button">Enter shell immediately</button>
+            <button id="retry" type="button">Deliberate module retry</button>
+            <div id="entry-state">Entries completed: 0</div>
+            <div id="module" aria-live="polite">Optional module has not loaded.</div>
+        </section>
+        <pre id="event-log" aria-label="Loading and entry event log"></pre>
+    </main>
+    <script src="js/loading-harness.js"></script>
+</body>
+</html>
