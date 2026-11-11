@@ -2547,3 +2547,67 @@ html, body {
     -webkit-user-drag: none;
     -webkit-touch-callout: none;
 }
+
+/* === COVER: primary ASCII water with a cropped emblem === */
+.cover-stage {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+}
+#water-cover {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    display: block;
+    width: 100%;
+    height: 100%;
+    background: #06080a;
+    color: #c9f7e8;
+    cursor: pointer;
+}
+#water-cover:focus-visible {
+    outline: 2px solid #c9f7e8;
+    outline-offset: -4px;
+}
+#cover-screen .cover-tremor {
+    position: relative;
+    z-index: 2;
+    display: block;
+    width: min(42vw, 340px);
+    height: min(56vh, 440px);
+    pointer-events: none;
+}
+#cover-screen .cover-tremor img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    max-height: none;
+    object-fit: cover;
+    object-position: 50% 42%;
+    clip-path: inset(6% 4% 10% 4%);
+    opacity: 0.68;
+    mix-blend-mode: screen;
+    filter: contrast(1.05) brightness(0.95) saturate(0.85);
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 12%, black 88%, transparent 100%);
+    mask-image: linear-gradient(to bottom, transparent 0%, black 12%, black 88%, transparent 100%);
+}
+.cover-ripples {
+    position: relative;
+    z-index: 3;
+    pointer-events: none;
+}
+@media (max-width: 768px) {
+    #cover-screen .cover-tremor {
+        width: min(64vw, 270px);
+        height: min(48vh, 400px);
+        margin-inline: auto;
+    }
+}
+@media (prefers-reduced-motion: reduce) {
+    #cover-screen .cover-tremor img { animation: none !important; }
+}

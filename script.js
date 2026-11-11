@@ -34,7 +34,6 @@ const chapterScreen = document.getElementById('chapter-screen');
 })();
 
 let isStarted = false;
-let touchStartX = 0;
 
 const menuTrigger = document.getElementById('menu-trigger');
 const menuOverlay = document.getElementById('menu-overlay');
@@ -570,22 +569,7 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
-// === ИНТРО: КАСАНИЕ / КЛИК / СВАЙП ===
-let touchStartY = 0;
-
-document.addEventListener('touchstart', (e) => {
-    touchStartY = e.touches[0].clientY;
-    touchStartX = e.touches[0].clientX;
-}, { passive: true });
-
-document.addEventListener('touchend', (e) => {
-    const diffY = touchStartY - e.changedTouches[0].clientY;
-    const diffX = touchStartX - e.changedTouches[0].clientX;
-    
-    if (!isStarted && diffY > 50 && Math.abs(diffX) < 40) {
-        startSequence();
-    }
-}, { passive: true });
+// === ИНТРО: КАСАНИЕ / КЛИК ===
 
 (function initMenuSwipeRecognizer() {
     let gesture = null;
@@ -634,8 +618,10 @@ document.addEventListener('touchend', (e) => {
 
 
 
-document.addEventListener('click', () => {
-    if (!isStarted) startSequence();
+document.addEventListener('click', (e) => {
+    if (isStarted) return;
+    if (e.detail !== 0 && e.target.closest('#cover-screen')) return;
+    startSequence();
 });
 
 // === ФУНКЦИИ ===
@@ -648,6 +634,7 @@ function startSequence() {
 
     // 1. Убираем картинку
     coverScreen.classList.add('hide-up');
+    coverScreen.dispatchEvent(new CustomEvent('echo:entry-start'));
 
     // 2. Показываем текст
     setTimeout(() => {
@@ -2858,6 +2845,7 @@ if ('serviceWorker' in navigator) {
 
 function coverSurgeHook() {
     /* W-8 integration point: emit the water impulse burst on SURGE. */
+    if (coverScreen.__waterSurge) coverScreen.__waterSurge();
 }
 
 (function coverIdleRhythm() {
@@ -2983,3 +2971,269 @@ function coverSurgeHook() {
 [menuOverlay, installOverlay, photoOverlay, document.getElementById('reader-sheet'), document.getElementById('progress-overlay')].forEach((ov) => {
     if (ov) ov.addEventListener('keydown', (e) => trapTab(ov, e));
 });
+
+
+(function initWaterCover() {
+    const canvas = document.getElementById('water-cover');
+    if (!coverScreen || !canvas || isStarted) return;
+    const saved = loadState();
+    if (saved.lastChapter !== undefined || /[?&]ch=/.test(location.search) || /^#ch-\d+$/.test(location.hash)) return;
+    try {
+        if (sessionStorage.getItem('echo_sw_route')) return;
+    } catch (error) {}
+
+    let state = 'idle';
+    let view = null;
+    let waterPromise = null;
+    let covered = false;
+    let pendingImpulse = null;
+    let entryAttempt = 0;
+    const pointers = new Map();
+    const gestureLog = [];
+    const clamp = (value, low, high) => Math.min(high, Math.max(low, value));
+    coverScreen.__waterLog = gestureLog;
+    coverScreen.__waterMetrics = () => view ? view.getMetrics() : null;
+    coverScreen.__waterState = () => ({
+        state,
+        covered,
+        pendingImpulse,
+        entryAttempt,
+        promiseCached: Boolean(waterPromise),
+        scriptCount: document.querySelectorAll('script[src="ascii-water.js"]').length,
+        cellPx: view ? view.cellPx : null
+    });
+
+    function record(step, details) {
+        gestureLog.push(Object.assign({ step, at: performance.now() }, details || {}));
+        if (gestureLog.length > 120) gestureLog.shift();
+    }
+
+    function toGrid(clientX, clientY) {
+        const rect = canvas.getBoundingClientRect();
+        const cellWidth = view ? view.cellWidth : 12;
+        const cellHeight = view ? view.cellHeight : 12;
+        const cols = view ? view.cols : Math.max(1, Math.floor(rect.width / 12));
+        const rows = view ? view.rows : Math.max(1, Math.floor(rect.height / 12));
+        const cssX = clamp(clientX - rect.left, 0, rect.width);
+        const cssY = clamp(clientY - rect.top, 0, rect.height);
+        return {
+            x: clamp(cssX / cellWidth, 0, cols - 1),
+            y: clamp(cssY / cellHeight, 0, rows - 1),
+            normalizedX: rect.width ? cssX / rect.width : 0,
+            normalizedY: rect.height ? cssY / rect.height : 0
+        };
+    }
+
+    function failWater(error, script) {
+        script.remove();
+        state = 'failed';
+        pendingImpulse = null;
+        waterPromise = null;
+        if (view) {
+            view.destroy();
+            view = null;
+        } else if (window.__echoWater) {
+            window.__echoWater.destroy();
+        }
+        record('load-error', { message: error.message });
+    }
+
+    function ensureWater(trigger) {
+        if (covered || state === 'failed') return null;
+        if (view) return Promise.resolve(view);
+        if (waterPromise) return waterPromise;
+        state = 'loading';
+        record('load-start', { trigger });
+        const script = document.createElement('script');
+        script.async = true;
+        script.src = 'ascii-water.js';
+        const current = new Promise((resolve, reject) => {
+            script.onload = () => {
+                if (covered) {
+                    pendingImpulse = null;
+                    record('discard-late');
+                    resolve(null);
+                    return;
+                }
+                try {
+                    if (!window.__echoWater || typeof window.__echoWater.init !== 'function') throw new Error('water module did not initialize');
+                    view = window.__echoWater.init(canvas);
+                    state = 'ready';
+                    record('ready');
+                    if (pendingImpulse) {
+                        const impulse = pendingImpulse;
+                        pendingImpulse = null;
+                        window.__echoWater.drop(impulse.x, impulse.y, impulse.strength);
+                        record('queued-flush', impulse);
+                    }
+                    resolve(view);
+                } catch (error) {
+                    failWater(error, script);
+                    reject(error);
+                }
+            };
+            script.onerror = () => {
+                const error = new Error('water module request failed');
+                failWater(error, script);
+                reject(error);
+            };
+            document.head.appendChild(script);
+        });
+        waterPromise = current.catch(() => null);
+        return waterPromise;
+    }
+
+    function emit(mapping, point, strength, pointerType, pointerId) {
+        if (state === 'ready' && view) {
+            window.__echoWater.drop(point.x, point.y, strength);
+            record(mapping, { x: point.x, y: point.y, strength, pointerType, pointerId });
+        } else {
+            record('impulse-discarded', { mapping, x: point.x, y: point.y, strength, pointerType, pointerId });
+        }
+    }
+
+    function enterWithWater(clientX, clientY, strength, pointerType, pointerId) {
+        if (isStarted) return;
+        const point = toGrid(clientX, clientY);
+        record('coordinates', { x: point.x, y: point.y, normalizedX: point.normalizedX, normalizedY: point.normalizedY, pointerType, pointerId });
+        const impulse = { x: point.x, y: point.y, strength, pointerType, pointerId, entryAttempt: ++entryAttempt };
+        if (state === 'ready' && view) {
+            window.__echoWater.drop(point.x, point.y, strength);
+            record('impulse', impulse);
+        } else if (state !== 'failed' && !covered) {
+            pendingImpulse = impulse;
+            record('queued-impulse', impulse);
+            ensureWater('entry');
+        } else {
+            record('impulse-discarded', impulse);
+        }
+        startSequence();
+    }
+
+    function pointerDown(event) {
+        if (event.pointerType === 'mouse' && event.button !== 0) return;
+        if (pointers.has(event.pointerId)) pointers.delete(event.pointerId);
+        if (pointers.size >= 3) {
+            record('cap-reject', { pointerId: event.pointerId, pointerType: event.pointerType });
+            return;
+        }
+        ensureWater('pointer-intent');
+        pointers.set(event.pointerId, {
+            id: event.pointerId,
+            pointerType: event.pointerType,
+            state: 'pending',
+            startTime: event.timeStamp,
+            startX: event.clientX,
+            startY: event.clientY,
+            lastTime: event.timeStamp,
+            lastX: event.clientX,
+            lastY: event.clientY,
+            lastImpulse: -Infinity
+        });
+        try { canvas.setPointerCapture(event.pointerId); } catch (error) { /* Synthetic verification events may not own capture. */ }
+        record('pending', { pointerId: event.pointerId, pointerType: event.pointerType });
+    }
+
+    function pointerMove(event) {
+        const pointer = pointers.get(event.pointerId);
+        if (!pointer) {
+            if (event.pointerType === 'mouse' && event.buttons === 0) {
+                if (event.timeStamp - pointerMove.lastHover < 40) return;
+                const previousTime = pointerMove.hoverTime === undefined ? event.timeStamp - 16 : pointerMove.hoverTime;
+                const previousX = pointerMove.hoverX === undefined ? event.clientX : pointerMove.hoverX;
+                const previousY = pointerMove.hoverY === undefined ? event.clientY : pointerMove.hoverY;
+                const seconds = Math.max(0.001, (event.timeStamp - previousTime) / 1000);
+                const velocity = clamp(Math.hypot(event.clientX - previousX, event.clientY - previousY) / seconds, 0, 4000);
+                const strength = clamp(0.035 + velocity / 2500 * 0.045, 0.035, 0.08);
+                emit('mouse-hover', toGrid(event.clientX, event.clientY), strength, 'mouse', event.pointerId);
+                pointerMove.lastHover = event.timeStamp;
+                pointerMove.hoverTime = event.timeStamp;
+                pointerMove.hoverX = event.clientX;
+                pointerMove.hoverY = event.clientY;
+            }
+            return;
+        }
+        const distance = Math.hypot(event.clientX - pointer.startX, event.clientY - pointer.startY);
+        if (pointer.state === 'pending' && distance >= 8) pointer.state = 'drag';
+        const seconds = Math.max(0.001, (event.timeStamp - pointer.lastTime) / 1000);
+        const velocity = clamp(Math.hypot(event.clientX - pointer.lastX, event.clientY - pointer.lastY) / seconds, 0, 4000);
+        pointer.lastTime = event.timeStamp;
+        pointer.lastX = event.clientX;
+        pointer.lastY = event.clientY;
+        if (pointer.state !== 'drag' || event.timeStamp - pointer.lastImpulse < 24) return;
+        const strength = clamp(0.12 + velocity / 2000 * 0.53, 0.12, 0.65);
+        emit(pointer.pointerType + '-drag', toGrid(event.clientX, event.clientY), strength, pointer.pointerType, event.pointerId);
+        pointer.lastImpulse = event.timeStamp;
+    }
+
+    function pointerUp(event) {
+        const pointer = pointers.get(event.pointerId);
+        if (!pointer) return;
+        const duration = event.timeStamp - pointer.startTime;
+        const distance = Math.hypot(event.clientX - pointer.startX, event.clientY - pointer.startY);
+        if (pointer.state === 'pending' && distance >= 8) pointer.state = 'drag';
+        if (pointer.state === 'pending' && distance < 8 && duration < 250) {
+            record('tap-classified', { pointerId: pointer.id, pointerType: pointer.pointerType, duration });
+            enterWithWater(pointer.startX, pointer.startY, pointer.pointerType === 'mouse' ? 1.1 : 0.65, pointer.pointerType, pointer.id);
+        } else {
+            record(pointer.state === 'drag' ? 'drag-end' : 'long-press-end', { pointerId: pointer.id, pointerType: pointer.pointerType });
+        }
+        pointers.delete(event.pointerId);
+        try { canvas.releasePointerCapture(event.pointerId); } catch (error) { /* Capture may already be released. */ }
+    }
+
+    function cancelPointer(event) {
+        if (!pointers.has(event.pointerId)) return;
+        pointers.delete(event.pointerId);
+        record(event.type === 'lostpointercapture' ? 'lostpointercapture' : 'pointercancel', { pointerId: event.pointerId });
+    }
+
+    function cancelAll() {
+        for (const id of pointers.keys()) record('blur-cancel', { pointerId: id });
+        pointers.clear();
+    }
+
+    function finishCover(event) {
+        if (covered || event.target !== coverScreen || event.propertyName !== 'transform' || !coverScreen.classList.contains('hide-up')) return;
+        covered = true;
+        pendingImpulse = null;
+        state = 'covered';
+        record('freeze');
+        if (view) view.freeze();
+        if (window.__echoWater) window.__echoWater.destroy();
+        state = 'destroyed';
+        record('destroy');
+    }
+
+    canvas.addEventListener('pointerdown', pointerDown);
+    canvas.addEventListener('pointermove', pointerMove);
+    canvas.addEventListener('pointerup', pointerUp);
+    canvas.addEventListener('pointercancel', cancelPointer);
+    canvas.addEventListener('lostpointercapture', cancelPointer);
+    canvas.addEventListener('keydown', event => {
+        if (event.repeat || event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        const rect = canvas.getBoundingClientRect();
+        enterWithWater(rect.left + rect.width / 2, rect.top + rect.height / 2, 0.65, 'keyboard', 'keyboard');
+    });
+    window.addEventListener('blur', cancelAll);
+    document.addEventListener('visibilitychange', () => { if (document.hidden) cancelAll(); });
+    coverScreen.addEventListener('echo:entry-start', () => {
+        state = 'entering';
+        record('entry-start');
+        setTimeout(() => finishCover({ target: coverScreen, propertyName: 'transform' }), 1050);
+    });
+    coverScreen.addEventListener('transitionend', finishCover);
+    coverScreen.__waterRetry = () => {
+        if (covered || isStarted) return null;
+        state = 'idle';
+        return ensureWater('deliberate-retry');
+    };
+    coverScreen.__waterSurge = () => {
+        if (state !== 'ready' || !view) return;
+        window.__echoWater.drop(view.cols * 0.5, view.rows * 0.68, 0.65);
+        record('surge', { x: view.cols * 0.5, y: view.rows * 0.68, strength: 0.65 });
+    };
+    const schedule = window.requestIdleCallback || (callback => setTimeout(callback, 250));
+    schedule(() => ensureWater('idle'), { timeout: 250 });
+})();

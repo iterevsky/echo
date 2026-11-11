@@ -43,13 +43,14 @@ const EXTRA_FILES = [
     './fonts/golos-text-cyrillic.woff2',
     './fonts/golos-text-latin.woff2',
     './fonts/golos-text-500.woff2',
-    './fonts/golos-text-700.woff2'
+    './fonts/golos-text-700.woff2',
+    './ascii-water.js'
 ];
 
 const PRECACHE = CORE_FILES.concat(EXTRA_FILES);
 
 /* файлы, которые всегда сначала спрашивают у сети */
-const CODE_FILES = ['index.html', 'style.css', 'script.js', 'chapters.js', 'version.js'];
+const CODE_FILES = ['index.html', 'style.css', 'script.js', 'chapters.js', 'version.js', 'ascii-water.js'];
 
 /* потолок ожидания сети — потом кэш или заглушка */
 const NETWORK_TIMEOUT = 8000;
