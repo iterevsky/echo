@@ -251,6 +251,7 @@
             this.render();
             const renderMs = performance.now() - started;
             if (this.metrics) {
+                this.metrics.frameRendered();
                 const cells = this.cols + ' × ' + this.rows + ' @ ' + this.cellPx + ' px'
                     + '\nWaves ' + this.waves.ambientCount + ' ambient, ' + this.waves.sources.length + ' active, ' + this.waves.resetCount + ' resets';
                 if (this.lastTimestamp !== null) this.metrics.record(timestamp - this.lastTimestamp, renderMs, cells);
