@@ -13,8 +13,11 @@
             this.canvas = canvas;
             this.renderer = renderer;
             this.onTap = options && options.onTap || null;
+            this.moduleState = options && options.moduleState || (() => 'ready');
+            this.queueImpulse = options && options.queueImpulse || null;
             this.pointers = new Map();
             this.taps = [];
+            this.entrySignals = [];
             this.effects = [];
             this.listeners = [];
             this.lastHoverTime = -Infinity;
@@ -25,6 +28,7 @@
             this.pointerCancel = this.pointerCancel.bind(this);
             this.lostPointerCapture = this.lostPointerCapture.bind(this);
             this.pointerLeave = this.pointerLeave.bind(this);
+            this.keyboardEntry = this.keyboardEntry.bind(this);
             this.cancelAll = this.cancelAll.bind(this);
             this.visibilityChange = this.visibilityChange.bind(this);
             this.listen(canvas, 'pointerdown', this.pointerDown);
@@ -33,6 +37,7 @@
             this.listen(canvas, 'pointercancel', this.pointerCancel);
             this.listen(canvas, 'lostpointercapture', this.lostPointerCapture);
             this.listen(canvas, 'pointerleave', this.pointerLeave);
+            this.listen(canvas, 'keydown', this.keyboardEntry);
             this.listen(window, 'blur', this.cancelAll);
             this.listen(document, 'visibilitychange', this.visibilityChange);
         }
@@ -81,6 +86,10 @@
         }
 
         emit(mapping, event, point, strength, radius, velocity) {
+            if (this.moduleState() !== 'ready') {
+                this.log('impulse-discarded', event, point, { strength, radius, moduleState: this.moduleState() });
+                return null;
+            }
             const sourceId = this.renderer.drop(point.x, point.y, strength, radius);
             const source = this.renderer.waves.sources.find(item => item.id === sourceId);
             if (source) {
@@ -178,34 +187,59 @@
             const duration = time - pointer.startTime;
             const distance = Math.hypot(event.clientX - pointer.startClientX, event.clientY - pointer.startClientY);
             if (pointer.state === 'pending' && distance >= TAP_DISTANCE) pointer.state = 'drag';
-            const point = this.toGrid(pointer.startClientX, pointer.startClientY);
             if (pointer.state === 'pending' && distance < TAP_DISTANCE && duration < TAP_DURATION) {
-                const mouse = pointer.pointerType === 'mouse';
-                const mapping = mouse ? 'mouse-click' : pointer.pointerType + '-tap';
-                this.emit(mapping, event, point, mouse ? 1.1 : 0.65, 3, 0);
-                const tap = {
-                    pointerId: pointer.id,
-                    pointerType: pointer.pointerType,
-                    eventTime: time,
-                    duration,
-                    clientX: pointer.startClientX,
-                    clientY: pointer.startClientY,
-                    x: point.x,
-                    y: point.y,
-                    normalizedX: point.normalizedX,
-                    normalizedY: point.normalizedY,
-                    dpr: point.dpr,
-                    cellPx: point.cellPx
-                };
-                this.taps.push(tap);
-                if (this.taps.length > 100) this.taps.shift();
-                this.log('tap-callback', event, point, { duration });
-                if (this.onTap) this.onTap(tap);
+                this.triggerTap(event, this.toGrid(pointer.startClientX, pointer.startClientY), pointer.id, pointer.pointerType, duration, pointer.startClientX, pointer.startClientY);
             } else {
+                const point = this.toGrid(pointer.startClientX, pointer.startClientY);
                 this.log(pointer.state === 'drag' ? 'drag-end' : 'long-press-end', event, point, { duration });
             }
             this.pointers.delete(event.pointerId);
             try { this.canvas.releasePointerCapture(event.pointerId); } catch (error) { /* Synthetic lab events may not own native capture. */ }
+        }
+
+        triggerTap(event, point, pointerId, pointerType, duration, clientX, clientY) {
+            const mouse = pointerType === 'mouse';
+            const keyboard = pointerType === 'keyboard';
+            const strength = mouse ? 1.1 : 0.65;
+            const readiness = this.moduleState();
+            if (readiness === 'ready') {
+                this.emit(keyboard ? 'keyboard-entry' : mouse ? 'mouse-click' : pointerType + '-tap', event, point, strength, 3, 0);
+            } else if (readiness === 'loading' && this.queueImpulse) {
+                const queuedId = this.queueImpulse({ x: point.x, y: point.y, strength, radius: 3, pointerId, pointerType, eventTime: this.eventTime(event) });
+                this.log('queued-impulse', event, point, { strength, radius: 3, queuedId });
+            } else {
+                this.log('impulse-discarded', event, point, { strength, radius: 3, moduleState: readiness });
+            }
+            const tap = {
+                pointerId,
+                pointerType,
+                eventTime: this.eventTime(event),
+                duration,
+                clientX,
+                clientY,
+                x: point.x,
+                y: point.y,
+                normalizedX: point.normalizedX,
+                normalizedY: point.normalizedY,
+                dpr: point.dpr,
+                cellPx: point.cellPx,
+                moduleState: readiness
+            };
+            this.taps.push(tap);
+            this.entrySignals.push(tap);
+            if (this.taps.length > 100) this.taps.shift();
+            if (this.entrySignals.length > 100) this.entrySignals.shift();
+            this.log('tap-callback', event, point, { duration, moduleState: readiness });
+            if (this.onTap) this.onTap(tap);
+        }
+
+        keyboardEntry(event) {
+            if (this.destroyed || event.repeat || event.key !== 'Enter' && event.key !== ' ') return;
+            this.prevent(event);
+            const bounds = this.canvas.getBoundingClientRect();
+            const clientX = bounds.left + bounds.width / 2;
+            const clientY = bounds.top + bounds.height / 2;
+            this.triggerTap(event, this.toGrid(clientX, clientY), 'keyboard', 'keyboard', 0, clientX, clientY);
         }
 
         pointerCancel(event) {
@@ -257,5 +291,56 @@
         }
     }
 
+    class EntryImpulseGateway {
+        constructor(renderer, onDrop) {
+            this.renderer = renderer;
+            this.onDrop = onDrop;
+            this.state = 'ready';
+            this.visible = true;
+            this.pending = null;
+            this.sequence = 0;
+        }
+
+        setLoading() {
+            this.state = 'loading';
+            this.visible = true;
+            this.pending = null;
+        }
+
+        ready() {
+            if (this.state === 'failed' || !this.visible) return null;
+            this.state = 'ready';
+            const pending = this.pending;
+            this.pending = null;
+            if (pending && this.visible) {
+                this.onDrop(pending);
+                return pending;
+            }
+            return null;
+        }
+
+        fail() {
+            this.state = 'failed';
+            this.visible = false;
+            this.pending = null;
+        }
+
+        cover() {
+            this.visible = false;
+            this.pending = null;
+        }
+
+        queue(impulse) {
+            if (this.state !== 'loading' || !this.visible) return null;
+            this.pending = Object.assign({}, impulse, { id: ++this.sequence });
+            return this.pending.id;
+        }
+
+        getState() {
+            return { state: this.state, visible: this.visible, pending: this.pending };
+        }
+    }
+
     root.InputController = InputController;
+    root.EntryImpulseGateway = EntryImpulseGateway;
 })();

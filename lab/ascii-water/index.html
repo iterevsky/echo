@@ -27,7 +27,7 @@
 <body>
     <main>
         <h1 class="visually-hidden">ASCII-WATER procedural night landscape</h1>
-        <canvas id="water" role="img" aria-label="A sparse ASCII night sky, textured shoreline, distant cyan light column, and its mirrored character reflection on dark water.">Your browser needs Canvas 2D to render the ASCII-WATER lab.</canvas>
+        <canvas id="water" role="button" tabindex="0" aria-label="ASCII night water. Activate with Enter or Space for an entry signal and a centered impulse. Pointer taps use their original contact coordinates; drags create only waves.">Your browser needs Canvas 2D to render the ASCII-WATER lab.</canvas>
     </main>
     <pre id="metrics" aria-label="Live rendering metrics">Collecting rendering metrics…</pre>
     <div id="cell-controls" role="group" aria-label="ASCII cell size">
@@ -49,7 +49,20 @@
             });
             const metrics = new AsciiWater.MetricsOverlay(document.getElementById('metrics'));
             const renderer = new AsciiWater.Renderer(document.getElementById('water'), { cellPx: 12, metrics });
+            const entryGateway = new AsciiWater.EntryImpulseGateway(renderer, impulse => {
+                const sourceId = renderer.drop(impulse.x, impulse.y, impulse.strength, impulse.radius);
+                const source = renderer.waves.sources.find(item => item.id === sourceId);
+                if (source) {
+                    source.input = true;
+                    source.inputPointerId = impulse.pointerId;
+                    source.mapping = 'queued-flush';
+                }
+                input.log('queued-flush', { pointerId: impulse.pointerId, pointerType: impulse.pointerType, timeStamp: performance.now() }, impulse, { sourceId, strength: impulse.strength, radius: impulse.radius });
+                return sourceId;
+            });
             const input = new AsciiWater.InputController(document.getElementById('water'), renderer, {
+                moduleState: () => entryGateway.state,
+                queueImpulse: impulse => entryGateway.queue(impulse),
                 onTap: tap => { window.waterLab.lastTap = tap; }
             });
             const quality = new AsciiWater.QualityController(renderer);
@@ -68,7 +81,9 @@
                 waves: renderer.waves,
                 input,
                 quality,
+                entryGateway,
                 taps: input.taps,
+                entrySignals: input.entrySignals,
                 effects: input.effects,
                 lastTap: null,
                 drop: (x, y, strength, radius) => renderer.drop(x, y, strength, radius)
