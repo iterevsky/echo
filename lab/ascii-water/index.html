@@ -41,6 +41,7 @@
     <script src="js/renderer.js"></script>
     <script src="js/metrics.js"></script>
     <script src="js/input.js"></script>
+    <script src="js/quality.js"></script>
     <script>
         (function () {
             window.addEventListener('error', event => {
@@ -51,12 +52,14 @@
             const input = new AsciiWater.InputController(document.getElementById('water'), renderer, {
                 onTap: tap => { window.waterLab.lastTap = tap; }
             });
+            const quality = new AsciiWater.QualityController(renderer);
+            renderer.quality = quality;
             const buttons = Array.from(document.querySelectorAll('[data-cell]'));
             function syncControls() {
                 buttons.forEach(button => button.setAttribute('aria-pressed', String(Number(button.dataset.cell) === renderer.cellPx)));
             }
             buttons.forEach(button => button.addEventListener('click', () => {
-                renderer.setCellSize(Number(button.dataset.cell));
+                quality.setCellSize(Number(button.dataset.cell), 'manual');
                 syncControls();
             }));
             window.waterLab = {
@@ -64,11 +67,22 @@
                 metrics,
                 waves: renderer.waves,
                 input,
+                quality,
                 taps: input.taps,
                 effects: input.effects,
                 lastTap: null,
                 drop: (x, y, strength, radius) => renderer.drop(x, y, strength, radius)
             };
+            const runReport = document.createElement('pre');
+            runReport.hidden = true;
+            runReport.setAttribute('aria-label', 'Full run performance summary');
+            runReport.style.cssText = 'position:fixed;right:12px;bottom:12px;z-index:3;max-width:min(600px,90vw);max-height:85vh;overflow:auto;margin:0;padding:12px;background:rgba(0,0,0,.94);color:#c9f7e8;font:12px/1.4 monospace;white-space:pre-wrap;';
+            document.body.appendChild(runReport);
+            window.addEventListener('keydown', event => {
+                if (event.key.toLowerCase() !== 'r' || event.ctrlKey || event.metaKey || event.altKey) return;
+                runReport.hidden = !runReport.hidden;
+                if (!runReport.hidden) runReport.textContent = JSON.stringify(metrics.getRunSummary(), null, 2);
+            });
             window.addEventListener('load', () => {
                 metrics.capturePayload();
                 setTimeout(() => metrics.capturePayload(), 250);

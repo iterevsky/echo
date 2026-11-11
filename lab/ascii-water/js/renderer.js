@@ -109,39 +109,46 @@
         }
 
         buildTreatment() {
+            const profile = this.treatmentProfile || { scanlines: 0.18, vignette: 0.22, grain: 0.12 };
             this.treatment = document.createElement('canvas');
             this.treatment.width = this.canvas.width;
             this.treatment.height = this.canvas.height;
             const context = this.treatment.getContext('2d');
             context.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
 
-            const scanlines = document.createElement('canvas');
-            scanlines.width = 1;
-            scanlines.height = 4;
-            const scanlineContext = scanlines.getContext('2d');
-            scanlineContext.fillStyle = 'rgba(0, 0, 0, 0.12)';
-            scanlineContext.fillRect(0, 2, 1, 2);
-            context.globalAlpha = 0.18;
-            context.fillStyle = context.createPattern(scanlines, 'repeat');
-            context.fillRect(0, 0, this.cssWidth, this.cssHeight);
+            if (profile.scanlines > 0) {
+                const scanlines = document.createElement('canvas');
+                scanlines.width = 1;
+                scanlines.height = 4;
+                const scanlineContext = scanlines.getContext('2d');
+                scanlineContext.fillStyle = 'rgba(0, 0, 0, 0.12)';
+                scanlineContext.fillRect(0, 2, 1, 2);
+                context.globalAlpha = profile.scanlines;
+                context.fillStyle = context.createPattern(scanlines, 'repeat');
+                context.fillRect(0, 0, this.cssWidth, this.cssHeight);
+            }
 
-            context.save();
-            context.translate(this.cssWidth / 2, this.cssHeight / 2);
-            context.scale(this.cssWidth / 2, this.cssHeight / 2);
-            const vignette = context.createRadialGradient(0, 0, 0, 0, 0, 1);
-            vignette.addColorStop(0, 'rgba(10,14,10,0.15)');
-            vignette.addColorStop(0.55, 'rgba(3,6,3,0.94)');
-            vignette.addColorStop(1, 'rgba(1,3,1,0.98)');
-            context.globalAlpha = 0.22;
-            context.fillStyle = vignette;
-            context.fillRect(-1, -1, 2, 2);
-            context.restore();
+            if (profile.vignette > 0) {
+                context.save();
+                context.translate(this.cssWidth / 2, this.cssHeight / 2);
+                context.scale(this.cssWidth / 2, this.cssHeight / 2);
+                const vignette = context.createRadialGradient(0, 0, 0, 0, 0, 1);
+                vignette.addColorStop(0, 'rgba(10,14,10,0.15)');
+                vignette.addColorStop(0.55, 'rgba(3,6,3,0.94)');
+                vignette.addColorStop(1, 'rgba(1,3,1,0.98)');
+                context.globalAlpha = profile.vignette;
+                context.fillStyle = vignette;
+                context.fillRect(-1, -1, 2, 2);
+                context.restore();
+            }
 
-            context.globalCompositeOperation = 'screen';
-            context.globalAlpha = 0.12;
-            context.fillStyle = context.createPattern(this.grainTile, 'repeat');
-            context.fillRect(0, 0, this.cssWidth, this.cssHeight);
-            context.globalCompositeOperation = 'source-over';
+            if (profile.grain > 0) {
+                context.globalCompositeOperation = 'screen';
+                context.globalAlpha = profile.grain;
+                context.fillStyle = context.createPattern(this.grainTile, 'repeat');
+                context.fillRect(0, 0, this.cssWidth, this.cssHeight);
+                context.globalCompositeOperation = 'source-over';
+            }
             context.globalAlpha = 1;
         }
 
@@ -149,7 +156,7 @@
             const bounds = this.canvas.getBoundingClientRect();
             this.cssWidth = Math.max(1, bounds.width);
             this.cssHeight = Math.max(1, bounds.height);
-            this.dpr = Math.min(window.devicePixelRatio || 1, 2);
+            this.dpr = Math.min(window.devicePixelRatio || 1, 1.5);
             this.cols = Math.max(1, Math.floor(this.cssWidth / this.cellPx));
             this.rows = Math.max(1, Math.floor(this.cssHeight / this.cellPx));
             this.cellWidth = this.cssWidth / this.cols;
@@ -168,9 +175,17 @@
             this.render();
         }
 
-        setCellSize(cellPx) {
+        setCellSize(cellPx, treatmentProfile) {
             if (!CELL_SIZES.includes(cellPx)) throw new RangeError('Cell size must be 8, 10, or 12 CSS px');
-            if (cellPx === this.cellPx) return;
+            const profileChanged = treatmentProfile && treatmentProfile !== this.treatmentProfile;
+            if (treatmentProfile) this.treatmentProfile = treatmentProfile;
+            if (cellPx === this.cellPx) {
+                if (profileChanged) {
+                    this.buildTreatment();
+                    this.render();
+                }
+                return;
+            }
             this.cellPx = cellPx;
             this.resize();
         }
@@ -212,10 +227,11 @@
                 }
             }
             context.drawImage(this.treatment, 0, 0, this.cssWidth, this.cssHeight);
+            if (this.metrics) this.metrics.markWaterFrame();
         }
 
         start() {
-            if (this.motionQuery.matches || this.rafId !== null) return;
+            if (this.staticFallback || this.motionQuery.matches || this.rafId !== null) return;
             this.lastTimestamp = null;
             if (this.metrics) this.metrics.reset();
             this.rafId = requestAnimationFrame(this.tick);
@@ -226,6 +242,17 @@
             this.rafId = null;
             this.lastTimestamp = null;
             if (this.metrics) this.metrics.reset();
+        }
+
+        activateFallback(reason) {
+            if (this.staticFallback) return;
+            this.staticFallback = true;
+            if (this.rafId !== null) cancelAnimationFrame(this.rafId);
+            this.rafId = null;
+            this.lastTimestamp = null;
+            const started = performance.now();
+            this.render();
+            if (this.metrics) this.metrics.setFallback(reason, performance.now() - started);
         }
 
         handleMotionChange() {
@@ -240,7 +267,7 @@
         }
 
         tick(timestamp) {
-            if (this.motionQuery.matches) {
+            if (this.staticFallback || this.motionQuery.matches) {
                 this.rafId = null;
                 return;
             }
@@ -261,6 +288,7 @@
                     this.metrics.paint(true);
                 }
             }
+            if (this.quality && this.lastTimestamp !== null) this.quality.recordFrame(timestamp - this.lastTimestamp, timestamp);
             this.lastTimestamp = timestamp;
         }
 
