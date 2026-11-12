@@ -5,8 +5,11 @@ const BAYER = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]];
 const PROFILES = {
 8: { scanlines: 0.18, vignette: 0.22, grain: 0.12 },
 10: { scanlines: 0.12, vignette: 0.18, grain: 0.06 },
-12: { scanlines: 0.08, vignette: 0.14, grain: 0 }
+12: { scanlines: 0.08, vignette: 0.14, grain: 0 },
+14: { scanlines: 0.06, vignette: 0.11, grain: 0 },
+16: { scanlines: 0.04, vignette: 0.08, grain: 0 }
 };
+const TARGET_FRAME_MS = 1000 / 30;
 const clamp = (v, low = 0, high = 1) => Math.min(high, Math.max(low, v));
 const hash = (x, y) => {
 const n = Math.sin(x * 127.1 + y * 311.7 + 17) * 43758.5453;
@@ -276,7 +279,7 @@ this.view = view;
 this.intervals = [];
 this.changes = [];
 this.lastChange = -Infinity;
-this.below30Since = null;
+this.below24Since = null;
 this.fallback = false;
 }
 p95(count) {
@@ -293,24 +296,24 @@ if (this.view.cellPx === cellPx || this.fallback) return;
 this.changes.push({ from: this.view.cellPx, to: cellPx, reason, timestamp });
 this.lastChange = timestamp;
 this.intervals.length = 0;
-this.below30Since = null;
+this.below24Since = null;
 this.view.setCellSize(cellPx);
 }
 record(frameMs, timestamp) {
 if (this.fallback || !Number.isFinite(frameMs) || frameMs <= 0) return;
 this.intervals.push(frameMs);
 if (this.intervals.length > 600) this.intervals.shift();
-if (this.view.cellPx === 12 && this.intervals.length >= 90 && this.mean(90) < 30 - 1e-9) {
-if (this.below30Since === null) this.below30Since = timestamp;
-if (timestamp - this.below30Since >= 60000) {
+if (this.view.cellPx === 16 && this.intervals.length >= 300 && this.mean(300) < 24 - 1e-9) {
+if (this.below24Since === null) this.below24Since = timestamp;
+if (timestamp - this.below24Since >= 10000) {
 this.fallback = true;
 this.view.freeze();
 return;
 }
-} else this.below30Since = null;
+} else this.below24Since = null;
 if (timestamp - this.lastChange < 5000) return;
-if (this.intervals.length >= 90 && this.p95(90) > 16 && this.view.cellPx < 12) this.setCell(this.view.cellPx + 2, timestamp, 'downgrade');
-else if (this.intervals.length >= 600 && this.p95(600) < 11 && this.view.cellPx > 8) this.setCell(this.view.cellPx - 2, timestamp, 'upgrade');
+if (this.intervals.length >= 90 && this.p95(90) > 40 && this.view.cellPx < 16) this.setCell(this.view.cellPx + 2, timestamp, 'downgrade');
+else if (this.intervals.length >= 300 && this.p95(300) < 34 && this.mean(300) >= 27 && this.view.cellPx > 8) this.setCell(this.view.cellPx - 2, timestamp, 'upgrade');
 }
 }
 class View {
@@ -488,9 +491,10 @@ this.rafId = null;
 return;
 }
 this.rafId = requestAnimationFrame(this.tick);
+const frameMs = this.lastTimestamp === null ? 0 : timestamp - this.lastTimestamp;
+if (this.lastTimestamp !== null && frameMs < TARGET_FRAME_MS - 0.5) return;
 const started = performance.now();
-const elapsed = this.lastTimestamp === null ? 0 : (timestamp - this.lastTimestamp) / 1000;
-this.field.advance(elapsed);
+this.field.advance(frameMs / 1000);
 this.render();
 const renderMs = performance.now() - started;
 this.lastRenderMs = renderMs;
@@ -504,11 +508,10 @@ this.pendingInputs.length = 0;
 if (this.inputLatencies.length > 120) this.inputLatencies.splice(0, this.inputLatencies.length - 120);
 }
 if (this.lastTimestamp !== null) {
-const frameMs = timestamp - this.lastTimestamp;
 this.intervals.push(frameMs);
 this.runIntervals.push(frameMs);
 this.totalFrameMs += frameMs;
-if (frameMs > 25) this.totalDropped++;
+this.totalDropped += Math.max(0, Math.round(frameMs / TARGET_FRAME_MS) - 1);
 if (this.intervals.length > 120) this.intervals.shift();
 this.quality.record(frameMs, timestamp);
 }
@@ -558,11 +561,12 @@ const mean = this.intervals.length ? this.intervals.reduce((sum, value) => sum +
 const sorted = this.intervals.slice().sort((a, b) => a - b);
 const runSorted = this.runIntervals.slice().sort((a, b) => a - b);
 const inputs = this.inputLatencies.slice().sort((a, b) => a - b);
+const dropped = this.intervals.reduce((total, value) => total + Math.max(0, Math.round(value / TARGET_FRAME_MS) - 1), 0);
 return {
 frames: this.intervals.length,
 fps: mean ? 1000 / mean : 0,
 p95Ms: sorted.length ? sorted[Math.floor((sorted.length - 1) * 0.95)] : 0,
-droppedRatio: this.intervals.length ? this.intervals.filter(value => value > 25).length / this.intervals.length : 0,
+droppedRatio: this.intervals.length ? dropped / (this.intervals.length + dropped) : 0,
 renderMs: this.lastRenderMs,
 inputLatencyMs: this.lastInputLatencyMs,
 inputP95Ms: inputs.length ? inputs[Math.floor((inputs.length - 1) * 0.95)] : 0,
@@ -571,7 +575,7 @@ firstResponsiveTouchMs: this.firstResponsiveTouchMs,
 runFrames: this.runIntervals.length,
 runMeanFps: this.totalFrameMs ? this.runIntervals.length * 1000 / this.totalFrameMs : 0,
 runP95Ms: runSorted.length ? runSorted[Math.floor((runSorted.length - 1) * 0.95)] : 0,
-runDroppedRatio: this.runIntervals.length ? this.totalDropped / this.runIntervals.length : 0,
+runDroppedRatio: this.runIntervals.length ? this.totalDropped / (this.runIntervals.length + this.totalDropped) : 0,
 cellPx: this.cellPx,
 dpr: this.dpr,
 grid: [this.cols, this.rows],
