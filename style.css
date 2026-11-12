@@ -103,7 +103,8 @@ html, body {
     top: 0;
     left: 0;
     width: 100%;
-    height: 100%;
+    height: 100vh;
+    height: 100dvh;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -2600,37 +2601,36 @@ html, body {
     -webkit-touch-callout: none;
 }
 
-/* === COVER: primary ASCII water with a cropped emblem === */
+/* === COVER: full-screen artwork with aligned water and illumination === */
 .cover-stage {
-    position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 100%;
-    height: 100%;
+    position: absolute;
+    inset: 0;
     overflow: hidden;
 }
 #water-cover {
     position: absolute;
     inset: 0;
-    z-index: 1;
+    z-index: 2;
     display: block;
     width: 100%;
     height: 100%;
     background: #06080a;
     color: #c9f7e8;
     cursor: pointer;
+    mix-blend-mode: screen;
 }
 #water-cover:focus-visible {
     outline: 2px solid #c9f7e8;
     outline-offset: -4px;
 }
 #cover-screen .cover-tremor {
-    position: relative;
-    z-index: 2;
+    position: absolute;
+    inset: 0;
+    z-index: 1;
     display: block;
-    width: min(42vw, 340px);
-    height: min(56vh, 440px);
+    width: auto;
+    height: auto;
+    margin: 0;
     pointer-events: none;
 }
 #cover-screen .cover-tremor img {
@@ -2640,25 +2640,22 @@ html, body {
     max-width: none;
     max-height: none;
     object-fit: cover;
-    object-position: 50% 42%;
-    clip-path: inset(6% 4% 10% 4%);
-    opacity: 0.68;
-    mix-blend-mode: screen;
+    object-position: 50% 50%;
+    clip-path: none;
+    opacity: 1;
+    mix-blend-mode: normal;
     filter: contrast(1.05) brightness(0.95) saturate(0.85);
-    -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 12%, black 88%, transparent 100%);
-    mask-image: linear-gradient(to bottom, transparent 0%, black 12%, black 88%, transparent 100%);
+    -webkit-mask-image: none;
+    mask-image: none;
+}
+#cover-screen::after {
+    z-index: 3;
 }
 .cover-ripples {
-    position: relative;
-    z-index: 3;
+    position: absolute;
+    inset: 0;
+    z-index: 4;
     pointer-events: none;
-}
-@media (max-width: 768px) {
-    #cover-screen .cover-tremor {
-        width: min(64vw, 270px);
-        height: min(48vh, 400px);
-        margin-inline: auto;
-    }
 }
 @media (prefers-reduced-motion: reduce) {
     #cover-screen .cover-tremor img { animation: none !important; }
