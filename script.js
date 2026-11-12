@@ -739,6 +739,14 @@ function bootContentsOnce() {
     }
 }
 
+function cleanupChapterTear() {
+    const tearOverlay = document.getElementById('tear-overlay');
+    if (!tearOverlay) return;
+    chapterScreen.classList.remove('tear-flash');
+    tearOverlay.style.display = 'none';
+    tearOverlay.querySelectorAll('*').forEach(el => el.style.animation = '');
+}
+
 function showChapterPending(index) {
     const chapter = chapters[index];
     if (!chapter) { openContentsFresh(); return; }
@@ -808,9 +816,8 @@ async function openChapter(index, opts = {}) {
         chScreen.classList.add('tear-flash');
 
         setTimeout(() => {
-            chScreen.classList.remove('tear-flash');
-            tearOverlay.style.display = 'none';
-            tearOverlay.querySelectorAll('*').forEach(el => el.style.animation = '');
+            if (generation !== readerGeneration) return;
+            cleanupChapterTear();
         }, 150);
     }
 
@@ -875,11 +882,13 @@ async function openChapter(index, opts = {}) {
 
 
     setTimeout(() => {
+        if (generation !== readerGeneration) return;
         chapterScreen.classList.add('visible');
         chapterScreen.inert = false;
         chapterScreen.scrollTop = 0;
         if (opts.restore) {
             const restorePos = () => {
+                if (generation !== readerGeneration) return;
                 const s = loadState();
                 const frac = s.readPos && s.readPos[index];
                 if (frac) {
@@ -890,7 +899,11 @@ async function openChapter(index, opts = {}) {
             if (document.fonts && document.fonts.ready) {
                 // позиция — после загрузки шрифтов, иначе метрики пересчитаются
                 document.fonts.ready.then(() => {
-                    requestAnimationFrame(() => requestAnimationFrame(restorePos));
+                    if (generation !== readerGeneration) return;
+                    requestAnimationFrame(() => {
+                        if (generation !== readerGeneration) return;
+                        requestAnimationFrame(restorePos);
+                    });
                 });
             } else {
                 setTimeout(restorePos, 300);
@@ -899,7 +912,10 @@ async function openChapter(index, opts = {}) {
         initVoiceObserver();
         requestReaderWakeLock();
     }, 300);
-    setTimeout(updateChapterProgress, 350);
+    setTimeout(() => {
+        if (generation !== readerGeneration) return;
+        updateChapterProgress();
+    }, 350);
 }
 
 /* === ФОТО: ОВЕРЛЕЙ === */
@@ -1707,6 +1723,11 @@ async function handleHashLink() {
 }
 
 function openContentsFresh() {
+    readerGeneration++;
+    cleanupSwipeHandlers();
+    cleanupChapterTear();
+    chapterScreen.classList.remove('visible');
+    chapterScreen.inert = true;
     contentsScreen.classList.add('visible');
     contentsScreen.inert = false;
     if (menuTrigger) menuTrigger.classList.add('visible');
@@ -2452,6 +2473,7 @@ function scrollContentsToCurrent() {
 function doExitChapterToContents() {
     chapterExitInProgress = false;
     readerGeneration++;            // leaving the reader invalidates pending writes
+    cleanupChapterTear();
     clearTimeout(readPosTimer);
     readPosTimer = null;
     releaseReaderWakeLock();

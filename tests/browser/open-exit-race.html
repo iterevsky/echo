@@ -1,0 +1,34 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>T27 — openChapter exit race regression</title>
+<style>html,body{margin:0;background:#0c0c0c;color:#e8e6e3;font:14px monospace}iframe{width:100%;height:55vh;border:0}pre{white-space:pre-wrap}</style>
+<iframe id="root" src="/?ch=0"></iframe>
+<pre id="output">Running open→exit race regression…</pre>
+<script>
+const frame = document.getElementById('root');
+const output = document.getElementById('output');
+const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
+frame.addEventListener('load', async () => {
+    const w = frame.contentWindow;
+    const chapter = w.document.getElementById('chapter-screen');
+    const contents = w.document.getElementById('contents-screen');
+    try {
+        await w.ensureChapters();
+        await pause(500);
+        const opening = w.openChapter(0);
+        await opening;
+        w.doExitChapterToContents();
+        const immediatelyAfterExit = { chapterClass: chapter.className, inert: chapter.inert, contentsClass: contents.className, contentsInert: contents.inert };
+        await pause(1600);
+        const otherVisibleScreens = w.document.querySelectorAll('#text-screen.visible, #final-screen.visible, #title-screen.visible, #film-screen.visible, #chapter-screen.visible').length;
+        const tearDisplay = w.getComputedStyle(w.document.getElementById('tear-overlay')).display;
+        const readerStayedClosed = chapter.inert === true && !chapter.classList.contains('visible') && tearDisplay === 'none';
+        const contentsOnly = contents.classList.contains('visible') && contents.inert === false && otherVisibleScreens === 0;
+        const pass = readerStayedClosed && contentsOnly;
+        output.textContent = JSON.stringify({ test: 'openChapter(0) followed immediately by doExitChapterToContents()', waitMs: 1600, immediatelyAfterExit, final: { chapterClass: chapter.className, inert: chapter.inert, contentsClass: contents.className, contentsInert: contents.inert, otherVisibleScreens, tearDisplay }, checks: { readerStayedClosed, contentsOnly }, result: pass ? 'RESULT: OK' : 'RESULT: FAILED' }, null, 2);
+    } catch (error) {
+        output.textContent = JSON.stringify({ result: 'RESULT: FAILED', error: error.stack }, null, 2);
+    }
+}, { once: true });
+</script>
