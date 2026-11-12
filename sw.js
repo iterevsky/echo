@@ -46,7 +46,14 @@ const EXTRA_FILES = [
     './fonts/golos-text-latin.woff2',
     './fonts/golos-text-500.woff2',
     './fonts/golos-text-700.woff2',
-    './ascii-water.js'
+    './ascii-water.js',
+    './images/frame/frame-01.jpg',
+    './images/frame/frame-02.jpg',
+    './images/frame/frame-03.jpg',
+    './images/frame/frame-04.jpg',
+    './images/frame/frame-05.jpg',
+    './images/frame/frame-06.jpg',
+    './images/frame/frame-07.jpg'
 ];
 
 const PRECACHE = CORE_FILES.concat(EXTRA_FILES);
