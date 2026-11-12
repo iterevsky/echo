@@ -178,7 +178,7 @@ body.install-open { overflow: hidden; }
     <div id="final-screen"></div>
 
     <!-- Проекторная плёнка: серия кадров между вспышкой и названием -->
-    <div id="film-screen">
+    <div id="film-screen" tabindex="-1">
       <div class="film-gate">
         <div class="film-rail film-rail-left"></div>
         <img class="film-image" src="" alt="" draggable="false">
@@ -186,11 +186,11 @@ body.install-open { overflow: hidden; }
         <div class="film-rail film-rail-right"></div>
       </div>
       <div class="film-grain"></div>
-      <div class="film-hint" id="film-hint" role="note">Дважды коснитесь, чтобы пропустить</div>
+      <div class="film-hint" id="film-hint" role="note">Дважды коснитесь, чтобы пропустить. Enter или Esc — тоже пропуск</div>
     </div>
 
     <!-- Экран с названием книги -->
-    <div id="title-screen">
+    <div id="title-screen" tabindex="-1">
         <div class="author">Итеревский-Кочетов Иван</div>
         <div class="book-title">Э<span class="h-char">Х</span>О</div>
     </div>

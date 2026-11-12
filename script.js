@@ -688,6 +688,7 @@ function showTitle({ decode = false } = {}) {
     const loading = document.getElementById('film-loading');
     if (loading) loading.remove();
     if (filmScreen) {
+        filmScreen.tabIndex = -1;
         filmScreen.classList.remove('visible', 'film-live', 'reduced', 'film-flick', 'film-breathe', 'film-hit-light', 'film-lamp-stutter', 'film-lamp-die', 'film-startup', 'film-catch-light', 'film-lamp-ignite');
         filmScreen.style.pointerEvents = '';
         filmScreen.style.transition = '';
@@ -707,10 +708,19 @@ function showTitle({ decode = false } = {}) {
     const crackle = filmScreen && filmScreen.querySelector('#film-crackle');
     if (crackle) crackle.style.opacity = '0';
     titleScreen.classList.add('visible');
+    titleScreen.setAttribute('role', 'button');
+    titleScreen.setAttribute('aria-label', 'Открыть оглавление');
+    titleScreen.tabIndex = 0;
+    titleScreen.focus({ preventScroll: true });
     if (decode) playTitleDecode();
     if (!titleActivationBound) {
         titleActivationBound = true;
         titleScreen.addEventListener('click', showContents, { once: true });
+        titleScreen.addEventListener('keydown', (event) => {
+            if (event.repeat || event.key !== 'Enter' && event.key !== ' ') return;
+            event.preventDefault();
+            showContents();
+        });
     }
 }
 
@@ -809,9 +819,15 @@ function showContentsList() {
     if (menuTrigger) menuTrigger.classList.add('visible');
     scrollContentsToCurrent();
     revealContentsItems();
+    const item = contentsScreen.querySelector('.contents-item.current') || contentsScreen.querySelector('.contents-item');
+    if (item) item.focus({ preventScroll: true });
 }
 
+let contentsTransitionStarted = false;
 function showContents() {
+    if (contentsTransitionStarted) return;
+    contentsTransitionStarted = true;
+    titleScreen.tabIndex = -1;
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     updateContentsMemory();
     titleScreen.classList.remove('film-enter');
@@ -2161,12 +2177,16 @@ function showFilmHint() {
     filmHint.classList.remove('visible');
     void filmHint.offsetWidth;
     filmHint.classList.add('visible');
+    filmScreen.focus({ preventScroll: true });
 }
 
 function runFilmSequence() {
     if (filmRunning || !filmScreen || !filmGate || !filmImage) return;
     filmRunning = true;
     filmScreen.style.pointerEvents = 'auto';
+    filmScreen.tabIndex = 0;
+    filmScreen.setAttribute('role', 'button');
+    filmScreen.setAttribute('aria-label', 'Пропустить плёнку');
 
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const timers = [];
@@ -2216,6 +2236,11 @@ function runFilmSequence() {
         }
     };
     const onFilmPointerCancel = () => resetFilmGesture();
+    const onFilmKeyDown = (event) => {
+        if (event.repeat || event.key !== 'Escape' && event.key !== 'Enter') return;
+        event.preventDefault();
+        endToTitle();
+    };
 
     /* pointerup is the only tap channel; synthetic clicks are never consumed */
     const endToTitle = () => {
@@ -2227,6 +2252,7 @@ function runFilmSequence() {
         filmScreen.removeEventListener('pointerdown', onFilmPointerDown);
         filmScreen.removeEventListener('pointerup', onFilmPointerUp);
         filmScreen.removeEventListener('pointercancel', onFilmPointerCancel);
+        filmScreen.removeEventListener('keydown', onFilmKeyDown);
         window.removeEventListener('blur', onFilmPointerCancel);
 
         showTitle();
@@ -2241,10 +2267,11 @@ function runFilmSequence() {
 
     try {
         filmScreen.addEventListener('pointerdown', onFilmPointerDown);
-    filmScreen.addEventListener('pointerup', onFilmPointerUp);
-    filmScreen.addEventListener('pointercancel', onFilmPointerCancel);
-    window.addEventListener('blur', onFilmPointerCancel);
-    document.addEventListener('visibilitychange', onVisibilityHidden);
+        filmScreen.addEventListener('pointerup', onFilmPointerUp);
+        filmScreen.addEventListener('pointercancel', onFilmPointerCancel);
+        filmScreen.addEventListener('keydown', onFilmKeyDown);
+        window.addEventListener('blur', onFilmPointerCancel);
+        document.addEventListener('visibilitychange', onVisibilityHidden);
 
     /* --- reduced-motion: плавные кроссфейды без эффектов --- */
     if (reduced) {

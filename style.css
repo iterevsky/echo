@@ -2660,3 +2660,9 @@ html, body {
 @media (prefers-reduced-motion: reduce) {
     #cover-screen .cover-tremor img { animation: none !important; }
 }
+
+#film-screen:focus-visible,
+#title-screen:focus-visible {
+    outline: 2px solid rgba(201, 247, 232, 0.85);
+    outline-offset: -6px;
+}
