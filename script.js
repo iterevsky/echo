@@ -453,13 +453,26 @@ updateContentsMemory();
    Every ordinary launch keeps the cover; saved progress is offered after the title. */
 async function applyInitialRoute() {
     let swRoute = null;
+    let rawRoute = null;
     try {
-        const raw = sessionStorage.getItem('echo_sw_route');
-        if (raw) {
-            swRoute = JSON.parse(raw);
-            sessionStorage.removeItem('echo_sw_route');   // one-shot, consumed now
+        rawRoute = sessionStorage.getItem('echo_sw_route');
+    } catch (error) {
+        console.warn('[ЭХО] Cannot read service worker route:', error);
+    }
+    if (rawRoute !== null) {
+        try {
+            swRoute = JSON.parse(rawRoute);
+        } catch (error) {
+            swRoute = null;
+            console.warn('[ЭХО] Malformed service worker route:', error);
+        } finally {
+            try {
+                sessionStorage.removeItem('echo_sw_route');
+            } catch (error) {
+                console.warn('[ЭХО] Cannot remove service worker route:', error);
+            }
         }
-    } catch (e) {}
+    }
 
     // reveal the cover immediately; chapter text loading must not block it
     document.documentElement.classList.remove('routing-pending');
