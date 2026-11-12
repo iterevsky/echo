@@ -3245,6 +3245,19 @@ function coverSurgeHook() {
             window.__echoWater.destroy();
         }
         record('load-error', { message: error.message });
+        console.error('[ЭХО] Cover water unavailable:', error);
+    }
+
+    function coverImageReady() {
+        const image = coverScreen.querySelector('.cover-tremor img');
+        if (!image) return Promise.reject(new Error('cover source image is missing'));
+        if (image.complete) {
+            return image.naturalWidth > 0 ? Promise.resolve(image) : Promise.reject(new Error('cover source image failed to load'));
+        }
+        return new Promise((resolve, reject) => {
+            image.addEventListener('load', () => resolve(image), { once: true });
+            image.addEventListener('error', () => reject(new Error('cover source image failed to load')), { once: true });
+        });
     }
 
     function ensureWater(trigger) {
@@ -3257,7 +3270,7 @@ function coverSurgeHook() {
         script.async = true;
         script.src = 'ascii-water.js';
         const current = new Promise((resolve, reject) => {
-            script.onload = () => {
+            script.onload = async () => {
                 if (covered) {
                     pendingImpulse = null;
                     record('discard-late');
@@ -3266,7 +3279,14 @@ function coverSurgeHook() {
                 }
                 try {
                     if (!window.__echoWater || typeof window.__echoWater.init !== 'function') throw new Error('water module did not initialize');
-                    view = window.__echoWater.init(canvas);
+                    const sourceImage = await coverImageReady();
+                    if (covered) {
+                        pendingImpulse = null;
+                        record('discard-late');
+                        resolve(null);
+                        return;
+                    }
+                    view = window.__echoWater.init(canvas, { sourceImage });
                     state = 'ready';
                     record('ready');
                     if (pendingImpulse) {

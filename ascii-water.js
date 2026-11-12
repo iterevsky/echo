@@ -20,8 +20,8 @@ const f = t < 0.55 ? t / 0.55 : (t - 0.55) / 0.45;
 return 'rgb(' + a.map((v, k) => Math.round(v + (b[k] - v) * f)).join(',') + ')';
 });
 class Scene {
-constructor(cols, rows) { this.resize(cols, rows); }
-resize(cols, rows) {
+constructor(sourceImage) { this.sourceImage = sourceImage; }
+resize(cols, rows, cssWidth = cols, cssHeight = rows) {
 this.cols = cols;
 this.rows = rows;
 const n = cols * rows;
@@ -34,25 +34,49 @@ this.dense = new Float32Array(n);
 this.glyph = new Float32Array(n);
 this.ramp = new Uint8Array(n);
 this.shore = new Uint8Array(n);
+const image = this.sourceImage;
+if (!image || !image.naturalWidth || !image.naturalHeight) throw new Error('cover source image is unavailable');
+this.sourceWidth = image.naturalWidth;
+this.sourceHeight = image.naturalHeight;
+this.cssWidth = cssWidth;
+this.cssHeight = cssHeight;
+this.cropScale = Math.max(cssWidth / this.sourceWidth, cssHeight / this.sourceHeight);
+this.cropWidth = cssWidth / this.cropScale;
+this.cropHeight = cssHeight / this.cropScale;
+this.cropX = (this.sourceWidth - this.cropWidth) / 2;
+this.cropY = (this.sourceHeight - this.cropHeight) / 2;
+this.waterline = clamp((0.67 * this.sourceHeight - this.cropY) * this.cropScale / cssHeight);
+const canvas = document.createElement('canvas');
+canvas.width = cols;
+canvas.height = rows;
+const context = canvas.getContext('2d');
+context.drawImage(image, this.cropX, this.cropY, this.cropWidth, this.cropHeight, 0, 0, cols, rows);
+const pixels = context.getImageData(0, 0, cols, rows).data;
+this.sourceLum = new Float32Array(n);
+for (let i = 0; i < n; i++) {
+const offset = i * 4;
+this.sourceLum[i] = (0.2126 * pixels[offset] + 0.7152 * pixels[offset + 1] + 0.0722 * pixels[offset + 2]) / 255;
+}
+}
+sourcePoint(x, y) {
+return {
+x: (this.cropX + clamp(x) * this.cssWidth / this.cropScale) / this.sourceWidth,
+y: (this.cropY + clamp(y) * this.cssHeight / this.cropScale) / this.sourceHeight
+};
+}
+sampleSource(x, y) {
+const gx = clamp((x * this.sourceWidth - this.cropX) / this.cropWidth) * (this.cols - 1);
+const gy = clamp((y * this.sourceHeight - this.cropY) / this.cropHeight) * (this.rows - 1);
+const x0 = Math.floor(gx), y0 = Math.floor(gy);
+const x1 = Math.min(this.cols - 1, x0 + 1), y1 = Math.min(this.rows - 1, y0 + 1);
+const tx = gx - x0, ty = gy - y0;
+const top = this.sourceLum[y0 * this.cols + x0] * (1 - tx) + this.sourceLum[y0 * this.cols + x1] * tx;
+const bottom = this.sourceLum[y1 * this.cols + x0] * (1 - tx) + this.sourceLum[y1 * this.cols + x1] * tx;
+return top * (1 - ty) + bottom * ty;
 }
 sample(x, y) {
-const shoreY = 0.50 + 0.006 * Math.sin(2 * Math.PI * (3 * x + 0.17)) + 0.003 * Math.sin(2 * Math.PI * 11 * x);
-const shore = y >= shoreY && y < 0.56;
-let base;
-if (y < shoreY) base = 0.035 + 0.055 * (1 - y / 0.50);
-else if (shore) base = 0.10 + 0.09 * hash(x, y);
-else {
-const t = (y - 0.56) / 0.44;
-base = 0.07 + 0.06 * (1 - t);
-}
-let column = 0;
-if (y >= 0.10 && y <= 0.56) {
-const vertical = clamp((y - 0.10) / 0.06);
-const halo = Math.max(0, 1 - Math.abs(x - 0.68) / 0.075) ** 2;
-const core = Math.max(0, 1 - Math.abs(x - 0.68) / 0.018);
-column = vertical * (0.35 * halo + 0.65 * core);
-}
-return { lum: clamp(base + column), column, shore };
+const point = this.sourcePoint(x, y);
+return { lum: this.sampleSource(point.x, point.y), column: 0, shore: false };
 }
 gray(buffer, index, lum, water) {
 const offset = index * 4;
@@ -69,8 +93,8 @@ const x = col / Math.max(1, this.cols - 1);
 const i = row * this.cols + col;
 const s = this.sample(x, y);
 this.lum[i] = s.lum;
-this.column[i] = s.column;
-this.shore[i] = s.shore ? 1 : 0;
+this.column[i] = 0;
+this.shore[i] = 0;
 this.gray(this.sb, i, s.lum, false);
 }
 }
@@ -79,15 +103,15 @@ const y = row / Math.max(1, this.rows - 1);
 for (let col = 0; col < this.cols; col++) {
 const x = col / Math.max(1, this.cols - 1);
 const i = row * this.cols + col;
-if (y < 0.56) {
+if (y < this.waterline) {
 this.highlight[i] = 0;
 this.gray(this.rb, i, 0, false);
 continue;
 }
-const t = (y - 0.56) / 0.44;
+const t = (y - this.waterline) / Math.max(0.0001, 1 - this.waterline);
 const p = field.displace(x, y);
-const source = this.sample(clamp(p.x), clamp(1.12 - p.y));
-const reflected = source.lum * 0.68 * Math.exp(-1.6 * t);
+const point = this.sourcePoint(p.x, p.y);
+const reflected = this.sampleSource(point.x, 1.34 - point.y) * 0.68 * Math.exp(-1.6 * t);
 const highlight = reflected * (0.45 + 0.55 * hash(x, y));
 this.highlight[i] = highlight;
 this.lum[i] = clamp(reflected + 0.08 * highlight);
@@ -99,10 +123,10 @@ for (let col = 0; col < this.cols; col++) {
 const i = row * this.cols + col;
 const x = col / Math.max(1, this.cols - 1);
 const y = row / Math.max(1, this.rows - 1);
-const dense = this.shore[i] ? 0.35 + 0.45 * hash(x, y) : Math.max(this.column[i], this.highlight[i]);
+const dense = Math.max(this.column[i], this.highlight[i]);
 const density = clamp(0.08 + 0.82 * dense + 0.04 * hash(x, y));
 this.dense[i] = dense;
-this.ramp[i] = this.shore[i] ? 2 : dense >= 0.35 ? 1 : 0;
+this.ramp[i] = dense >= 0.35 ? 1 : 0;
 this.glyph[i] = clamp(this.lum[i] * (0.80 + 0.20 * density));
 }
 }
@@ -290,7 +314,7 @@ else if (this.intervals.length >= 600 && this.p95(600) < 11 && this.view.cellPx 
 }
 }
 class View {
-constructor(canvas) {
+constructor(canvas, sourceImage) {
 this.canvas = canvas;
 this.context = canvas.getContext('2d', { alpha: false });
 this.cellPx = 12;
@@ -313,7 +337,7 @@ this.reduced = this.reducedQuery.matches;
 this.tick = this.tick.bind(this);
 this.resize = this.resize.bind(this);
 this.motionChange = this.motionChange.bind(this);
-this.scene = new Scene(1, 1);
+this.scene = new Scene(sourceImage);
 this.field = new Field(1, 1);
 this.quality = new Quality(this);
 this.buildGrain();
@@ -421,7 +445,7 @@ this.canvas.width = Math.round(this.cssWidth * this.dpr);
 this.canvas.height = Math.round(this.cssHeight * this.dpr);
 this.context.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
 this.atlases = new Map();
-this.scene.resize(this.cols, this.rows);
+this.scene.resize(this.cols, this.rows, this.cssWidth, this.cssHeight);
 this.field.resize(this.cols, this.rows);
 this.buildTreatment();
 this.render();
@@ -438,7 +462,7 @@ const i = row * this.cols + col;
 const x = col / Math.max(1, this.cols - 1);
 const y = row / Math.max(1, this.rows - 1);
 const threshold = (BAYER[row % 4][col % 4] + 0.5) / 16 - 0.5;
-const modulation = y < 0.56 ? 1 : this.field.modulation(x, y);
+const modulation = y < this.scene.waterline ? 1 : this.field.modulation(x, y);
 const quantized = clamp(this.scene.glyph[i] * modulation + threshold * 0.10);
 const ramp = this.scene.ramp[i];
 const glyph = Math.round(quantized * (RAMPS[ramp].length - 1));
@@ -561,9 +585,10 @@ frozen: this.frozen
 }
 let active = null;
 window.__echoWater = {
-init(canvas) {
+init(canvas, { sourceImage } = {}) {
+if (!sourceImage) throw new Error('cover source image is required');
 if (active) active.destroy();
-active = new View(canvas);
+active = new View(canvas, sourceImage);
 return active;
 },
 destroy() {
