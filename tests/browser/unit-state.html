@@ -36,7 +36,7 @@
     }
 
     fetch('/script.js').then(function (r) { return r.text(); }).then(function (src) {
-        var names = ['normalizeChapterMap', 'normalizeSeenNew', 'sanitizeReaderSettings', 'sanitizeDateString', 'sanitizeState'];
+        var names = ['normalizeChapterMap', 'sanitizeReaderSettings', 'sanitizeState'];
         eval(names.map(function (n) { return extract(src, n); }).join('\n'));
 
         // T1: zero-padded legacy keys become numeric
@@ -74,9 +74,9 @@
         var messy = { readPos: { '03': 2, 3: 0.4, 'zz': 1 }, seenNew: { '07': true, '7': false, '09': 1 },
                       lastChapter: 5.0, lastVisit: 'not a date', weird: { deep: true } };
         check('T7 idempotent', eq(sanitizeState(sanitizeState(messy)), sanitizeState(messy)));
-        check('T7b seenNew normalized', eq(sanitizeState(messy).seenNew, { 7: true, 9: true }));
-        check('T7b invalid date dropped, unknown kept',
-            !('lastVisit' in sanitizeState(messy)) && eq(sanitizeState(messy).weird, { deep: true }));
+        check('T7b badge-era keys preserved verbatim', eq(sanitizeState(messy).seenNew, messy.seenNew));
+        check('T7b legacy date string and unknown fields preserved',
+            sanitizeState(messy).lastVisit === 'not a date' && eq(sanitizeState(messy).weird, { deep: true }));
 
         // T8: readerSettings partial validity
         check('T8 readerSettings', eq(
@@ -96,12 +96,12 @@
         check('T11 future chapter kept', eq(
             sanitizeState({ readPos: { '77': 1 } }).readPos, { 77: 1 }));
 
-        // T12: valid numeric state passes through unchanged (no-op migration)
+        // T12: valid state, including inert badge-era keys, passes through unchanged
         var clean = { readPos: { 0: 1, 1: 0.92, 2: 0.5, 3: 0.86 }, lastChapter: 3,
                       lastVisit: '2026-10-25T10:00:00.000Z', prevVisit: '2026-10-20T10:00:00.000Z',
                       seenNew: { 70: true }, installed: true,
                       readerSettings: { size: 2, tone: 'soft', dim: 10 } };
-        check('T12 valid state is a no-op', eq(sanitizeState(clean), clean));
+        check('T12 valid state and badge-era keys are a no-op', eq(sanitizeState(clean), clean));
 
         log(failures ? 'RESULT: FAILED (' + failures + ')' : 'RESULT: OK');
     }).catch(function (e) {

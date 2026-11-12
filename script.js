@@ -34,13 +34,34 @@ const chapterScreen = document.getElementById('chapter-screen');
 })();
 
 let isStarted = false;
-let touchStartX = 0;
 
 const menuTrigger = document.getElementById('menu-trigger');
 const menuOverlay = document.getElementById('menu-overlay');
 const menuClose = document.getElementById('menu-close');
 
 let isMenuOpen = false;
+const overlayOpenOrder = [];
+
+function markOverlayOpen(overlay) {
+    const existing = overlayOpenOrder.indexOf(overlay);
+    if (existing !== -1) overlayOpenOrder.splice(existing, 1);
+    overlayOpenOrder.push(overlay);
+}
+
+function markOverlayClosed(overlay) {
+    const existing = overlayOpenOrder.indexOf(overlay);
+    if (existing !== -1) overlayOpenOrder.splice(existing, 1);
+}
+
+function getTopmostOpenOverlay() {
+    for (let i = overlayOpenOrder.length - 1; i >= 0; i--) {
+        const overlay = overlayOpenOrder[i];
+        if (overlay.classList.contains('open') || overlay.classList.contains('active') || overlay.classList.contains('visible')) {
+            return overlay;
+        }
+    }
+    return null;
+}
 
 let currentChapter = 0;
 
@@ -73,16 +94,6 @@ function normalizeChapterMap(obj, clamp) {
     return out;
 }
 
-function normalizeSeenNew(obj) {
-    const out = {};
-    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return out;
-    Object.keys(obj).forEach((k) => {
-        if (!/^\d+$/.test(k)) return;
-        if (obj[k]) out[parseInt(k, 10)] = true;
-    });
-    return out;
-}
-
 function sanitizeReaderSettings(rs) {
     if (!rs || typeof rs !== 'object' || Array.isArray(rs)) return undefined;
     const size = Number(rs.size);
@@ -94,17 +105,11 @@ function sanitizeReaderSettings(rs) {
     };
 }
 
-function sanitizeDateString(v) {
-    if (typeof v !== 'string') return undefined;
-    return isNaN(new Date(v).getTime()) ? undefined : v;
-}
-
 /* чистим известные поля, неизвестные поля и их порядок не трогаем */
 function sanitizeState(parsed) {
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
     const s = Object.assign({}, parsed);
     if ('readPos' in s) s.readPos = normalizeChapterMap(s.readPos, true);
-    if ('seenNew' in s) s.seenNew = normalizeSeenNew(s.seenNew);
     if ('readerSettings' in s) {
         const rs = sanitizeReaderSettings(s.readerSettings);
         if (rs) s.readerSettings = rs; else delete s.readerSettings;
@@ -114,12 +119,6 @@ function sanitizeState(parsed) {
         if (!isFinite(n) || n < 0 || Math.floor(n) !== n) delete s.lastChapter;
         else s.lastChapter = n;
     }
-    ['lastVisit', 'prevVisit'].forEach((k) => {
-        if (k in s) {
-            const d = sanitizeDateString(s[k]);
-            if (d === undefined) delete s[k]; else s[k] = d;
-        }
-    });
     return s;
 }
 
@@ -136,6 +135,7 @@ function loadState() {
         return {};
     }
     const clean = sanitizeState(parsed);
+    if (!('v' in clean)) clean.v = 1;
     if (!stateChecked) {
         stateChecked = true;
         if (JSON.stringify(clean) !== JSON.stringify(parsed)) {
@@ -151,6 +151,7 @@ function saveState(patch) {
     try {
         const s = loadState();
         Object.assign(s, patch);
+        s.v = 1;
         localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
     } catch (e) {}
 }
@@ -305,27 +306,61 @@ function cleanupSwipeHandlers() {
     resetSwipeHint();
 }
 
-/* --- ротация визитов: если с прошлого захода больше 12 часов,
-   lastVisit становится prevVisit — до того, как его перезапишет openChapter --- */
-(function rotateVisits() {
-    const s = loadState();
-    if (!s.lastVisit) return;
-    const age = Date.now() - new Date(s.lastVisit).getTime();
-    if (age > 12 * 3600 * 1000) {
-        saveState({ prevVisit: s.lastVisit });
-    }
-})();
-
 // === ПОСТРОЕНИЕ МАССИВА ГЛАВ ИЗ HTML ===
 const items = document.querySelectorAll('.contents-item');
 const chapters = Array.from(items).map((item, index) => {
     const num = String(index + 1).padStart(2, '0');
     const raw = item.textContent.trim();
     const title = raw.replace(/^\d+\s*[•\s]*/, '').trim();
-    const rawText = chapterTexts[index];
-    const text = rawText || `<p class="placeholder">Глава в процессе написания…</p>`;
-    return { number: num, title, text, empty: !rawText };
+    return { number: num, title, text: '', empty: false };
 });
+
+let chaptersPromise = null;
+function applyChapterTexts() {
+    if (typeof chapterTexts === 'undefined' || !chapterTexts || typeof chapterTexts !== 'object' || Array.isArray(chapterTexts)) {
+        throw new Error('chapterTexts unavailable after load');
+    }
+    chapters.forEach((chapter, index) => {
+        const rawText = chapterTexts[index];
+        chapter.empty = typeof rawText !== 'string' || !rawText.trim();
+        chapter.text = chapter.empty ? `<p class="placeholder">Глава в процессе написания…</p>` : rawText;
+    });
+    updateContentsMemory();
+}
+
+function ensureChapters() {
+    if (chaptersPromise) return chaptersPromise;
+    if (typeof chapterTexts !== 'undefined') {
+        chaptersPromise = Promise.resolve().then(applyChapterTexts);
+        return chaptersPromise;
+    }
+    chaptersPromise = new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        const fail = () => {
+            script.onload = script.onerror = null;
+            script.remove();
+            chaptersPromise = null;
+            reject(new Error('Unable to load chapters.js'));
+        };
+        script.src = 'chapters.js';
+        script.async = true;
+        script.onload = () => {
+            try {
+                applyChapterTexts();
+                resolve();
+            } catch (error) {
+                fail();
+            }
+        };
+        script.onerror = fail;
+        document.head.appendChild(script);
+    });
+    return chaptersPromise;
+}
+
+function prefetchChapters() {
+    ensureChapters().catch(() => {});
+}
 
 /* --- обход пустых глав: «в работе» пропускаются всеми переходами --- */
 function nextReadableIndex(from) {
@@ -347,8 +382,6 @@ function updateContentsMemory() {
     const s = loadState();
     const readPos = s.readPos || {};
     const last = (typeof s.lastChapter === 'number') ? s.lastChapter : -1;
-    const seenNew = s.seenNew || {};
-    const prevVisit = s.prevVisit || null;
 
     // общий прогресс книги — одна приглушённая строка под заголовком
     const totalPublished = chapters.filter((c) => !c.empty).length;
@@ -382,15 +415,10 @@ function updateContentsMemory() {
         const isEmpty = !!(chapters[i] && chapters[i].empty);
         const isRead = !isEmpty && (typeof frac === 'number') && frac >= 0.85;
         const isCurrent = (i === last) && !isRead && !isEmpty;
-        // «новое»: глава вышла после прошлого визита и ещё не открывалась
-        const isNew = !isEmpty && !isRead && !seenNew[i] && !!prevVisit &&
-            typeof PUBLISHED_AT !== 'undefined' && !!PUBLISHED_AT[i] &&
-            new Date(PUBLISHED_AT[i]).getTime() > new Date(prevVisit).getTime();
 
         item.classList.toggle('read', isRead);
         item.classList.toggle('current', isCurrent);
         item.classList.toggle('empty', isEmpty);
-        item.classList.toggle('new', isNew);
 
         if (isCurrent) item.setAttribute('aria-current', 'true');
         else item.removeAttribute('aria-current');
@@ -423,7 +451,7 @@ updateContentsMemory();
 
 /* single initial-route decision: SW-reload flag first, then deep/hash links,
    then saved-progress overlay, else the cover. Nothing paints before this. */
-function applyInitialRoute() {
+async function applyInitialRoute() {
     let swRoute = null;
     try {
         const raw = sessionStorage.getItem('echo_sw_route');
@@ -433,17 +461,17 @@ function applyInitialRoute() {
         }
     } catch (e) {}
 
-    // decision is made: remove the pending state now so the applied route
-    // (including the progress overlay's focused button) is actually visible
+    // reveal the cover immediately; chapter text loading must not block it
     document.documentElement.classList.remove('routing-pending');
 
-    if (swRoute && typeof swRoute.chapter === 'number' &&
-        chapters[swRoute.chapter] && !chapters[swRoute.chapter].empty) {
+    if (swRoute && typeof swRoute.chapter === 'number' && chapters[swRoute.chapter]) {
         hideIntroScreens();
-        openChapter(swRoute.chapter, { restore: !!swRoute.restore });
-    } else if (!handleDeepLink() && !handleHashLink()) {
-        initProgress();
+        await openChapter(swRoute.chapter, { restore: !!swRoute.restore });
+        return;
     }
+    if (await handleDeepLink()) return;
+    if (await handleHashLink()) return;
+    await initProgress();
 }
 /* символьный статик на разрыве глав: два кадра шума в полосе
    45–55% высоты экрана, отрисовываются заранее в простое.
@@ -502,6 +530,20 @@ contentsScreen.addEventListener('click', (e) => {
     openChapter(idx);
 });
 
+function closeProgress(restoreFocus = true) {
+    const overlay = document.getElementById('progress-overlay');
+    if (!overlay || !overlay.classList.contains('visible')) return;
+    overlay.classList.remove('visible');
+    overlay.inert = true;
+    contentsScreen.classList.remove('progress-dimmed');
+    contentsScreen.inert = false;
+    markOverlayClosed(overlay);
+    if (restoreFocus) {
+        const item = contentsScreen.querySelector('.contents-item.current') || contentsScreen.querySelector('.contents-item');
+        if (item) item.focus();
+    }
+}
+
 // === КЛАВИАТУРА ===
 /* image gestures: cancel dragstart and contextmenu on images and their
    dedicated containers only — not site-wide, not text selection */
@@ -514,20 +556,17 @@ document.addEventListener('contextmenu', (e) => {
     }
 });
 document.addEventListener('keydown', (e) => {
-    // сначала — закрытие оверлеев в порядке приоритета, независимо от видимого экрана
     if (e.key === 'Escape') {
-        e.preventDefault();
-        const progOverlay = document.getElementById('progress-overlay');
-        if (progOverlay && progOverlay.classList.contains('visible')) {
-            progOverlay.classList.remove('visible');
-            contentsScreen.classList.remove('progress-dimmed');
-            contentsScreen.inert = false;
+        const overlay = getTopmostOpenOverlay();
+        if (overlay) {
+            e.preventDefault();
+            if (overlay.id === 'progress-overlay') closeProgress();
+            else if (overlay.id === 'install-overlay') closeInstall();
+            else if (overlay.id === 'photo-overlay') closePhoto();
+            else if (overlay.id === 'menu-overlay') closeMenu();
+            else if (overlay.id === 'reader-sheet') toggleReaderSheet(false);
             return;
         }
-        if (installOverlay && installOverlay.classList.contains('visible')) { closeInstall(); return; }
-        if (photoOverlay && photoOverlay.classList.contains('active')) { closePhoto(); return; }
-        if (isMenuOpen) { closeMenu(); return; }
-        if (isReaderSheetOpen()) { toggleReaderSheet(false); return; }
     }
 
     if (!chapterScreen.classList.contains('visible')) return;
@@ -559,35 +598,59 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
-// === ИНТРО: КАСАНИЕ / КЛИК / СВАЙП ===
-let touchStartY = 0;
+// === ИНТРО: КАСАНИЕ / КЛИК ===
 
-document.addEventListener('touchstart', (e) => {
-    touchStartY = e.touches[0].clientY;
-    touchStartX = e.touches[0].clientX;
-}, { passive: true });
+(function initMenuSwipeRecognizer() {
+    let gesture = null;
+    const cancel = () => { gesture = null; };
+    const overlayActive = () => document.querySelector(
+        '#photo-overlay.active, #reader-sheet.open, #install-overlay.visible, #progress-overlay.visible'
+    );
 
-document.addEventListener('touchend', (e) => {
-    const diffY = touchStartY - e.changedTouches[0].clientY;
-    const diffX = touchStartX - e.changedTouches[0].clientX;
-    
-    if (!isStarted && diffY > 50 && Math.abs(diffX) < 40) {
-        startSequence();
-    }
-    
-    // Свайп справа налево в главе — открыть меню
-    if (chapterScreen.classList.contains('visible') 
-        && Math.abs(diffX) > Math.abs(diffY) * 1.8 
-        && diffX > 70 
-        && touchStartX > window.innerWidth * 0.82) {
-        openMenu();
-    }
-}, { passive: true });
+    document.addEventListener('touchstart', (e) => {
+        if (e.touches.length !== 1 || e.target.closest('.photo-link')) { cancel(); return; }
+        const t = e.touches[0];
+        gesture = { id: t.identifier, x: t.clientX, y: t.clientY, at: performance.now(), axis: null };
+    }, { passive: true });
+
+    document.addEventListener('touchmove', (e) => {
+        if (!gesture) return;
+        if (e.touches.length !== 1) { cancel(); return; }
+        const t = e.touches[0];
+        const dx = t.clientX - gesture.x;
+        const dy = t.clientY - gesture.y;
+        if (gesture.axis) return;
+        if (Math.abs(dy) >= 10 && Math.abs(dy) > Math.abs(dx)) gesture.axis = 'vertical';
+        else if (Math.abs(dx) >= 10 && Math.abs(dx) > Math.abs(dy) * 1.2) gesture.axis = 'horizontal';
+    }, { passive: true });
+
+    document.addEventListener('touchend', (e) => {
+        if (!gesture) return;
+        const start = gesture;
+        gesture = null;
+        const t = Array.from(e.changedTouches).find((point) => point.identifier === start.id);
+        if (!t || start.axis !== 'horizontal') return;
+        const dx = t.clientX - start.x;
+        const dy = t.clientY - start.y;
+        if (performance.now() - start.at > 600 || Math.abs(dx) < 64 || Math.abs(dx) <= 1.5 * Math.abs(dy)) return;
+        if (overlayActive()) return;
+        const onMenuSurface = chapterScreen.classList.contains('visible') || contentsScreen.classList.contains('visible');
+        if (!onMenuSurface) return;
+        if (isMenuOpen && dx > 0) closeMenu();
+        else if (!isMenuOpen && dx < 0) openMenu();
+    }, { passive: true });
+
+    /* no preventDefault: vertical scrolling and text selection keep ownership */
+    document.addEventListener('touchcancel', cancel, { passive: true });
+    window.addEventListener('blur', cancel);
+})();
 
 
 
-document.addEventListener('click', () => {
-    if (!isStarted) startSequence();
+document.addEventListener('click', (e) => {
+    if (isStarted) return;
+    if (e.detail !== 0 && e.target.closest('#cover-screen')) return;
+    startSequence();
 });
 
 // === ФУНКЦИИ ===
@@ -618,10 +681,12 @@ function playTitleDecode() {
 function startSequence() {
     if (isStarted) return;
     isStarted = true;
+    prefetchChapters();
     startFilmPreload();
 
     // 1. Убираем картинку
     coverScreen.classList.add('hide-up');
+    coverScreen.dispatchEvent(new CustomEvent('echo:entry-start'));
 
     // 2. Показываем текст
     setTimeout(() => {
@@ -705,13 +770,94 @@ function showContents() {
     }, 1200);
 }
 
-function openChapter(index, opts = {}) {
-    if (index < 0 || index >= chapters.length) return;
-    if (chapters[index].empty) return;
-    // invalidate any pending position write from the previous chapter
-    readerGeneration++;
+/* signal-acquisition boot: only the first full contents entry, started when
+   fonts are actually ready; the real labels are never touched — the glyphs
+   are a separate transient layer */
+function bootContentsOnce() {
+    const s = loadState();
+    if (s.seenContentsBoot) return;
+    saveState({ seenContentsBoot: true });
+    const start = () => {
+        if (!contentsScreen.classList.contains('visible')) return;
+        document.querySelectorAll('.contents-item').forEach((item, i) => {
+            item.style.setProperty('--boot-delay', (200 + i * 80) + 'ms');
+        });
+        contentsScreen.classList.add('signal-boot');
+        setTimeout(() => contentsScreen.classList.remove('signal-boot'), 7500);
+    };
+    if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(start);
+    } else {
+        start();
+    }
+}
+
+function cleanupChapterTear() {
+    const tearOverlay = document.getElementById('tear-overlay');
+    if (!tearOverlay) return;
+    chapterScreen.classList.remove('tear-flash');
+    tearOverlay.style.display = 'none';
+    tearOverlay.querySelectorAll('*').forEach(el => el.style.animation = '');
+}
+
+function showChapterPending(index) {
+    const chapter = chapters[index];
+    if (!chapter) { openContentsFresh(); return; }
+    hideIntroScreens();
+    contentsScreen.classList.remove('visible');
+    contentsScreen.inert = true;
+    clearRevealTimers();
+    if (menuTrigger) menuTrigger.classList.remove('visible');
+    chapterScreen.querySelector('.chapter-number').textContent = 'Глава ' + chapter.number;
+    chapterScreen.querySelector('.chapter-title').textContent = chapter.title;
+    const textEl = chapterScreen.querySelector('.chapter-text');
+    textEl.innerHTML = '<p class="placeholder" role="status" style="margin:2em 0">Загрузка главы…</p>';
+    chapterScreen.classList.add('visible');
+    chapterScreen.inert = false;
+    chapterScreen.scrollTop = 0;
+    const pending = textEl.firstElementChild;
+    if (pending.animate && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        pending.animate([{ opacity: 0.3 }, { opacity: 0.85 }], {
+            duration: 650, direction: 'alternate', iterations: Infinity
+        });
+    }
+}
+
+function showChapterLoadError(index, retry) {
+    showChapterPending(index);
+    const textEl = chapterScreen.querySelector('.chapter-text');
+    textEl.innerHTML = '<p class="placeholder" role="alert">Не удалось загрузить главу. Проверьте соединение.</p>';
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = 'Повторить';
+    button.style.cssText = 'display:block;margin:1em 0;padding:10px 24px;background:none;border:1px solid #00A8E8;color:#00A8E8;font:inherit;cursor:pointer';
+    button.addEventListener('click', retry);
+    textEl.appendChild(button);
+    button.focus();
+}
+
+async function openChapter(index, opts = {}) {
+    if (!chapters[index]) { openContentsFresh(); return false; }
+    const generation = ++readerGeneration;
+    const wasChapterVisible = chapterScreen.classList.contains('visible');
     clearTimeout(readPosTimer);
     readPosTimer = null;
+    showChapterPending(index);
+    try {
+        await ensureChapters();
+    } catch (error) {
+        if (generation === readerGeneration) {
+            showChapterLoadError(index, () => openChapter(index, opts));
+        }
+        return null;
+    }
+    if (generation !== readerGeneration) return null;
+    if (chapters[index].empty) {
+        chapterScreen.classList.remove('visible');
+        chapterScreen.inert = true;
+        openContentsFresh();
+        return false;
+    }
     const tearOverlay = document.getElementById('tear-overlay');
     const chScreen = document.getElementById('chapter-screen');
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -734,11 +880,8 @@ function openChapter(index, opts = {}) {
         }
 
         setTimeout(() => {
-            chScreen.classList.remove('tear-flash');
-            tearOverlay.style.display = 'none';
-            tearOverlay.querySelectorAll('*').forEach(el => el.style.animation = '');
-            const st = tearOverlay.querySelector('#tear-static');
-            if (st) st.style.opacity = '0';
+            if (generation !== readerGeneration) return;
+            cleanupChapterTear();
         }, 150);
     }
 
@@ -746,22 +889,13 @@ function openChapter(index, opts = {}) {
     setBarHidden(false);
 
     // ушли «вперёд» из открытой главы — она считается прочитанной
-    if (chapterScreen.classList.contains('visible') && index > currentChapter) {
+    if (wasChapterVisible && index > currentChapter) {
         const sFwd = loadState();
         const posFwd = sFwd.readPos || {};
         if ((posFwd[currentChapter] || 0) < 0.85) {
             posFwd[currentChapter] = 1;
             saveState({ readPos: posFwd });
         }
-    }
-
-    // глава с бейджем «новое» увидена — метка гаснет
-    const sSeen = loadState();
-    if (sSeen.prevVisit && typeof PUBLISHED_AT !== 'undefined' && PUBLISHED_AT[index] &&
-        new Date(PUBLISHED_AT[index]).getTime() > new Date(sSeen.prevVisit).getTime()) {
-        const seen = sSeen.seenNew || {};
-        seen[index] = true;
-        saveState({ seenNew: seen });
     }
 
     // точка «назад» системной кнопки Android (в ответ на popstate не пушим);
@@ -813,15 +947,16 @@ function openChapter(index, opts = {}) {
       .replace(
         /{{VOICE(?::(\w+))?}}(.*?){{\/VOICE}}/g,
         (match, mode, text) => {
-          const voiceMode = mode || 'aggressive';
+          const voiceMode = mode || 'standard';
           return `<span class="voice-glitch" data-voice-mode="${voiceMode}">${text}</span>`;
         }
       );
 
+    cleanupVoiceObserver();
     textEl.innerHTML = processedText;
     appendChapterEnd(textEl, index);
 
-   saveState({ lastChapter: index, lastVisit: new Date().toISOString(), chapterTitle: chapter.title });
+   saveState({ lastChapter: index, chapterTitle: chapter.title });
 
 
     prevBtn.classList.toggle('inactive', prevReadableIndex(index) === -1);
@@ -834,11 +969,13 @@ function openChapter(index, opts = {}) {
 
 
     setTimeout(() => {
+        if (generation !== readerGeneration) return;
         chapterScreen.classList.add('visible');
         chapterScreen.inert = false;
         chapterScreen.scrollTop = 0;
         if (opts.restore) {
             const restorePos = () => {
+                if (generation !== readerGeneration) return;
                 const s = loadState();
                 const frac = s.readPos && s.readPos[index];
                 if (frac) {
@@ -849,7 +986,11 @@ function openChapter(index, opts = {}) {
             if (document.fonts && document.fonts.ready) {
                 // позиция — после загрузки шрифтов, иначе метрики пересчитаются
                 document.fonts.ready.then(() => {
-                    requestAnimationFrame(() => requestAnimationFrame(restorePos));
+                    if (generation !== readerGeneration) return;
+                    requestAnimationFrame(() => {
+                        if (generation !== readerGeneration) return;
+                        requestAnimationFrame(restorePos);
+                    });
                 });
             } else {
                 setTimeout(restorePos, 300);
@@ -858,7 +999,10 @@ function openChapter(index, opts = {}) {
         initVoiceObserver();
         requestReaderWakeLock();
     }, 300);
-    setTimeout(updateChapterProgress, 350);
+    setTimeout(() => {
+        if (generation !== readerGeneration) return;
+        updateChapterProgress();
+    }, 350);
 }
 
 /* === ФОТО: ОВЕРЛЕЙ === */
@@ -876,9 +1020,11 @@ let photoTrigger = null;   // the photo-link that opened the overlay (focus rest
 
 function openPhoto(src) {
   photoImage.src = 'images/' + src;
+  photoImage.alt = photoTrigger && photoTrigger.textContent.trim() ? photoTrigger.textContent.trim() : 'Фотография из главы';
   photoOverlay.classList.add('active');
   photoOverlay.inert = false;
   document.body.style.overflow = 'hidden';
+  markOverlayOpen(photoOverlay);
   if (photoClose) photoClose.focus();
 }
 
@@ -887,6 +1033,8 @@ function closePhoto() {
   photoOverlay.inert = true;
   document.body.style.overflow = '';
   photoImage.src = '';
+  photoImage.alt = '';
+  markOverlayClosed(photoOverlay);
   if (photoTrigger && document.contains(photoTrigger)) {
       photoTrigger.focus();
       photoTrigger = null;
@@ -925,6 +1073,17 @@ if (photoOverlay) {
     const GROUP_SIZE = 15;          // Каждые 15 глав = одна группа
     const INTERVAL_MS = 15000;      // Раз в 15 секунд
     const GLITCH_DURATION = 1200;   // Длительность дребезга одной главы
+    const GLITCH_VARIANTS = ['shear', 'chroma-walk', 'drop-frame'];
+    const variantHistory = new WeakMap();
+    let variantSeed = 0x4543484f;
+
+    function pickGlitchVariant(item) {
+        variantSeed = (1664525 * variantSeed + 1013904223) >>> 0;
+        let index = variantSeed % GLITCH_VARIANTS.length;
+        if (index === variantHistory.get(item)) index = (index + 1) % GLITCH_VARIANTS.length;
+        variantHistory.set(item, index);
+        return GLITCH_VARIANTS[index];
+    }
 
     const contentsScreen = document.getElementById('contents-screen');
     if (!contentsScreen) return;
@@ -953,11 +1112,13 @@ if (photoOverlay) {
             // пустые главы не дребезжат
             if (item.classList.contains('empty')) continue;
 
+            item.dataset.glitchVariant = pickGlitchVariant(item);
             item.classList.add('electric-glitch');
 
             // Убираем эффект после окончания анимации
             setTimeout(() => {
                 item.classList.remove('electric-glitch');
+                delete item.dataset.glitchVariant;
             }, GLITCH_DURATION);
         }
     }
@@ -1027,207 +1188,211 @@ function prepareVoiceElement(el) {
     return text;
 }
 
-function generateAggressiveGlitch(el) {
-    const chapterScreen = document.getElementById('chapter-screen');
-
-    if (chapterScreen) {
-        chapterScreen.classList.add('xray-flash');
-    }
-
-    setTimeout(() => {
-        if (chapterScreen) {
-            chapterScreen.classList.remove('xray-flash');
-        }
-
-        const text = prepareVoiceElement(el);
-        const animId = 'voice-glitch-' + Math.random().toString(36).substr(2, 9);
-        const duration = '1.9';
-
-        const base = document.createElement('span');
-        base.className = 'voice-base';
-        base.textContent = text;
-
-        const red = createVoiceSpan('voice-red', text);
-        const cyan = createVoiceSpan('voice-cyan', text);
-        const slice1 = createVoiceSpan('voice-slice', text);
-        const slice2 = createVoiceSpan('voice-slice', text);
-
-        el.appendChild(base);
-        el.appendChild(red);
-        el.appendChild(cyan);
-        el.appendChild(slice1);
-        el.appendChild(slice2);
-
-        const c1 = '#c41e3a';
-        const c2 = '#00A8E8';
-        let baseFrames = '';
-        let redFrames = '';
-        let cyanFrames = '';
-        let slice1Frames = '';
-        let slice2Frames = '';
-
-        /* authored: acquisition -> channel failure -> convergence -> stable */
-        const clean = 'transform: none; opacity: 1; text-shadow: none; filter: none;';
-        baseFrames = `
-            0% { ${clean} }
-            10% { transform: translate(0.4px, 0); opacity: 0.85; text-shadow: 1px 0 ${c1}, -1px 0 ${c2}; filter: brightness(0.92); }
-            18% { ${clean} }
-            26% { transform: translate(1.5px, 0) skewX(-3deg); opacity: 0.9; text-shadow: 2px 0 ${c1}, -2px 0 ${c2}; filter: brightness(1.08); }
-            32% { transform: translate(-1.5px, 0) skewX(2deg); opacity: 0.95; text-shadow: -2px 0 ${c1}, 2px 0 ${c2}; }
-            40% { transform: translate(0.6px, 0); opacity: 0.92; text-shadow: 1px 0 ${c1}, -1px 0 ${c2}; }
-            50% { ${clean} }
-            62% { transform: translate(0.3px, 0); text-shadow: 1px 0 ${c1}, -1px 0 ${c2}; }
-            74% { transform: translate(-0.2px, 0); }
-            86%, 100% { ${clean} }
-        `;
-        redFrames = `
-            0%, 20% { opacity: 0; }
-            26% { opacity: 0.55; clip-path: inset(12% 0 58% 0); transform: translateX(-3px); }
-            32% { opacity: 0.45; clip-path: inset(55% 0 18% 0); transform: translateX(-4px); }
-            40% { opacity: 0.3; clip-path: inset(0 0 0 0); transform: translateX(-2px); }
-            48%, 100% { opacity: 0; }
-        `;
-        cyanFrames = `
-            0%, 20% { opacity: 0; }
-            26% { opacity: 0.5; clip-path: inset(58% 0 12% 0); transform: translateX(3px); }
-            32% { opacity: 0.4; clip-path: inset(18% 0 55% 0); transform: translateX(4px); }
-            40% { opacity: 0.3; clip-path: inset(0 0 0 0); transform: translateX(2px); }
-            48%, 100% { opacity: 0; }
-        `;
-        slice1Frames = `
-            0%, 8% { opacity: 0; }
-            12% { opacity: 0.5; clip-path: inset(30% 0 60% 0); transform: translateX(3px); }
-            20% { opacity: 0.35; clip-path: inset(62% 0 8% 0); transform: translateX(-3px); }
-            26%, 100% { opacity: 0; }
-        `;
-        slice2Frames = `
-            0%, 16% { opacity: 0; }
-            22% { opacity: 0.4; clip-path: inset(8% 0 70% 0); transform: translateX(-4px); }
-            30% { opacity: 0.25; clip-path: inset(48% 0 30% 0); transform: translateX(3px); }
-            38%, 100% { opacity: 0; }
-        `;
-
-        const keyframes = `
-            @keyframes ${animId} { ${baseFrames} }
-            @keyframes ${animId}-red { ${redFrames} }
-            @keyframes ${animId}-cyan { ${cyanFrames} }
-            @keyframes ${animId}-slice1 { ${slice1Frames} }
-            @keyframes ${animId}-slice2 { ${slice2Frames} }
-        `;
-
-        const style = document.createElement('style');
-        style.textContent = keyframes;
-        style.dataset.voiceGlitch = animId;
-        document.head.appendChild(style);
-
-        base.style.animation = `${animId} ${duration}s steps(1) forwards`;
-        red.style.animation = `${animId}-red ${duration}s steps(1) forwards`;
-        cyan.style.animation = `${animId}-cyan ${duration}s steps(1) forwards`;
-        slice1.style.animation = `${animId}-slice1 ${duration}s steps(1) forwards`;
-        slice2.style.animation = `${animId}-slice2 ${duration}s steps(1) forwards`;
-
-        // Ударная волна
-        const parentP = el.closest('p');
-        if (parentP) {
-            const prev = parentP.previousElementSibling;
-            const next = parentP.nextElementSibling;
-            if (prev && prev.tagName === 'P') {
-                prev.classList.add('voice-shock-prev');
-                setTimeout(() => prev.classList.remove('voice-shock-prev'), 700);
-            }
-            if (next && next.tagName === 'P') {
-                next.classList.add('voice-shock-next');
-                setTimeout(() => next.classList.remove('voice-shock-next'), 700);
-            }
-        }
-
-        // Вибрация
-        if (navigator.vibrate) {
-            navigator.vibrate([30, 60, 30]);
-        }
-
-        setTimeout(() => {
-            base.style.animation = '';
-            red.style.animation = '';
-            cyan.style.animation = '';
-            slice1.style.animation = '';
-            slice2.style.animation = '';
-            if (style.parentNode) style.remove();
-        }, parseFloat(duration) * 1000);
-    }, 70);
-}
-
-function generateStandardGlitch(el) {
+function buildVoiceLayers(el) {
     const text = prepareVoiceElement(el);
-    const animId = 'voice-standard-' + Math.random().toString(36).substr(2, 9);
-    const duration = '1.4';
-
     const base = document.createElement('span');
     base.className = 'voice-base';
     base.textContent = text;
+    const red = createVoiceSpan('voice-red', text);
+    const cyan = createVoiceSpan('voice-cyan', text);
+    const slice1 = createVoiceSpan('voice-slice', text);
+    const slice2 = createVoiceSpan('voice-slice', text);
     el.appendChild(base);
+    el.appendChild(red);
+    el.appendChild(cyan);
+    el.appendChild(slice1);
+    el.appendChild(slice2);
+    return { base, red, cyan, slice1, slice2 };
+}
 
-    /* two brief shadow blips, then perfectly stable text */
-    let frames = `
-            0% { text-shadow: none; opacity: 1; }
-            12% { text-shadow: 1px 0 #c41e3a, -1px 0 #00A8E8; opacity: 0.88; }
-            24% { text-shadow: none; opacity: 1; }
-            38% { text-shadow: 1px 0 #c41e3a, -1px 0 #00A8E8; opacity: 0.94; }
-            52%, 100% { text-shadow: none; opacity: 1; }
-    `;
-    
-    const keyframes = `@keyframes ${animId} {\n${frames}        }`;
-    
-    const style = document.createElement('style');
-    style.textContent = keyframes;
-    style.dataset.voiceGlitch = animId;
-    document.head.appendChild(style);
-    
-    base.style.animation = `${animId} ${duration}s steps(1) forwards`;
-    
-    setTimeout(() => {
-        base.style.animation = '';
-        if (style.parentNode) style.remove();
-    }, parseFloat(duration) * 1000);
+function voiceTimer(el, fn, delay) {
+    if (!el._voiceTimers) el._voiceTimers = [];
+    const id = setTimeout(() => {
+        el._voiceTimers = el._voiceTimers.filter((timer) => timer !== id);
+        fn();
+    }, delay);
+    el._voiceTimers.push(id);
+    return id;
+}
+
+function onVoiceCancel(el, fn) {
+    if (!el._voiceCancel) el._voiceCancel = [];
+    el._voiceCancel.push(fn);
+}
+
+function cancelVoiceAnimations(el) {
+    (el._voiceTimers || []).forEach(clearTimeout);
+    el._voiceTimers = [];
+    (el._voiceCancel || []).forEach((fn) => fn());
+    el._voiceCancel = [];
+    [el, ...el.querySelectorAll('.voice-base, .voice-red, .voice-cyan, .voice-slice')].forEach((node) => {
+        node.getAnimations().forEach((animation) => animation.cancel());
+    });
+    delete el.dataset.voiceActive;
+}
+
+function applyVoiceShock(el) {
+    const parentP = el.closest('p');
+    if (!parentP) return;
+    const prev = parentP.previousElementSibling;
+    const next = parentP.nextElementSibling;
+    if (prev && prev.tagName === 'P') prev.classList.add('voice-shock-prev');
+    if (next && next.tagName === 'P') next.classList.add('voice-shock-next');
+    onVoiceCancel(el, () => {
+        if (prev) prev.classList.remove('voice-shock-prev');
+        if (next) next.classList.remove('voice-shock-next');
+    });
+    voiceTimer(el, () => {
+        if (prev) prev.classList.remove('voice-shock-prev');
+        if (next) next.classList.remove('voice-shock-next');
+    }, 700);
+}
+
+function generateAggressiveGlitch(el) {
+    const { base, red, cyan, slice1, slice2 } = buildVoiceLayers(el);
+    applyVoiceShock(el);
+    const snapMs = 250 + Math.random() * 150;
+    const sustainMs = 450 + Math.random() * 350;
+    const decayMs = 450 + Math.random() * 150;
+    const clean = { transform: 'translateX(0)', opacity: 1, clipPath: 'inset(0 0 0 0)' };
+    const snap = {
+        duration: snapMs, easing: 'steps(3, jump-start)', fill: 'forwards'
+    };
+    base.animate([
+        clean,
+        { transform: 'translateX(1.5px) skewX(-3deg)', opacity: 0.9, clipPath: 'inset(0 0 0 0)' }
+    ], snap);
+    slice1.animate([
+        { ...clean, opacity: 0 },
+        { transform: 'translateX(8px)', opacity: 0.65, clipPath: 'inset(12% 0 48% 0)' }
+    ], snap);
+    slice2.animate([
+        { ...clean, opacity: 0 },
+        { transform: 'translateX(-8px)', opacity: 0.65, clipPath: 'inset(48% 0 12% 0)' }
+    ], snap);
+    red.animate([
+        { ...clean, opacity: 0 },
+        { transform: 'translateX(-3px)', opacity: 0.5, clipPath: 'inset(0 0 0 0)' }
+    ], snap);
+    cyan.animate([
+        { ...clean, opacity: 0 },
+        { transform: 'translateX(3px)', opacity: 0.5, clipPath: 'inset(0 0 0 0)' }
+    ], snap);
+
+    voiceTimer(el, () => {
+        const sustain = { duration: sustainMs, easing: 'steps(2, jump-start)', fill: 'forwards' };
+        base.animate([
+            { transform: 'translateX(1.5px) skewX(-3deg)', opacity: 0.9 },
+            { transform: 'translateX(0.4px)', opacity: 1 }
+        ], sustain);
+        slice1.animate([
+            { transform: 'translateX(8px)', opacity: 0.65, clipPath: 'inset(12% 0 48% 0)' },
+            { transform: 'translateX(3px)', opacity: 0.35, clipPath: 'inset(22% 0 38% 0)' }
+        ], sustain);
+        slice2.animate([
+            { transform: 'translateX(-8px)', opacity: 0.65, clipPath: 'inset(48% 0 12% 0)' },
+            { transform: 'translateX(-3px)', opacity: 0.35, clipPath: 'inset(38% 0 22% 0)' }
+        ], sustain);
+        red.animate([{ transform: 'translateX(-3px)', opacity: 0.5 }, { transform: 'translateX(-1.5px)', opacity: 0.25 }], sustain);
+        cyan.animate([{ transform: 'translateX(3px)', opacity: 0.5 }, { transform: 'translateX(1.5px)', opacity: 0.25 }], sustain);
+    }, snapMs);
+
+    voiceTimer(el, () => {
+        const decay = { duration: decayMs, easing: 'steps(3, jump-start)', fill: 'forwards' };
+        base.animate([
+            { transform: 'translateX(0.4px)', opacity: 1 },
+            { transform: 'translateX(-0.2px)', opacity: 0.96 },
+            clean
+        ], decay);
+        [slice1, slice2].forEach((layer, index) => {
+            const direction = index === 0 ? 1 : -1;
+            layer.animate([
+                { transform: `translateX(${direction * 3}px)`, opacity: 0.35 },
+                { transform: `translateX(${direction}px)`, opacity: 0.18 },
+                { transform: 'translateX(0)', opacity: 0 }
+            ], decay);
+        });
+        red.animate([{ transform: 'translateX(-1.5px)', opacity: 0.25 }, { transform: 'translateX(0)', opacity: 0 }], decay);
+        cyan.animate([{ transform: 'translateX(1.5px)', opacity: 0.25 }, { transform: 'translateX(0)', opacity: 0 }], decay);
+    }, snapMs + sustainMs);
+    voiceTimer(el, () => cancelVoiceAnimations(el), snapMs + sustainMs + decayMs + 50);
+}
+
+function generateStandardGlitch(el) {
+    const { base, red, cyan, slice1, slice2 } = buildVoiceLayers(el);
+    const jitterFrames = () => {
+        const steps = 8 + Math.floor(Math.random() * 5);
+        const frames = Array.from({ length: steps }, () => ({
+            transform: `translate(${(Math.random() * 3 - 1.5).toFixed(2)}px, ${(Math.random() * 2 - 1).toFixed(2)}px)`,
+            opacity: 0.94 + Math.random() * 0.06,
+            easing: 'steps(1, jump-start)'
+        }));
+        frames.push({ transform: 'translate(0, 0)', opacity: 1, easing: 'steps(1, jump-start)' });
+        return frames;
+    };
+    const jitter = base.animate(jitterFrames(), { duration: 1000, iterations: Infinity });
+    jitter.oniteration = () => jitter.effect.setKeyframes(jitterFrames());
+
+    const burst = () => {
+        if (!el.isConnected) return;
+        const duration = 150 + Math.random() * 100;
+        const shear = 4 + Math.random() * 4;
+        const split = 25 + Math.random() * 35;
+        const easing = 'steps(3, jump-start)';
+        const firstClip = `inset(0 0 ${100 - split}% 0)`;
+        const secondClip = `inset(${split}% 0 0 0)`;
+        slice1.animate([
+            { opacity: 0, transform: 'translateX(0)', clipPath: firstClip },
+            { opacity: 0.65, transform: `translateX(${shear}px) skewX(-4deg)`, clipPath: firstClip, offset: 0.35 },
+            { opacity: 0.35, transform: `translateX(${shear * 0.6}px)`, clipPath: firstClip, offset: 0.75 },
+            { opacity: 0, transform: 'translateX(0)', clipPath: firstClip }
+        ], { duration, easing });
+        slice2.animate([
+            { opacity: 0, transform: 'translateX(0)', clipPath: secondClip },
+            { opacity: 0.65, transform: `translateX(${-shear}px) skewX(4deg)`, clipPath: secondClip, offset: 0.35 },
+            { opacity: 0.35, transform: `translateX(${-shear * 0.6}px)`, clipPath: secondClip, offset: 0.75 },
+            { opacity: 0, transform: 'translateX(0)', clipPath: secondClip }
+        ], { duration, easing });
+        const peekMs = 80 + Math.random() * 40;
+        red.animate([
+            { opacity: 0, transform: 'translateX(0)', clipPath: 'inset(0 0 0 0)' },
+            { opacity: 0.45, transform: 'translateX(-1.5px)', clipPath: 'inset(0 0 0 0)' },
+            { opacity: 0, transform: 'translateX(0)', clipPath: 'inset(0 0 0 0)' }
+        ], { duration: peekMs, easing: 'steps(2, jump-start)' });
+        cyan.animate([
+            { opacity: 0, transform: 'translateX(0)', clipPath: 'inset(0 0 0 0)' },
+            { opacity: 0.5, transform: 'translateX(1.5px)', clipPath: 'inset(0 0 0 0)' },
+            { opacity: 0, transform: 'translateX(0)', clipPath: 'inset(0 0 0 0)' }
+        ], { duration: peekMs, easing: 'steps(2, jump-start)' });
+        voiceTimer(el, burst, 800 + Math.random() * 1600);
+    };
+    voiceTimer(el, burst, 800 + Math.random() * 1600);
 }
 
 function generateWhisperGlitch(el) {
     const text = prepareVoiceElement(el);
-    const animId = 'voice-whisper-' + Math.random().toString(36).substr(2, 9);
-    const duration = '1.6';
-
     const base = document.createElement('span');
     base.className = 'voice-base';
     base.textContent = text;
     el.appendChild(base);
 
-    /* one soft dip into blur/opacity, then back to stable readable text */
-    let frames = `
-            0% { transform: none; opacity: 1; filter: none; }
-            22% { transform: translateX(0.2px) scaleX(1.01); opacity: 0.55; filter: blur(0.5px) brightness(0.95); }
-            44% { transform: translateX(-0.1px) scaleX(1.005); opacity: 0.78; filter: blur(0.2px) brightness(1); }
-            66% { transform: none; opacity: 0.96; filter: blur(0) brightness(1); }
-            86%, 100% { transform: none; opacity: 1; filter: none; }
-    `;
-    
-    const keyframes = `@keyframes ${animId} {\n${frames}        }`;
-    
-    const style = document.createElement('style');
-    style.textContent = keyframes;
-    style.dataset.voiceGlitch = animId;
-    document.head.appendChild(style);
-    
-    base.style.animation = `${animId} ${duration}s ease-in-out forwards`;
-    
-    setTimeout(() => {
-        base.style.animation = '';
-        if (style.parentNode) style.remove();
-    }, parseFloat(duration) * 1000);
+    /* the existing soft transform/opacity dip, without injected keyframes */
+    base.animate([
+        { transform: 'none', opacity: 1, offset: 0 },
+        { transform: 'translateX(0.2px) scaleX(1.01)', opacity: 0.55, offset: 0.22 },
+        { transform: 'translateX(-0.1px) scaleX(1.005)', opacity: 0.78, offset: 0.44 },
+        { transform: 'none', opacity: 0.96, offset: 0.66 },
+        { transform: 'none', opacity: 1, offset: 0.86 },
+        { transform: 'none', opacity: 1, offset: 1 }
+    ], { duration: 1600, easing: 'ease-in-out', fill: 'forwards' });
+    voiceTimer(el, () => cancelVoiceAnimations(el), 1650);
 }
 
 
+const voiceUnknownTokens = new Set();
+
 function generateGlitchAnimation(el) {
-    const mode = el.dataset.voiceMode || 'aggressive';
+    const requested = el.dataset.voiceMode || 'standard';
 
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
         // reduced motion: stable text immediately, no glitch sequence
@@ -1235,39 +1400,45 @@ function generateGlitchAnimation(el) {
         return;
     }
 
-    switch (mode) {
-        case 'standard':
-            generateStandardGlitch(el);
-            break;
-        case 'whisper':
-            generateWhisperGlitch(el);
-            break;
-        default:
-            generateAggressiveGlitch(el);
+    let mode = requested;
+    if (!['standard', 'strong', 'whisper'].includes(mode)) {
+        if (!voiceUnknownTokens.has(mode)) {
+            console.warn('[ЭХО] Unknown VOICE mode "' + mode + '"; using standard.');
+            voiceUnknownTokens.add(mode);
+        }
+        mode = 'standard';
     }
+    el.dataset.voiceActive = mode;
+    if (mode === 'strong') generateAggressiveGlitch(el);
+    else if (mode === 'whisper') generateWhisperGlitch(el);
+    else generateStandardGlitch(el);
 }
 
 function initVoiceObserver() {
     if (voiceObserver) voiceObserver.disconnect();
-    
+
     const chapterScreen = document.getElementById('chapter-screen');
     if (!chapterScreen) return;
-    
+    chapterScreen.querySelectorAll('.voice-glitch').forEach(cancelVoiceAnimations);
+
     const options = {
         root: chapterScreen,
         rootMargin: '-45% 0px -45% 0px',
         threshold: 0.5
     };
-    
+
     voiceObserver = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
             if (entry.isIntersecting && !entry.target.dataset.voiceTriggered) {
                 entry.target.dataset.voiceTriggered = 'true';
                 generateGlitchAnimation(entry.target);
+            } else if (!entry.isIntersecting) {
+                cancelVoiceAnimations(entry.target);
+                delete entry.target.dataset.voiceTriggered;
             }
         });
     }, options);
-    
+
     chapterScreen.querySelectorAll('.voice-glitch').forEach(el => {
         voiceObserver.observe(el);
     });
@@ -1280,6 +1451,7 @@ function cleanupVoiceObserver() {
     }
     document.querySelectorAll('style[data-voice-glitch]').forEach(s => s.remove());
     document.querySelectorAll('.voice-glitch').forEach(el => {
+        cancelVoiceAnimations(el);
         el.style.animation = '';
         delete el.dataset.voiceTriggered;
         if (el.dataset.voiceText) {
@@ -1303,6 +1475,7 @@ function openMenu() {
         chapterScreen.classList.add('menu-dimmed');
     }
     if (menuTrigger) menuTrigger.classList.remove('visible');
+    markOverlayOpen(menuOverlay);
     if (menuClose) menuClose.focus();
 }
 
@@ -1313,9 +1486,14 @@ function closeMenu() {
     menuOverlay.inert = true;
     contentsScreen.classList.remove('menu-dimmed');
     chapterScreen.classList.remove('menu-dimmed');
+    markOverlayClosed(menuOverlay);
     if (contentsScreen.classList.contains('visible') && menuTrigger) {
         menuTrigger.classList.add('visible');
-        menuTrigger.focus();   // keyboard focus returns to the trigger
+        syncTriggerInert();
+        menuTrigger.focus();
+    } else if (chapterScreen.classList.contains('visible')) {
+        const contentsButton = chapterScreen.querySelector('.nav-contents');
+        if (contentsButton) contentsButton.focus();
     }
 }
 
@@ -1330,12 +1508,15 @@ if (menuClose) menuClose.addEventListener('click', closeMenu);
 function trapTab(container, e) {
     if (e.key !== 'Tab') return;
     const focusables = Array.from(container.querySelectorAll(
-        'a[href], button:not([disabled]), input, [tabindex="0"]'
-    )).filter((el) => el.getClientRects().length > 0);
+        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    )).filter((el) => !el.closest('[inert]') && el.getClientRects().length > 0);
     if (!focusables.length) return;
     const first = focusables[0];
     const last = focusables[focusables.length - 1];
-    if (e.shiftKey && document.activeElement === first) {
+    if (!container.contains(document.activeElement)) {
+        e.preventDefault();
+        (e.shiftKey ? last : first).focus();
+    } else if (e.shiftKey && document.activeElement === first) {
         e.preventDefault();
         last.focus();
     } else if (!e.shiftKey && document.activeElement === last) {
@@ -1449,6 +1630,7 @@ function openInstall() {
     installOverlay.classList.add('visible');
     installOverlay.inert = false;
     document.body.classList.add('install-open');
+    markOverlayOpen(installOverlay);
     if (installClose) installClose.focus();
 }
 
@@ -1456,7 +1638,14 @@ function closeInstall() {
     installOverlay.classList.remove('visible');
     installOverlay.inert = true;
     document.body.classList.remove('install-open');
-    if (installTrigger && installTrigger.classList.contains('visible')) installTrigger.focus();
+    markOverlayClosed(installOverlay);
+    if (installTrigger && installTrigger.classList.contains('visible')) {
+        syncTriggerInert();
+        installTrigger.focus();
+    } else if (chapterScreen.classList.contains('visible')) {
+        const contentsButton = chapterScreen.querySelector('.nav-contents');
+        if (contentsButton) contentsButton.focus();
+    }
 }
 
 if (installTrigger) installTrigger.addEventListener('click', openInstall);
@@ -1590,7 +1779,7 @@ function hideIntroScreens() {
 }
 
 /* deep-link ?ch=N: открыть главу сразу; пустая/невалидная — в оглавление */
-function handleDeepLink() {
+async function handleDeepLink() {
     const m = /[?&]ch=(\d+)/.exec(location.search);
     if (!m) return false;
     const idx = parseInt(m[1], 10);
@@ -1598,29 +1787,34 @@ function handleDeepLink() {
     hideIntroScreens();
     updateContentsMemory();
 
-    if (isNaN(idx) || idx < 0 || idx >= chapters.length || chapters[idx].empty) {
+    if (isNaN(idx) || idx < 0 || idx >= chapters.length) {
         openContentsFresh();
         return true;
     }
-    openChapter(idx);
+    await openChapter(idx);
     return true;
 }
 
 /* ссылка вида #ch-12: внешний переход (history.state пуст) — открыть главу сразу.
    Перезагрузка внутри сессии (history.state уже наш) — НЕ перехватываем:
    отдаём ход initProgress(), чтобы показать «Продолжить / Начать сначала» */
-function handleHashLink() {
+async function handleHashLink() {
     const m = (location.hash || '').match(/^#ch-(\d+)$/);
     if (!m) return false;
     if (history.state && history.state.echoChapter !== undefined) return false;
     const idx = chapters.findIndex((c) => String(c.number) === m[1]);
-    if (idx < 0 || chapters[idx].empty) return false; /* пустые главы («в работе») не открываем */
+    if (idx < 0) return false;
     hideIntroScreens(); /* новый читатель по ссылке — без заставки */
-    openChapter(idx);
+    await openChapter(idx);
     return true;
 }
 
 function openContentsFresh() {
+    readerGeneration++;
+    cleanupSwipeHandlers();
+    cleanupChapterTear();
+    chapterScreen.classList.remove('visible');
+    chapterScreen.inert = true;
     contentsScreen.classList.add('visible');
     contentsScreen.inert = false;
     if (menuTrigger) menuTrigger.classList.add('visible');
@@ -1642,281 +1836,24 @@ function revealContentsItems() {
             item.classList.add('revealed');
             const at = revealTimers.indexOf(id);
             if (at !== -1) revealTimers.splice(at, 1);
-        }, 200 + i * 80);
+        }, 200 + i * 20);
         revealTimers.push(id);
     });
 }
 
-/* contents acquisition: coloured sequence on every hidden->visible entry.
-   Real labels and accessible text are untouched; corruption is transient. */
-let contentsAcqTimers = [];
-let contentsAcqActive = false;
-const CONTENTS_ACQ_ALPHABET = ['Э', 'Х', 'Ξ', 'Δ', 'Ø', '0', '1', '/', '▓', '▒'];
-
-function contentsAcqSchedule(fn, ms) {
-    const id = setTimeout(fn, ms);
-    contentsAcqTimers.push(id);
-    return id;
-}
-
-function cancelContentsAcquisition() {
-    contentsAcqTimers.forEach(clearTimeout);
-    contentsAcqTimers = [];
-    contentsAcqActive = false;
-    document.querySelectorAll('.acq-overlay').forEach((el) => el.remove());
-}
-
-/* === ПОЛНЫЙ КАСКАД ОГЛАВЛЕНИЯ (большой ярус, раз на версию) ===
-   Ключ записывается на СТАРТЕ: обрыв не перезапускает каскад.
-   Анимируются видимое окно + 6 пунктов вперёд; остальные ждут
-   статичным скремблом и декодируются IntersectionObserver'ом
-   по мере скролла. Одновременно в decode — не больше 3 пунктов. */
-const CASCADE_KEY = 'echo_cascade_version';
-let cascadeActive = false;
-let cascadeObserver = null;
-let cascadeTimer = null;
-let cascadeRunning = 0;
-const cascadeQueue = [];
-const cascadePreRestore = new Map();   // item -> restore() статичного скрембла
-const cascadeFinishers = new Map();    // item -> finish() активного decode
-
-function contentsCascadeDue() {
-    if (typeof ECHO_VERSION === 'undefined' || typeof decodeText !== 'function') return false;
-    try { return localStorage.getItem(CASCADE_KEY) !== ECHO_VERSION; }
-    catch (e) { return false; }
-}
-
-function cascadePump() {
-    while (cascadeRunning < 3 && cascadeQueue.length) {
-        const item = cascadeQueue.shift();
-        const pre = cascadePreRestore.get(item);
-        if (pre) { pre(); cascadePreRestore.delete(item); }
-        cascadeRunning++;
-        cascadeFinishers.set(item, decodeText(item, {
-            duration: 300,
-            order: 'ltr',
-            onDone: () => {
-                cascadeRunning--;
-                cascadeFinishers.delete(item);
-                cascadePump();
-            }
-        }));
-    }
-    if (!cascadeQueue.length && !cascadeRunning && !cascadePreRestore.size) {
-        cascadeActive = false;
-        if (cascadeTimer) { clearInterval(cascadeTimer); cascadeTimer = null; }
-        if (cascadeObserver) { cascadeObserver.disconnect(); cascadeObserver = null; }
-    }
-}
-
-function runContentsCascade() {
-    try { localStorage.setItem(CASCADE_KEY, ECHO_VERSION); } catch (e) {}
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    if (cascadeActive) return;
-    cascadeActive = true;
-
-    const items = Array.from(document.querySelectorAll('.contents-item:not(.empty)'));
-    const vh = window.innerHeight;
-    const laterItems = [];
-    items.forEach((item) => {
-        const r = item.getBoundingClientRect();
-        if (r.top < vh && r.bottom > 0) cascadeQueue.push(item);
-        else laterItems.push(item);
-    });
-    /* 6 пунктов за окном анимируются сразу, остальные — по скроллу */
-    laterItems.splice(0, 6).forEach((item) => cascadeQueue.push(item));
-
-    if (laterItems.length && typeof IntersectionObserver === 'function') {
-        laterItems.forEach((item) => cascadePreRestore.set(item, scrambleStatic(item)));
-        cascadeObserver = new IntersectionObserver((entries) => {
-            entries.forEach((en) => {
-                if (!en.isIntersecting) return;
-                cascadeObserver.unobserve(en.target);
-                cascadeQueue.push(en.target);
-                cascadePump();
-            });
-        }, { root: null, rootMargin: '0px 0px 25% 0px' });
-        laterItems.forEach((item) => cascadeObserver.observe(item));
-    }
-
-    cascadeTimer = setInterval(cascadePump, 25);  /* стаггер 25 мс */
-    cascadePump();
-}
-
-/* обрыв (уход из оглавления): ожидающие пункты — сразу финальный текст */
-function cancelContentsCascade() {
-    if (cascadeTimer) { clearInterval(cascadeTimer); cascadeTimer = null; }
-    if (cascadeObserver) { cascadeObserver.disconnect(); cascadeObserver = null; }
-    cascadeQueue.length = 0;
-    cascadePreRestore.forEach((restore) => restore());
-    cascadePreRestore.clear();
-    cascadeFinishers.forEach((finish) => finish());
-    cascadeFinishers.clear();
-    cascadeRunning = 0;
-    cascadeActive = false;
-}
-
-/* единая точка показа/скрытия оглавления: большой ярус по версии,
-   иначе — короткое приобретение на каждый вход */
-let contentsEntryFxDone = false;  /* не более одного входного эффекта за сессию видимости */
-function onContentsShown() {
-    if (contentsEntryFxDone) return;  /* analog-drop и др. дёргают class без реального входа */
-    if (contentsCascadeDue()) {
-        contentsEntryFxDone = true;
-        cancelContentsAcquisition();
-        runContentsCascade();
-    } else if (!contentsAcqActive) {
-        contentsEntryFxDone = true;
-        startContentsAcquisition();
-    }
-}
-function onContentsHidden() {
-    contentsEntryFxDone = false;
-    cancelContentsAcquisition();
-    cancelContentsCascade();
-}
-
-function acqCorruptPositions(label) {
-    const letters = [];
-    for (let i = 0; i < label.length; i++) {
-        if (/[А-Яа-яA-Za-z0-9]/.test(label[i])) letters.push(i);
-    }
-    if (!letters.length) return [];
-    const count = Math.min(5, Math.max(1, Math.round(letters.length * 0.3)));
-    const positions = [];
-    const step = Math.max(1, Math.floor(letters.length / count));
-    for (let i = 0; i < count; i++) positions.push(letters[i * step]);
-    return positions;
-}
-
-function acqCorrupt(label, positions, salt) {
-    const chars = [...label];
-    positions.forEach((pos, i) => {
-        chars[pos] = CONTENTS_ACQ_ALPHABET[(salt + i * 3 + pos) % CONTENTS_ACQ_ALPHABET.length];
-    });
-    return chars.join('');
-}
-
-function startContentsAcquisition() {
-    document.title = 'acq-defined';
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    cancelContentsAcquisition();
-    contentsAcqActive = true;
-
-    const header = document.querySelector('.contents-header');
-    if (header) {
-        const ov = document.createElement('span');
-        ov.className = 'acq-overlay acq-header-overlay';
-        ov.setAttribute('aria-hidden', 'true');
-        ov.innerHTML = '<span class="acq-base"></span><span class="acq-cyan"></span><span class="acq-red"></span>';
-        header.appendChild(ov);
-        const base = ov.querySelector('.acq-base');
-        const cyan = ov.querySelector('.acq-cyan');
-        const red = ov.querySelector('.acq-red');
-        base.textContent = cyan.textContent = red.textContent = header.textContent;
-        ov.style.opacity = '0.25';
-        ov.style.filter = 'blur(2px)';
-        ov.style.transform = 'translate(-4px, -50%)';
-        contentsAcqSchedule(() => {
-            cyan.style.transform = 'translate(-3px, 0)';
-            cyan.style.opacity = '0.7';
-        }, 125);
-        contentsAcqSchedule(() => {
-            red.style.transform = 'translate(3px, 0)';
-            red.style.opacity = '0.5';
-            ov.style.filter = 'blur(2px) brightness(0.7)';
-        }, 210);
-        contentsAcqSchedule(() => {
-            ov.style.opacity = '0.9';
-            ov.style.filter = 'blur(0.5px)';
-            ov.style.transform = 'translate(0, -50%)';
-            cyan.style.opacity = '0';
-            red.style.opacity = '0';
-        }, 325);
-        contentsAcqSchedule(() => ov.remove(), 500);
-    }
-
-    const items = Array.from(document.querySelectorAll('.contents-item:not(.empty)'));
-    const vh = window.innerHeight;
-    const visible = items.filter((item) => {
-        const r = item.getBoundingClientRect();
-        return r.top < vh && r.bottom > 0;
-    });
-    const nextTwo = items.filter((item) => item.getBoundingClientRect().top >= vh).slice(0, 2);
-    const targets = visible.concat(nextTwo);
-
-    targets.forEach((item, idx) => {
-        const label = item.textContent;
-        const positions = acqCorruptPositions(label);
-        const corrupted1 = acqCorrupt(label, positions, 0);
-        const corrupted2 = acqCorrupt(label, positions.slice(0, 3), 1);
-        const ov = document.createElement('span');
-        ov.className = 'acq-overlay';
-        ov.setAttribute('aria-hidden', 'true');
-        ov.innerHTML = '<span class="acq-base"></span><span class="acq-cyan"></span><span class="acq-red"></span><span class="acq-slice"></span>';
-        item.appendChild(ov);
-        const base = ov.querySelector('.acq-base');
-        const cyan = ov.querySelector('.acq-cyan');
-        const red = ov.querySelector('.acq-red');
-        const slice = ov.querySelector('.acq-slice');
-        const setText = (t) => { base.textContent = cyan.textContent = red.textContent = slice.textContent = t; };
-        setText(label);
-        const delay = 180 + idx * 45;
-        ov.style.opacity = '0.12';
-        ov.style.filter = 'blur(1.8px) brightness(0.75)';
-        ov.style.transform = 'translate(0, calc(-50% + 3px))';
-        contentsAcqSchedule(() => {
-            setText(corrupted1);
-            ov.style.opacity = '0.35';
-            cyan.style.transform = 'translate(-3px, 0)';
-            cyan.style.opacity = '0.85';
-            ov.style.filter = 'blur(1.8px) brightness(1.25)';
-        }, delay + 78);
-        contentsAcqSchedule(() => {
-            setText(corrupted2);
-            red.style.transform = 'translate(3px, 0)';
-            red.style.opacity = '0.55';
-            ov.style.transform = 'translate(2px, calc(-50% + 3px))';
-            slice.style.transform = 'translate(3px, 0)';
-            slice.style.opacity = '1';
-        }, delay + 166);
-        contentsAcqSchedule(() => {
-            setText(label);
-            ov.style.opacity = '0.85';
-            ov.style.filter = 'blur(0.6px) brightness(1)';
-            ov.style.transform = 'translate(0, -50%)';
-            cyan.style.opacity = '0';
-            red.style.opacity = '0';
-            slice.style.opacity = '0';
-        }, delay + 250);
-        contentsAcqSchedule(() => {
-            ov.style.opacity = '1';
-            ov.style.filter = 'blur(0) brightness(1)';
-            ov.style.transform = 'translate(0, -50%)';
-        }, delay + 374);
-        contentsAcqSchedule(() => ov.remove(), delay + 520);
-    });
-}
-
-document.title = 'observer-registered';
-new MutationObserver(() => {
-    if (contentsScreen.classList.contains('visible')) {
-        onContentsShown();
-    } else {
-        onContentsHidden();
-    }
-}).observe(contentsScreen, { attributes: true, attributeFilter: ['class'] });
-document.title = 'setup-visible:' + contentsScreen.classList.contains('visible');
-if (contentsScreen.classList.contains('visible')) {
-    onContentsShown();
-    document.title = 'acq:' + document.querySelectorAll('.acq-overlay').length;
-}
-function initProgress() {
+async function initProgress() {
     const saved = loadState();
     if (saved.lastChapter === undefined || saved.lastChapter < 0) return;
+    isStarted = true;
 
+    try {
+        await ensureChapters();
+    } catch (error) {
+        showChapterLoadError(saved.lastChapter, initProgress);
+        return;
+    }
     const chapter = chapters[saved.lastChapter];
-    if (!chapter || chapter.empty) return;
+    if (!chapter || chapter.empty) { openContentsFresh(); return; }
 
     hideIntroScreens();
 
@@ -1943,14 +1880,14 @@ function initProgress() {
         </div>
     `;
     overlay.setAttribute('aria-labelledby', 'progress-title');
+    overlay.inert = false;
     overlay.classList.add('visible');
     contentsScreen.inert = true;   // dimmed contents stays out of the Tab order
+    markOverlayOpen(overlay);
     overlay.querySelector('.progress-continue').focus();
 
     overlay.querySelector('.progress-continue').addEventListener('click', () => {
-        overlay.classList.remove('visible');
-        contentsScreen.classList.remove('progress-dimmed');
-        contentsScreen.inert = false;
+        closeProgress(false);
         setTimeout(() => openChapter(saved.lastChapter, { restore: true }), 400);
     });
 
@@ -1965,9 +1902,7 @@ function initProgress() {
         try {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
         } catch (err) {}
-        contentsScreen.classList.remove('progress-dimmed');
-        contentsScreen.inert = false;
-        overlay.classList.remove('visible');
+        closeProgress(false);
         location.reload();
     });
 }
@@ -2041,6 +1976,7 @@ const filmGate = filmScreen ? filmScreen.querySelector('.film-gate') : null;
 const filmImage = filmGate ? filmGate.querySelector('.film-image') : null;
 const filmGrain = filmScreen ? filmScreen.querySelector('.film-grain') : null;
 const filmHalo = filmGate ? filmGate.querySelector('.film-halo') : null;
+const filmHint = document.getElementById('film-hint');
 
 let filmReady = false;
 let filmRunning = false;
@@ -2127,17 +2063,29 @@ buildFilmGrain();
 
 /* preload only when the intro will actually run: bypassed intro
    (deep link, hash link, saved progress) never plays the film */
+function prefetchIntroAssets() {
+    prefetchChapters();
+    startFilmPreload();
+}
 if (!isStarted) {
     if ('requestIdleCallback' in window) {
-        requestIdleCallback(startFilmPreload, { timeout: 8000 });
+        requestIdleCallback(prefetchIntroAssets, { timeout: 8000 });
     } else {
-        setTimeout(startFilmPreload, 4000);
+        setTimeout(prefetchIntroAssets, 4000);
     }
+}
+
+function showFilmHint() {
+    if (!filmHint) return;
+    filmHint.classList.remove('visible');
+    void filmHint.offsetWidth;
+    filmHint.classList.add('visible');
 }
 
 function runFilmSequence() {
     if (filmRunning || !filmScreen || !filmGate || !filmImage) return;
     filmRunning = true;
+    filmScreen.style.pointerEvents = 'auto';
 
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const timers = [];
@@ -2161,16 +2109,49 @@ function runFilmSequence() {
     const onVisibilityHidden = () => {
         if (document.hidden) endToTitle();
     };
+    let filmPointer = null;
+    let lastFilmTap = 0;
+    const resetFilmGesture = () => {
+        filmPointer = null;
+        lastFilmTap = 0;
+    };
+    const onFilmPointerDown = (e) => {
+        if (!filmRunning || !e.isPrimary || !['touch', 'pen', 'mouse'].includes(e.pointerType)) return;
+        filmPointer = { id: e.pointerId, x: e.clientX, y: e.clientY, at: performance.now() };
+    };
+    const onFilmPointerUp = (e) => {
+        if (!filmRunning || !filmPointer || filmPointer.id !== e.pointerId) return;
+        const start = filmPointer;
+        filmPointer = null;
+        const duration = performance.now() - start.at;
+        const movement = Math.hypot(e.clientX - start.x, e.clientY - start.y);
+        if (duration > 300 || movement > 10) { lastFilmTap = 0; return; }
+        const now = performance.now();
+        if (lastFilmTap && now - lastFilmTap <= 300) {
+            lastFilmTap = 0;
+            endToTitle();
+        } else {
+            lastFilmTap = now;
+        }
+    };
+    const onFilmPointerCancel = () => resetFilmGesture();
 
-    /* выход из серии: снять классы, таймеры, клоны; довести до названия */
+    /* pointerup is the only tap channel; synthetic clicks are never consumed */
     const endToTitle = () => {
         if (finished) return;
         finished = true;
         clearAllTimers();
+        resetFilmGesture();
         document.removeEventListener('visibilitychange', onVisibilityHidden);
+        filmScreen.removeEventListener('pointerdown', onFilmPointerDown);
+        filmScreen.removeEventListener('pointerup', onFilmPointerUp);
+        filmScreen.removeEventListener('pointercancel', onFilmPointerCancel);
+        window.removeEventListener('blur', onFilmPointerCancel);
 
         filmScreen.classList.remove('film-live');
         filmScreen.classList.remove('visible');
+        filmScreen.style.pointerEvents = '';
+        if (filmHint) filmHint.classList.remove('visible');
         filmGate.classList.remove('filming', 'film-flick', 'film-tear', 'film-zoom', 'film-slip', 'film-gap', 'film-gap-dip', 'film-drift', 'film-breathe', 'film-jam', 'film-push', 'film-catch', 'film-lamp-stutter', 'film-lamp-die');
         filmGate.style.visibility = '';
         filmGate.style.clipPath = '';
@@ -2187,16 +2168,7 @@ function runFilmSequence() {
         titleScreen.classList.add('visible');
         titleScreen.addEventListener('click', showContents, { once: true });
 
-        /* после плёнки фокус-пул титула: blur 12→0 за 1.7 с с задержкой
-           0.45 с; декод стартует в середине размытия (1.25 с), чтобы
-           лок символов и наводка резкости завершились вместе */
-        if (titleScreen.classList.contains('film-enter')) {
-            setTimeout(playTitleDecode, 1250);
-        } else {
-            playTitleDecode();
-        }
-
-        setTimeout(() => {
+        later(() => {
             filmScreen.classList.remove('reduced', 'film-flick', 'film-breathe', 'film-hit-light', 'film-lamp-stutter', 'film-lamp-die', 'film-startup', 'film-catch-light', 'film-lamp-ignite');
             filmScreen.style.transition = '';
             removeClones();
@@ -2204,12 +2176,17 @@ function runFilmSequence() {
         }, 450);
     };
 
+    filmScreen.addEventListener('pointerdown', onFilmPointerDown);
+    filmScreen.addEventListener('pointerup', onFilmPointerUp);
+    filmScreen.addEventListener('pointercancel', onFilmPointerCancel);
+    window.addEventListener('blur', onFilmPointerCancel);
     document.addEventListener('visibilitychange', onVisibilityHidden);
 
     /* --- reduced-motion: плавные кроссфейды без эффектов --- */
     if (reduced) {
         filmScreen.classList.add('visible');
         filmScreen.classList.add('reduced');
+        showFilmHint();
 
         const buffer = document.createElement('img');
         buffer.className = 'film-image film-clone';
@@ -2379,6 +2356,7 @@ function runFilmSequence() {
     filmGate.classList.add('filming');
     void filmScreen.offsetWidth;
     filmScreen.classList.add('film-lamp-ignite');
+    showFilmHint();
 
     // пыль и царапины видны в пустом свете до появления кадра
     later(runScratch, 260);
@@ -2437,7 +2415,6 @@ function runFilmSequence() {
             if (nextFrame === 5) {
                 pulse('film-hit', 300);
                 pulseScreen('film-hit-light', 300);
-                if (navigator.vibrate) navigator.vibrate(30);
             }
             if (nextFrame === 6) {
                 filmGate.classList.add('film-push');
@@ -2565,10 +2542,12 @@ function toggleReaderSheet(open) {
     backdrop.classList.toggle('open', open);
     if (open) {
         setBarHidden(false);
+        markOverlayOpen(sheet);
         const first = sheet.querySelector('button, input');
         if (first) first.focus();
-    } else if (navAaBtn) {
-        navAaBtn.focus();
+    } else {
+        markOverlayClosed(sheet);
+        if (navAaBtn) navAaBtn.focus();
     }
 }
 
@@ -2616,6 +2595,7 @@ function scrollContentsToCurrent() {
 function doExitChapterToContents() {
     chapterExitInProgress = false;
     readerGeneration++;            // leaving the reader invalidates pending writes
+    cleanupChapterTear();
     clearTimeout(readPosTimer);
     readPosTimer = null;
     cancelHeadingEffects();        /* если ушли в середине сборки — чистый текст */
@@ -2769,9 +2749,7 @@ if ('serviceWorker' in navigator) {
         location.reload();
     });
 
-    window.addEventListener('load', () => {
-        navigator.serviceWorker.register('sw.js').catch(() => {});
-    });
+    navigator.serviceWorker.register('sw.js').catch(() => {});
 }
 
 /* ============================================================
@@ -2809,7 +2787,7 @@ if ('serviceWorker' in navigator) {
             fab.setAttribute('role', 'group');
             fab.setAttribute('aria-label', 'Поделиться цитатой');
             fab.innerHTML = '<span class="share-fab-label">Поделиться</span>' +
-                '<button type="button" class="share-fab">' + FAB_ICON + '</button>';
+                '<button type="button" class="share-fab" aria-label="Поделиться цитатой">' + FAB_ICON + '</button>';
             /* тап не сбрасывает выделение до генерации карточки;
                preventDefault на touchstart гасит синтезированный click,
                поэтому на тач-устройствах действие вызываем из touchend */
@@ -3010,34 +2988,397 @@ if ('serviceWorker' in navigator) {
 })();
 
 
-/* === ЗАСТАВКА: ЗОВ БЕЗДЕЙСТВИЯ ===
-   Нет тапа ~1с — обложка дышит, ~5с — подрагивает, ~10.5с — круги.
-   Любое касание снимает зов навсегда. Если интро пропущено
-   (дип-линк/прогресс: isStarted уже true) — таймеры срабатывают вхолостую. */
-(function coverBeckon() {
-    if (!coverScreen) return;
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    /* authored single run: 600ms stillness, then a 7.5s choreography
-       (beckon-play), then faint breathing (beckon-settle) */
-    let settleTimer = null;
-    const startTimer = setTimeout(() => {
-        if (isStarted) return;
-        coverScreen.classList.add('beckon-play');
-        settleTimer = setTimeout(() => {
-            coverScreen.classList.remove('beckon-play');
-            if (!isStarted) coverScreen.classList.add('beckon-settle');
-        }, 7500);
-    }, 600);
-    ['touchstart', 'mousedown', 'keydown'].forEach((ev) => {
-        document.addEventListener(ev, () => {
-            clearTimeout(startTimer);
-            clearTimeout(settleTimer);
-            coverScreen.classList.remove('beckon-play', 'beckon-settle');
-        }, { once: true, passive: true });
+function coverSurgeHook() {
+    /* W-8 integration point: emit the water impulse burst on SURGE. */
+    if (coverScreen.__waterSurge) coverScreen.__waterSurge();
+}
+
+(function coverIdleRhythm() {
+    if (!coverScreen || isStarted) return;
+    const img = coverScreen.querySelector('img');
+    const tremor = coverScreen.querySelector('.cover-tremor');
+    if (!img || !tremor) return;
+    const entryEvents = ['touchstart', 'mousedown', 'keydown', 'click'];
+
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        const hint = document.createElement('div');
+        hint.className = 'cover-idle-static';
+        hint.setAttribute('role', 'note');
+        hint.textContent = 'Коснитесь, чтобы войти';
+        coverScreen.appendChild(hint);
+        entryEvents.forEach((eventName) => {
+            document.addEventListener(eventName, () => hint.remove(), { once: true, passive: true });
+        });
+        return;
+    }
+
+    const ring = document.createElement('div');
+    ring.className = 'cover-beckon-ring';
+    ring.setAttribute('aria-hidden', 'true');
+    ring.innerHTML = '<i></i><i></i>';
+    coverScreen.appendChild(ring);
+
+    let phase = 'IDLE';
+    let timer = null;
+    let tremorAnimation = null;
+    let stopped = false;
+    const ringObserver = new ResizeObserver(positionRing);
+
+    function positionRing() {
+        const rect = img.getBoundingClientRect();
+        const size = Math.max(76, Math.min(132, Math.min(rect.width, rect.height) * 0.18));
+        ring.style.width = size + 'px';
+        ring.style.height = size + 'px';
+        ring.style.left = (rect.left + rect.width / 2 - size / 2) + 'px';
+        ring.style.top = (rect.top + rect.height * 0.43 - size / 2) + 'px';
+    }
+
+    function cancelSurge() {
+        if (tremorAnimation) {
+            tremorAnimation.cancel();
+            tremorAnimation = null;
+        }
+        coverScreen.classList.remove('surge');
+        ring.classList.remove('visible');
+    }
+
+    function schedulePhase() {
+        if (stopped || document.hidden) return;
+        const delay = phase === 'IDLE' ? 8000 : phase === 'SURGE' ? 3000 : 12000;
+        timer = setTimeout(() => {
+            if (phase === 'IDLE') enterPhase('SURGE');
+            else if (phase === 'SURGE') enterPhase('LULL');
+            else enterPhase('IDLE');
+        }, delay);
+    }
+
+    function enterPhase(next) {
+        if (stopped) return;
+        clearTimeout(timer);
+        timer = null;
+        phase = next;
+        coverScreen.dataset.idlePhase = phase;
+        coverScreen.classList.toggle('lull', phase === 'LULL');
+        cancelSurge();
+        if (phase === 'SURGE') {
+            positionRing();
+            coverScreen.classList.add('surge');
+            ring.classList.add('visible');
+            const frames = Array.from({ length: 24 }, () => ({
+                transform: `translate(${(Math.random() * 1.5 - 0.75).toFixed(2)}px, ${(Math.random() * 1.5 - 0.75).toFixed(2)}px)`,
+                easing: 'steps(1, jump-start)'
+            }));
+            frames.push({ transform: 'translate(0, 0)', easing: 'steps(1, jump-start)' });
+            tremorAnimation = tremor.animate(frames, { duration: 3000 });
+            coverSurgeHook();
+        }
+        schedulePhase();
+    }
+
+    function stopRhythm() {
+        stopped = true;
+        clearTimeout(timer);
+        timer = null;
+        cancelSurge();
+        coverScreen.classList.remove('lull');
+        delete coverScreen.dataset.idlePhase;
+        ringObserver.disconnect();
+        ring.remove();
+    }
+
+    function rearmOnVisibility() {
+        if (stopped) return;
+        clearTimeout(timer);
+        timer = null;
+        cancelSurge();
+        coverScreen.classList.remove('lull');
+        phase = 'IDLE';
+        coverScreen.dataset.idlePhase = phase;
+        if (!document.hidden) {
+            positionRing();
+            enterPhase('IDLE');
+        }
+    }
+
+    positionRing();
+    enterPhase('IDLE');
+    img.addEventListener('load', positionRing);
+    ringObserver.observe(img);
+    window.addEventListener('resize', positionRing);
+    window.addEventListener('orientationchange', positionRing);
+    document.addEventListener('visibilitychange', rearmOnVisibility);
+    entryEvents.forEach((eventName) => {
+        document.addEventListener(eventName, stopRhythm, { once: true, passive: true });
     });
 })();
 
 /* focus containment hooks — registered last, after every overlay exists */
-[menuOverlay, installOverlay, photoOverlay].forEach((ov) => {
+[menuOverlay, installOverlay, photoOverlay, document.getElementById('reader-sheet'), document.getElementById('progress-overlay')].forEach((ov) => {
     if (ov) ov.addEventListener('keydown', (e) => trapTab(ov, e));
 });
+
+
+(function initWaterCover() {
+    const canvas = document.getElementById('water-cover');
+    if (!coverScreen || !canvas || isStarted) return;
+    const saved = loadState();
+    if (saved.lastChapter !== undefined || /[?&]ch=/.test(location.search) || /^#ch-\d+$/.test(location.hash)) return;
+    try {
+        if (sessionStorage.getItem('echo_sw_route')) return;
+    } catch (error) {}
+
+    let state = 'idle';
+    let view = null;
+    let waterPromise = null;
+    let covered = false;
+    let pendingImpulse = null;
+    let entryAttempt = 0;
+    const pointers = new Map();
+    const gestureLog = [];
+    const clamp = (value, low, high) => Math.min(high, Math.max(low, value));
+    coverScreen.__waterLog = gestureLog;
+    coverScreen.__waterMetrics = () => view ? view.getMetrics() : null;
+    coverScreen.__waterState = () => ({
+        state,
+        covered,
+        pendingImpulse,
+        entryAttempt,
+        promiseCached: Boolean(waterPromise),
+        scriptCount: document.querySelectorAll('script[src="ascii-water.js"]').length,
+        cellPx: view ? view.cellPx : null
+    });
+
+    function record(step, details) {
+        gestureLog.push(Object.assign({ step, at: performance.now() }, details || {}));
+        if (gestureLog.length > 120) gestureLog.shift();
+    }
+
+    function toGrid(clientX, clientY) {
+        const rect = canvas.getBoundingClientRect();
+        const cellWidth = view ? view.cellWidth : 12;
+        const cellHeight = view ? view.cellHeight : 12;
+        const cols = view ? view.cols : Math.max(1, Math.floor(rect.width / 12));
+        const rows = view ? view.rows : Math.max(1, Math.floor(rect.height / 12));
+        const cssX = clamp(clientX - rect.left, 0, rect.width);
+        const cssY = clamp(clientY - rect.top, 0, rect.height);
+        return {
+            x: clamp(cssX / cellWidth, 0, cols - 1),
+            y: clamp(cssY / cellHeight, 0, rows - 1),
+            normalizedX: rect.width ? cssX / rect.width : 0,
+            normalizedY: rect.height ? cssY / rect.height : 0
+        };
+    }
+
+    function failWater(error, script) {
+        script.remove();
+        state = 'failed';
+        pendingImpulse = null;
+        waterPromise = null;
+        if (view) {
+            view.destroy();
+            view = null;
+        } else if (window.__echoWater) {
+            window.__echoWater.destroy();
+        }
+        record('load-error', { message: error.message });
+    }
+
+    function ensureWater(trigger) {
+        if (covered || state === 'failed') return null;
+        if (view) return Promise.resolve(view);
+        if (waterPromise) return waterPromise;
+        state = 'loading';
+        record('load-start', { trigger });
+        const script = document.createElement('script');
+        script.async = true;
+        script.src = 'ascii-water.js';
+        const current = new Promise((resolve, reject) => {
+            script.onload = () => {
+                if (covered) {
+                    pendingImpulse = null;
+                    record('discard-late');
+                    resolve(null);
+                    return;
+                }
+                try {
+                    if (!window.__echoWater || typeof window.__echoWater.init !== 'function') throw new Error('water module did not initialize');
+                    view = window.__echoWater.init(canvas);
+                    state = 'ready';
+                    record('ready');
+                    if (pendingImpulse) {
+                        const impulse = pendingImpulse;
+                        pendingImpulse = null;
+                        window.__echoWater.drop(impulse.x, impulse.y, impulse.strength);
+                        record('queued-flush', impulse);
+                    }
+                    resolve(view);
+                } catch (error) {
+                    failWater(error, script);
+                    reject(error);
+                }
+            };
+            script.onerror = () => {
+                const error = new Error('water module request failed');
+                failWater(error, script);
+                reject(error);
+            };
+            document.head.appendChild(script);
+        });
+        waterPromise = current.catch(() => null);
+        return waterPromise;
+    }
+
+    function emit(mapping, point, strength, pointerType, pointerId) {
+        if (state === 'ready' && view) {
+            window.__echoWater.drop(point.x, point.y, strength);
+            record(mapping, { x: point.x, y: point.y, strength, pointerType, pointerId });
+        } else {
+            record('impulse-discarded', { mapping, x: point.x, y: point.y, strength, pointerType, pointerId });
+        }
+    }
+
+    function enterWithWater(clientX, clientY, strength, pointerType, pointerId) {
+        if (isStarted) return;
+        const point = toGrid(clientX, clientY);
+        record('coordinates', { x: point.x, y: point.y, normalizedX: point.normalizedX, normalizedY: point.normalizedY, pointerType, pointerId });
+        const impulse = { x: point.x, y: point.y, strength, pointerType, pointerId, entryAttempt: ++entryAttempt };
+        if (state === 'ready' && view) {
+            window.__echoWater.drop(point.x, point.y, strength);
+            record('impulse', impulse);
+        } else if (state !== 'failed' && !covered) {
+            pendingImpulse = impulse;
+            record('queued-impulse', impulse);
+            ensureWater('entry');
+        } else {
+            record('impulse-discarded', impulse);
+        }
+        startSequence();
+    }
+
+    function pointerDown(event) {
+        if (event.pointerType === 'mouse' && event.button !== 0) return;
+        if (pointers.has(event.pointerId)) pointers.delete(event.pointerId);
+        if (pointers.size >= 3) {
+            record('cap-reject', { pointerId: event.pointerId, pointerType: event.pointerType });
+            return;
+        }
+        ensureWater('pointer-intent');
+        pointers.set(event.pointerId, {
+            id: event.pointerId,
+            pointerType: event.pointerType,
+            state: 'pending',
+            startTime: event.timeStamp,
+            startX: event.clientX,
+            startY: event.clientY,
+            lastTime: event.timeStamp,
+            lastX: event.clientX,
+            lastY: event.clientY,
+            lastImpulse: -Infinity
+        });
+        try { canvas.setPointerCapture(event.pointerId); } catch (error) { /* Synthetic verification events may not own capture. */ }
+        record('pending', { pointerId: event.pointerId, pointerType: event.pointerType });
+    }
+
+    function pointerMove(event) {
+        const pointer = pointers.get(event.pointerId);
+        if (!pointer) {
+            if (event.pointerType === 'mouse' && event.buttons === 0) {
+                if (event.timeStamp - pointerMove.lastHover < 40) return;
+                const previousTime = pointerMove.hoverTime === undefined ? event.timeStamp - 16 : pointerMove.hoverTime;
+                const previousX = pointerMove.hoverX === undefined ? event.clientX : pointerMove.hoverX;
+                const previousY = pointerMove.hoverY === undefined ? event.clientY : pointerMove.hoverY;
+                const seconds = Math.max(0.001, (event.timeStamp - previousTime) / 1000);
+                const velocity = clamp(Math.hypot(event.clientX - previousX, event.clientY - previousY) / seconds, 0, 4000);
+                const strength = clamp(0.035 + velocity / 2500 * 0.045, 0.035, 0.08);
+                emit('mouse-hover', toGrid(event.clientX, event.clientY), strength, 'mouse', event.pointerId);
+                pointerMove.lastHover = event.timeStamp;
+                pointerMove.hoverTime = event.timeStamp;
+                pointerMove.hoverX = event.clientX;
+                pointerMove.hoverY = event.clientY;
+            }
+            return;
+        }
+        const distance = Math.hypot(event.clientX - pointer.startX, event.clientY - pointer.startY);
+        if (pointer.state === 'pending' && distance >= 8) pointer.state = 'drag';
+        const seconds = Math.max(0.001, (event.timeStamp - pointer.lastTime) / 1000);
+        const velocity = clamp(Math.hypot(event.clientX - pointer.lastX, event.clientY - pointer.lastY) / seconds, 0, 4000);
+        pointer.lastTime = event.timeStamp;
+        pointer.lastX = event.clientX;
+        pointer.lastY = event.clientY;
+        if (pointer.state !== 'drag' || event.timeStamp - pointer.lastImpulse < 24) return;
+        const strength = clamp(0.12 + velocity / 2000 * 0.53, 0.12, 0.65);
+        emit(pointer.pointerType + '-drag', toGrid(event.clientX, event.clientY), strength, pointer.pointerType, event.pointerId);
+        pointer.lastImpulse = event.timeStamp;
+    }
+
+    function pointerUp(event) {
+        const pointer = pointers.get(event.pointerId);
+        if (!pointer) return;
+        const duration = event.timeStamp - pointer.startTime;
+        const distance = Math.hypot(event.clientX - pointer.startX, event.clientY - pointer.startY);
+        if (pointer.state === 'pending' && distance >= 8) pointer.state = 'drag';
+        if (pointer.state === 'pending' && distance < 8 && duration < 250) {
+            record('tap-classified', { pointerId: pointer.id, pointerType: pointer.pointerType, duration });
+            enterWithWater(pointer.startX, pointer.startY, pointer.pointerType === 'mouse' ? 1.1 : 0.65, pointer.pointerType, pointer.id);
+        } else {
+            record(pointer.state === 'drag' ? 'drag-end' : 'long-press-end', { pointerId: pointer.id, pointerType: pointer.pointerType });
+        }
+        pointers.delete(event.pointerId);
+        try { canvas.releasePointerCapture(event.pointerId); } catch (error) { /* Capture may already be released. */ }
+    }
+
+    function cancelPointer(event) {
+        if (!pointers.has(event.pointerId)) return;
+        pointers.delete(event.pointerId);
+        record(event.type === 'lostpointercapture' ? 'lostpointercapture' : 'pointercancel', { pointerId: event.pointerId });
+    }
+
+    function cancelAll() {
+        for (const id of pointers.keys()) record('blur-cancel', { pointerId: id });
+        pointers.clear();
+    }
+
+    function finishCover(event) {
+        if (covered || event.target !== coverScreen || event.propertyName !== 'transform' || !coverScreen.classList.contains('hide-up')) return;
+        covered = true;
+        pendingImpulse = null;
+        state = 'covered';
+        record('freeze');
+        if (view) view.freeze();
+        if (window.__echoWater) window.__echoWater.destroy();
+        state = 'destroyed';
+        record('destroy');
+    }
+
+    canvas.addEventListener('pointerdown', pointerDown);
+    canvas.addEventListener('pointermove', pointerMove);
+    canvas.addEventListener('pointerup', pointerUp);
+    canvas.addEventListener('pointercancel', cancelPointer);
+    canvas.addEventListener('lostpointercapture', cancelPointer);
+    canvas.addEventListener('keydown', event => {
+        if (event.repeat || event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        const rect = canvas.getBoundingClientRect();
+        enterWithWater(rect.left + rect.width / 2, rect.top + rect.height / 2, 0.65, 'keyboard', 'keyboard');
+    });
+    window.addEventListener('blur', cancelAll);
+    document.addEventListener('visibilitychange', () => { if (document.hidden) cancelAll(); });
+    coverScreen.addEventListener('echo:entry-start', () => {
+        state = 'entering';
+        record('entry-start');
+        setTimeout(() => finishCover({ target: coverScreen, propertyName: 'transform' }), 1050);
+    });
+    coverScreen.addEventListener('transitionend', finishCover);
+    coverScreen.__waterRetry = () => {
+        if (covered || isStarted) return null;
+        state = 'idle';
+        return ensureWater('deliberate-retry');
+    };
+    coverScreen.__waterSurge = () => {
+        if (state !== 'ready' || !view) return;
+        window.__echoWater.drop(view.cols * 0.5, view.rows * 0.68, 0.65);
+        record('surge', { x: view.cols * 0.5, y: view.rows * 0.68, strength: 0.65 });
+    };
+    const schedule = window.requestIdleCallback || (callback => setTimeout(callback, 250));
+    schedule(() => ensureWater('idle'), { timeout: 250 });
+})();

@@ -49,7 +49,7 @@
 }
 @font-face {
     font-family: 'Golos Text';
-    src: url('fonts/golos-text-cyrillic.woff2') format('woff2');
+    src: url('fonts/golos-text-500.woff2') format('woff2');
     font-weight: 500;
     font-style: normal;
     font-display: swap;
@@ -57,7 +57,7 @@
 }
 @font-face {
     font-family: 'Golos Text';
-    src: url('fonts/golos-text-latin.woff2') format('woff2');
+    src: url('fonts/golos-text-500.woff2') format('woff2');
     font-weight: 500;
     font-style: normal;
     font-display: swap;
@@ -65,7 +65,7 @@
 }
 @font-face {
     font-family: 'Golos Text';
-    src: url('fonts/golos-text-cyrillic.woff2') format('woff2');
+    src: url('fonts/golos-text-700.woff2') format('woff2');
     font-weight: 700;
     font-style: normal;
     font-display: swap;
@@ -73,7 +73,7 @@
 }
 @font-face {
     font-family: 'Golos Text';
-    src: url('fonts/golos-text-latin.woff2') format('woff2');
+    src: url('fonts/golos-text-700.woff2') format('woff2');
     font-weight: 700;
     font-style: normal;
     font-display: swap;
@@ -116,6 +116,7 @@ html, body {
 #cover-screen img {
     max-width: 92%;
     max-height: 88vh;
+    max-height: 88dvh;
     object-fit: contain;
     -webkit-user-drag: none;
     user-select: none;
@@ -124,6 +125,13 @@ html, body {
         transparent 0%, black 10%, black 90%, transparent 100%);
     mask-image: linear-gradient(to bottom,
         transparent 0%, black 10%, black 90%, transparent 100%);
+}
+
+@media (max-width: 768px) {
+    #cover-screen img {
+        display: block;
+        margin-inline: auto;
+    }
 }
 
 /* дыхание разлома: тихая пульсация свечения в верхней трети по центру */
@@ -456,6 +464,36 @@ html, body {
     opacity: 1;
 }
 
+.film-hint {
+    position: absolute;
+    left: 50%;
+    bottom: calc(28px + env(safe-area-inset-bottom));
+    z-index: 8;
+    transform: translateX(-50%);
+    color: #b8b5b0;
+    font-family: 'Golos Text', sans-serif;
+    font-size: 13px;
+    letter-spacing: 0.03em;
+    text-align: center;
+    opacity: 0;
+    pointer-events: none;
+    white-space: nowrap;
+}
+.film-hint.visible {
+    opacity: 1;
+    animation: film-hint-fade 0.4s ease 2s forwards;
+}
+@keyframes film-hint-fade {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .film-hint.visible {
+        animation: none;
+        opacity: 1;
+    }
+}
+
 /* окно проектора: чёрная колодка по периметру */
 .film-gate {
     position: absolute;
@@ -531,10 +569,10 @@ html, body {
 
 @keyframes film-grain-shift {
     0% { background-position: 0 0; }
-    20% { background-position: -64px 32px); }
-    40% { background-position: 32px -96px); }
-    60% { background-position: -96px -32px); }
-    80% { background-position: 64px 64px); }
+    20% { background-position: -64px 32px; }
+    40% { background-position: 32px -96px; }
+    60% { background-position: -96px -32px; }
+    80% { background-position: 64px 64px; }
     100% { background-position: 0 0; }
 }
 
@@ -1218,9 +1256,9 @@ html, body {
 
 @keyframes crt-noise-shift {
     0% { background-position: 0 0; }
-    25% { background-position: 128px 64px); }
-    50% { background-position: 64px 128px); }
-    75% { background-position: 192px 32px); }
+    25% { background-position: 128px 64px; }
+    50% { background-position: 64px 128px; }
+    75% { background-position: 192px 32px; }
     100% { background-position: 0 0; }
 }
 
@@ -1335,6 +1373,7 @@ html, body {
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
     border-top: 1px solid #1a1a1a;
+    padding-bottom: env(safe-area-inset-bottom);
     transform: translateY(0);
     transition: transform 0.3s ease;
     user-select: none;
@@ -1412,30 +1451,53 @@ html, body {
     }
 }
 /* === ЭЛЕКТРИЧЕСКИЙ ДРЕБЕЗГ В ОГЛАВЛЕНИИ === */
-@keyframes electric-glitch {
-    0%   { transform: translate(0, 0) scaleX(1); opacity: 1; text-shadow: none; filter: brightness(1); clip-path: inset(0 0 0 0); }
-    6%   { transform: translate(-2px, 1px) scaleX(1.02); opacity: 0.3; text-shadow: 1px 0 #00A8E8, -1px 0 #c41e3a; filter: brightness(1.4); }
-    12%  { transform: translate(2px, -1px) scaleX(1); opacity: 1; text-shadow: -1px 0 #00A8E8, 1px 0 #c41e3a; filter: brightness(1); }
-    18%  { transform: translate(-1px, 2px) scaleX(1.02); opacity: 0.7; text-shadow: 2px 0 #00A8E8; }
-    24%  { transform: translate(1px, -2px) scaleX(1); opacity: 1; text-shadow: none; }
-    30%  { transform: translate(-2px, 0) scaleX(1.02); opacity: 0.9; text-shadow: -2px 0 #c41e3a; }
-    36%  { transform: translate(5px, 0) scaleX(1.02); opacity: 0.8; clip-path: inset(30% 0 40% 0); text-shadow: 1px 0 #00A8E8; }
-    42%  { transform: translate(0, -1px) scaleX(1); opacity: 1; text-shadow: none; clip-path: inset(0 0 0 0); }
-    48%  { transform: translate(-1px, 2px) scaleX(1.02); opacity: 0.7; text-shadow: 2px 0 #c41e3a; }
-    54%  { transform: translate(1px, -1px) scaleX(1); opacity: 1; text-shadow: none; }
-    60%  { transform: translate(-2px, 1px) scaleX(1.02); opacity: 0.9; text-shadow: -1px 0 #00A8E8; }
-    66%  { transform: translate(-4px, 0) scaleX(1.02); opacity: 0.85; clip-path: inset(50% 0 20% 0); text-shadow: 1px 0 #c41e3a; }
-    72%  { transform: translate(1px, 0) scaleX(1); opacity: 1; text-shadow: none; clip-path: inset(0 0 0 0); }
-    78%  { transform: translate(-1px, 1px) scaleX(1.02); opacity: 0.75; text-shadow: 2px 0 #00A8E8; }
-    84%  { transform: translate(2px, -1px) scaleX(1); opacity: 1; text-shadow: none; }
-    90%  { transform: translate(0, 0) scaleX(1.02); opacity: 0.9; text-shadow: -1px 0 #c41e3a; }
-    100% { transform: translate(0, 0) scaleX(1); opacity: 1; text-shadow: none; filter: brightness(1); clip-path: inset(0 0 0 0); }
+@keyframes electric-glitch-shear {
+    0%   { transform: translateX(0) skewX(0); text-shadow: none; clip-path: inset(0 0 0 0); }
+    12%  { transform: translateX(-3px) skewX(-6deg); text-shadow: 2px 0 #00A8E8, -2px 0 #c41e3a; clip-path: inset(12% 0 60% 0); }
+    24%  { transform: translateX(4px) skewX(7deg); text-shadow: -2px 0 #00A8E8, 2px 0 #c41e3a; clip-path: inset(55% 0 10% 0); }
+    36%  { transform: translateX(-2px) skewX(-4deg); text-shadow: 1px 0 #00A8E8, -1px 0 #c41e3a; clip-path: inset(25% 0 35% 0); }
+    48%  { transform: translateX(3px) skewX(5deg); text-shadow: -2px 0 #00A8E8, 2px 0 #c41e3a; clip-path: inset(65% 0 5% 0); }
+    60%  { transform: translateX(-4px) skewX(-7deg); text-shadow: 2px 0 #00A8E8, -2px 0 #c41e3a; clip-path: inset(35% 0 25% 0); }
+    72%  { transform: translateX(2px) skewX(3deg); text-shadow: -1px 0 #00A8E8, 1px 0 #c41e3a; clip-path: inset(8% 0 70% 0); }
+    84%  { transform: translateX(-1px) skewX(-2deg); text-shadow: 1px 0 #00A8E8, -1px 0 #c41e3a; clip-path: inset(45% 0 20% 0); }
+    100% { transform: translateX(0) skewX(0); text-shadow: none; clip-path: inset(0 0 0 0); }
+}
+
+@keyframes electric-glitch-chroma-walk {
+    0%   { transform: translateX(0); text-shadow: none; clip-path: inset(0 0 0 0); }
+    10%  { transform: translateX(-1px); text-shadow: -3px 0 #00A8E8, 3px 0 #c41e3a; clip-path: inset(0 0 0 0); }
+    20%  { transform: translateX(1px); text-shadow: -2px 0 #00A8E8, 2px 0 #c41e3a; clip-path: inset(20% 0 20% 0); }
+    30%  { transform: translateX(-1px); text-shadow: -1px 0 #00A8E8, 1px 0 #c41e3a; clip-path: inset(40% 0 10% 0); }
+    40%  { transform: translateX(1px); text-shadow: 1px 0 #00A8E8, -1px 0 #c41e3a; clip-path: inset(60% 0 5% 0); }
+    50%  { transform: translateX(-1px); text-shadow: 2px 0 #00A8E8, -2px 0 #c41e3a; clip-path: inset(40% 0 10% 0); }
+    60%  { transform: translateX(1px); text-shadow: 3px 0 #00A8E8, -3px 0 #c41e3a; clip-path: inset(20% 0 20% 0); }
+    70%  { transform: translateX(-1px); text-shadow: 2px 0 #00A8E8, -2px 0 #c41e3a; clip-path: inset(0 0 0 0); }
+    80%  { transform: translateX(1px); text-shadow: 1px 0 #00A8E8, -1px 0 #c41e3a; clip-path: inset(55% 0 15% 0); }
+    90%  { transform: translateX(-1px); text-shadow: -1px 0 #00A8E8, 1px 0 #c41e3a; clip-path: inset(25% 0 35% 0); }
+    100% { transform: translateX(0); text-shadow: none; clip-path: inset(0 0 0 0); }
+}
+
+@keyframes electric-glitch-drop-frame {
+    0%   { transform: translateX(0) scaleX(1); text-shadow: none; clip-path: inset(0 0 0 0); }
+    10%, 30% { transform: translateX(-4px) scaleX(1.02); text-shadow: 2px 0 #00A8E8, -2px 0 #c41e3a; clip-path: inset(15% 0 60% 0); }
+    31%, 32% { transform: translateX(4px) scaleX(1); text-shadow: -2px 0 #00A8E8, 2px 0 #c41e3a; clip-path: inset(50% 0 15% 0); }
+    50%, 70% { transform: translateX(-2px) scaleX(1.03); text-shadow: 1px 0 #00A8E8, -1px 0 #c41e3a; clip-path: inset(30% 0 35% 0); }
+    71%, 90% { transform: translateX(3px) scaleX(1); text-shadow: -1px 0 #00A8E8, 1px 0 #c41e3a; clip-path: inset(65% 0 5% 0); }
+    100% { transform: translateX(0) scaleX(1); text-shadow: none; clip-path: inset(0 0 0 0); }
 }
 
 .contents-item.electric-glitch {
-    animation: electric-glitch 1.2s steps(1) forwards;
+    animation: electric-glitch-shear 1.2s steps(1) forwards;
     color: #e8e6e3 !important;
     transform-origin: left center;
+}
+
+.contents-item.electric-glitch[data-glitch-variant="chroma-walk"] {
+    animation-name: electric-glitch-chroma-walk;
+}
+
+.contents-item.electric-glitch[data-glitch-variant="drop-frame"] {
+    animation-name: electric-glitch-drop-frame;
 }
 
 .contents-item.electric-glitch .dot {
@@ -1445,11 +1507,13 @@ html, body {
 
 /* === АНАЛОГОВЫЙ ПРОСАД В ОГЛАВЛЕНИИ === */
 @keyframes analog-drop {
-    0% { filter: brightness(1) contrast(1); transform: translateX(0); }
-    25% { filter: brightness(1.12) contrast(1.05); transform: translateX(1.2px); }
-    50% { filter: brightness(1.08) contrast(1.03); transform: translateX(-0.8px); }
-    75% { filter: brightness(1.1) contrast(1.04); transform: translateX(0.4px); }
-    100% { filter: brightness(1) contrast(1); transform: translateX(0); }
+    0% { filter: brightness(1) contrast(1); transform: translateY(0); }
+    16% { filter: brightness(1.14) contrast(1.04); transform: translateY(-0.35px); }
+    30% { filter: brightness(1.1) contrast(1.03); transform: translateY(0.25px); }
+    48% { filter: brightness(1.065) contrast(1.025); transform: translateY(-0.2px); }
+    68% { filter: brightness(1.035) contrast(1.015); transform: translateY(0.15px); }
+    84% { filter: brightness(1.015) contrast(1.008); transform: translateY(-0.05px); }
+    100% { filter: brightness(1) contrast(1); transform: translateY(0); }
 }
 
 #contents-screen.analog-drop {
@@ -1462,9 +1526,9 @@ html, body {
     top: 0;
     left: 0;
     width: 100%;
-    height: 1px;
-    background: rgba(232,230,227,0.06);
-    box-shadow: 0 0 6px rgba(232,230,227,0.04);
+    height: 18px;
+    background: linear-gradient(to bottom, rgba(232,230,227,0) 0%, rgba(232,230,227,0.025) 45%, rgba(232,230,227,0.16) 88%, rgba(232,230,227,0.4) 100%);
+    box-shadow: 0 1px 8px rgba(232,230,227,0.12);
     opacity: 0;
     pointer-events: none;
     z-index: 5;
@@ -1472,7 +1536,9 @@ html, body {
 
 @keyframes scanline-fly {
     0% { opacity: 0; transform: translateY(-5vh); }
-    20% { opacity: 1; }
+    12% { opacity: 0.85; transform: translateY(12vh); }
+    38% { opacity: 0.72; transform: translateY(38vh); }
+    66% { opacity: 0.48; transform: translateY(66vh); }
     100% { opacity: 0; transform: translateY(105vh); }
 }
 
@@ -1541,7 +1607,7 @@ html, body {
     color: #c41e3a;
 }
 
-/* === VOICE: STANDARD — мягкое мерцание === */
+/* === VOICE: STANDARD — stepped jitter + slice bursts === */
 .voice-glitch[data-voice-mode="standard"] {
     color: #b8b5b0;
     transition: color 0.3s ease;
@@ -2179,14 +2245,14 @@ html, body {
 .rs-row:last-child { border-bottom: none; }
 .rs-label { font-size: 0.85rem; color: #8a8a8a; }
 
-.rs-size { display: flex; align-items: center; gap: 14px); }
+.rs-size { display: flex; align-items: center; gap: 14px; }
 .rs-size-btn {
     background: none; border: 1px solid #2a2a2a; color: #b8b5b0;
     width: 36px; height: 32px; font-size: 1rem; cursor: pointer;
     font-family: 'PT Serif', serif; transition: border-color 0.3s ease, color 0.3s ease;
 }
 .rs-size-btn:hover { border-color: #00A8E8; color: #e8e6e3; }
-.rs-size-dots { display: flex; gap: 6px); }
+.rs-size-dots { display: flex; gap: 6px; }
 .rs-dot {
     width: 4px; height: 4px; border-radius: 50%;
     background: #3a3a3a; transition: background 0.3s ease;
@@ -2248,7 +2314,7 @@ html, body {
     #reader-sheet {
         padding: 14px 14px calc(14px + env(safe-area-inset-bottom));
     }
-    .rs-row { gap: 10px); }
+    .rs-row { gap: 10px; }
     .rs-tone { padding: 6px 8px; font-size: 0.72rem; }
 }
 
@@ -2326,17 +2392,10 @@ html, body {
     margin-left: 2px;
 }
 
-/* === БЕЙДЖ «НОВОЕ» НА ГЛАВАХ === */
-.contents-item.new .dot {
-    background: #00A8E8;
-    box-shadow: 0 0 6px rgba(0, 168, 232, 0.5);
-    animation: dot-pulse 2.4s ease-in-out infinite;
-}
 @keyframes dot-pulse {
     0%, 100% { box-shadow: 0 0 4px rgba(0, 168, 232, 0.35); }
     50% { box-shadow: 0 0 10px rgba(0, 168, 232, 0.75); }
 }
-.contents-item.new:not(.current) { color: #a8a8a8; }
 
 /* === ПОДЕЛИТЬСЯ ЦИТАТОЙ: ПЛАВАЮЩАЯ КНОПКА У ПРАВОГО КРАЯ === */
 .share-fab-wrap {
@@ -2409,46 +2468,47 @@ html, body {
     .share-fab-wrap.share-fab-in .share-fab { animation: none; }
 }
 
-/* === ЗАСТАВКА: ЗОВ БЕЗДЕЙСТВИЯ (нарастающий) === */
-/* ступень 1 (~1.2с): обложка чуть дышит */
-#cover-screen.beckon-1 img {
-  animation: beckon-breath 5s ease-in-out infinite;
+/* === COVER: image-anchored double-outline beckon ring === */
+.cover-beckon-ring {
+  position: fixed;
+  z-index: 6;
+  border: 2px solid #e8e6e3;
+  outline: 2px solid #101214;
+  outline-offset: 4px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.08);
+  box-shadow: 0 0 20px rgba(0, 168, 232, 0.28);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.35s ease;
 }
-
-/* ступень 2 (~5с): дыхание чаще + едва заметная дрожь */
-#cover-screen.beckon-2 img {
-  animation: beckon-breath 3.6s ease-in-out infinite,
-             beckon-jitter-soft 0.7s steps(2) infinite;
-}
-
-/* ступень 3 (~10.5с): дрожь заметнее + круги на воде из центра */
-#cover-screen.beckon-3 img {
-  animation: beckon-breath 2.6s ease-in-out infinite,
-             beckon-jitter-hard 0.45s steps(2) infinite;
-}
-#cover-screen.beckon-3 .cover-ripples i {
-  animation: beckon-ripple 3.2s cubic-bezier(0.2, 0.5, 0.3, 1) infinite;
-}
-#cover-screen.beckon-3 .cover-ripples i:last-child {
-  animation-delay: 1.6s;
-}
-
-.cover-ripples {
+.cover-beckon-ring.visible { opacity: 1; }
+.cover-beckon-ring i {
   position: absolute;
-  inset: 0;
-  overflow: hidden;
+  inset: -10px;
+  border: 1px solid rgba(0, 168, 232, 0.62);
+  border-radius: 50%;
+  opacity: 0;
   pointer-events: none;
 }
-.cover-ripples i {
-  position: absolute;
+.cover-beckon-ring.visible i {
+  animation: cover-beckon-ripple 1.4s ease-out infinite;
+}
+.cover-beckon-ring.visible i:nth-child(2) { animation-delay: 0.7s; }
+
+.cover-idle-static {
+  position: fixed;
   left: 50%;
-  top: 50%;
-  width: 42vmin;
-  height: 42vmin;
-  margin: -21vmin 0 0 -21vmin;
-  border-radius: 50%;
-  border: 1px solid rgba(0, 168, 232, 0.5);
-  opacity: 0;
+  bottom: calc(30px + env(safe-area-inset-bottom));
+  z-index: 6;
+  transform: translateX(-50%);
+  color: #d8d5cf;
+  font-family: 'Golos Text', sans-serif;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  text-align: center;
+  pointer-events: none;
+  white-space: nowrap;
 }
 
 /* дыхание сохраняет базовую степень картинки (contrast/brightness обложки),
@@ -2456,40 +2516,6 @@ html, body {
 @keyframes beckon-breath {
   0%, 100% { transform: scale(1); filter: contrast(1.05) brightness(0.95); }
   50%      { transform: scale(1.004); filter: contrast(1.05) brightness(0.99); }
-}
-
-/* дрожь — отдельным свойством translate, чтобы не конфликтовать
-   ни с transform дыхания, ни с анимацией ухода обложки (hide-up) */
-@keyframes beckon-jitter-soft {
-  0%   { transform: translateX(0px) translateY(0px); }
-  25%  { transform: translateX(0.8px) translateY(-0.5px); }
-  50%  { transform: translateX(-0.7px) translateY(0.5px); }
-  75%  { transform: translateX(0.4px) translateY(0.8px); }
-  100% { transform: translateX(0px) translateY(0px); }
-}
-
-@keyframes beckon-jitter-hard {
-  0%   { transform: translateX(0px) translateY(0px); }
-  20%  { transform: translateX(2px) translateY(-1.2px); }
-  40%  { transform: translateX(-1.8px) translateY(1px); }
-  60%  { transform: translateX(1px) translateY(1.8px); }
-  80%  { transform: translateX(-1px) translateY(-1.6px); }
-  100% { transform: translateX(0px) translateY(0px); }
-}
-
-@keyframes beckon-ripple {
-  0%   { transform: scale(0.25); opacity: 0; }
-  15%  { opacity: 0.5; }
-  100% { transform: scale(2); opacity: 0; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  #cover-screen.beckon-1 img,
-  #cover-screen.beckon-2 img,
-  #cover-screen.beckon-3 img,
-  #cover-screen.beckon-3 .cover-ripples i {
-    animation: none !important;
-  }
 }
 
 /* === REDUCED MOTION: remaining nonessential motion becomes static === */
@@ -2509,51 +2535,20 @@ html, body {
     #contents-screen.analog-drop,
     #contents-screen.analog-drop::after,
     .voice-shock-prev,
-    .voice-shock-next,
-    .contents-item.new .dot {
+    .voice-shock-next {
         animation: none !important;
     }
 }
 
-/* === BECKON CHOREOGRAPHY: 600ms stillness, one authored 7.5s run, then settle ===
-   Four irregular events; stillness between them makes each one readable.
-   Wrapper = displacement, image = scale/filter (no transform fights). */
+/* === COVER: IDLE → SURGE → LULL === */
 .cover-tremor {
   display: inline-flex;   /* exactly the image's box: no layout shift */
 }
-#cover-screen.beckon-play .cover-tremor {
-  animation: beckon-tremor 7.5s linear forwards;
+#cover-screen.surge img {
+  animation: beckon-glow 3s ease-in-out;
 }
-#cover-screen.beckon-play img {
-  animation: beckon-glow 7.5s ease-in-out forwards,
-             beckon-run-scale 7.5s ease-in-out forwards;
-}
-#cover-screen.beckon-play .cover-ripples i {
-  animation: beckon-ripple-once 7.5s cubic-bezier(0.2, 0.5, 0.3, 1) forwards;
-}
-#cover-screen.beckon-play .cover-ripples i:last-child {
-  animation-name: beckon-ripple-second;
-  animation-delay: 0.18s;   /* second ring: later, quieter */
-}
-
-#cover-screen.beckon-settle img {
+#cover-screen.lull img {
   animation: beckon-breath 7s ease-in-out infinite;
-}
-
-/* events at 1.2 / 2.4 / 4.0 / 5.6 s of the run; strongest last; then stillness */
-@keyframes beckon-tremor {
-  0%, 15.5%      { transform: translateX(0px) translateY(0px); }
-  16%, 16.8%     { transform: translateX(1.6px) translateY(-0.8px); }  /* 1.2 s, hold 60 ms */
-  18.4%, 31.5%   { transform: translateX(0px) translateY(0px); }       /* return over 120 ms */
-  32%, 32.93%    { transform: translateX(-2.4px) translateY(1.2px); }  /* 2.4 s, hold 70 ms */
-  34%, 36%       { transform: translateX(1.2px) translateY(-0.5px); }  /* 2.55 s answer */
-  37.33%, 52.5%  { transform: translateX(0px) translateY(0px); }       /* still by 2.8 s */
-  53.33%, 54.4%  { transform: translateX(3.2px) translateY(-1.6px); }  /* 4.0 s, hold 80 ms */
-  55.33%, 58%    { transform: translateX(-1.6px) translateY(0.8px); }  /* 4.15 s answer */
-  60%, 73.5%     { transform: translateX(0px) translateY(0px); }       /* return by 4.5 s */
-  74.67%, 75.87% { transform: translateX(-4.2px) translateY(2px); }    /* 5.6 s, hold 90 ms */
-  76.8%, 79%     { transform: translateX(2.2px) translateY(-1px); }    /* answer, 70 ms */
-  81.33%, 100%   { transform: translateX(0px) translateY(0px); }       /* zero by 6.1 s */
 }
 
 /* illumination: base 0.95, crest 1.06 at 2.8 s, failure dip 0.72 at 5.6 s */
@@ -2566,30 +2561,17 @@ html, body {
   96%, 100% { filter: contrast(1.05) brightness(0.95); }
 }
 
-/* slow scale envelope, not a zoom: 1.000 -> 1.008 by 4.5 s, 1.003 by 7.5 s */
-@keyframes beckon-run-scale {
-  0%   { scale: 1; }
-  60%  { scale: 1.008; }
-  100% { scale: 1.003; }
-}
-
-/* water answer: starts ~5.9 s, 2 s, scale 0.25 -> 1.65, max opacity 0.50 */
-@keyframes beckon-ripple-once {
-  0%, 78.6% { transform: scale(0.25); opacity: 0; }
-  80%       { opacity: 0.5; }
-  100%      { transform: scale(1.65); opacity: 0; }
-}
-@keyframes beckon-ripple-second {
-  0%, 78.6% { transform: scale(0.25); opacity: 0; }
-  80%       { opacity: 0.3; }
-  100%      { transform: scale(1.65); opacity: 0; }
+@keyframes cover-beckon-ripple {
+  0%   { transform: scale(0.96); opacity: 0; }
+  20%  { opacity: 0.55; }
+  100% { transform: scale(1.25); opacity: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  #cover-screen.beckon-play .cover-tremor,
-  #cover-screen.beckon-play img,
-  #cover-screen.beckon-settle img,
-  #cover-screen.beckon-play .cover-ripples i {
+  #cover-screen.surge img,
+  #cover-screen.lull img,
+  .cover-beckon-ring,
+  .cover-beckon-ring i {
     animation: none !important;
   }
 }
@@ -2618,33 +2600,66 @@ html, body {
     -webkit-touch-callout: none;
 }
 
-/* === CONTENTS: coloured acquisition on every entry (transient overlay) ===
-   the real labels and accessible text are never modified */
-.contents-header { position: relative; }
-.acq-overlay {
-  position: absolute;
-  left: 0;
-  top: 50%;
-  pointer-events: none;
-  background: #000;
-  color: inherit;
-  white-space: nowrap;
-  z-index: 2;
-  transition: opacity 120ms ease, filter 120ms ease, transform 120ms ease;
+/* === COVER: primary ASCII water with a cropped emblem === */
+.cover-stage {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
 }
-.acq-overlay .acq-cyan,
-.acq-overlay .acq-red,
-.acq-overlay .acq-slice {
-  position: absolute;
-  left: 0;
-  top: 0;
-  pointer-events: none;
-  transition: opacity 120ms ease, transform 120ms ease;
+#water-cover {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    display: block;
+    width: 100%;
+    height: 100%;
+    background: #06080a;
+    color: #c9f7e8;
+    cursor: pointer;
 }
-.acq-overlay .acq-cyan { color: #00A8E8; opacity: 0; }
-.acq-overlay .acq-red { color: #c41e3a; opacity: 0; }
-.acq-overlay .acq-slice { opacity: 0; clip-path: inset(35% 0 35% 0); }
-
+#water-cover:focus-visible {
+    outline: 2px solid #c9f7e8;
+    outline-offset: -4px;
+}
+#cover-screen .cover-tremor {
+    position: relative;
+    z-index: 2;
+    display: block;
+    width: min(42vw, 340px);
+    height: min(56vh, 440px);
+    pointer-events: none;
+}
+#cover-screen .cover-tremor img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    max-height: none;
+    object-fit: cover;
+    object-position: 50% 42%;
+    clip-path: inset(6% 4% 10% 4%);
+    opacity: 0.68;
+    mix-blend-mode: screen;
+    filter: contrast(1.05) brightness(0.95) saturate(0.85);
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 12%, black 88%, transparent 100%);
+    mask-image: linear-gradient(to bottom, transparent 0%, black 12%, black 88%, transparent 100%);
+}
+.cover-ripples {
+    position: relative;
+    z-index: 3;
+    pointer-events: none;
+}
+@media (max-width: 768px) {
+    #cover-screen .cover-tremor {
+        width: min(64vw, 270px);
+        height: min(48vh, 400px);
+        margin-inline: auto;
+    }
+}
 @media (prefers-reduced-motion: reduce) {
-  .acq-overlay { display: none; }
+    #cover-screen .cover-tremor img { animation: none !important; }
 }

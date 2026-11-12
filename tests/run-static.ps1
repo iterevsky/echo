@@ -11,9 +11,70 @@ function Check($name, $cond) {
     else { Write-Host "FAIL  $name"; $script:failures++ }
 }
 
-# files served by the website — changing any of them requires an ECHO_VERSION bump
-$served = @('index.html','style.css','script.js','chapters.js','sw.js','chapters-meta.js',
-            'version.js','glyph-utils.js',
+function Test-CssSyntax([string]$text) {
+    $errors = New-Object System.Collections.Generic.List[string]
+    $stack = New-Object System.Collections.Generic.Stack[object]
+    $line = 1
+    $inComment = $false
+    $quote = [char]0
+    for ($i = 0; $i -lt $text.Length; $i++) {
+        $c = $text[$i]
+        $next = if ($i + 1 -lt $text.Length) { $text[$i + 1] } else { [char]0 }
+        if ($c -eq "`n") { $line++ }
+        if ($inComment) {
+            if ($c -eq '*' -and $next -eq '/') { $inComment = $false; $i++ }
+            continue
+        }
+        if ($quote -ne [char]0) {
+            if ($c -eq '\') {
+                if ($next -eq [char]0) { $errors.Add("escape at end of file (line $line)"); continue }
+                if ($next -eq "`n") { $line++ }
+                $i++
+                continue
+            }
+            if ($c -eq "`n" -or $c -eq "`r") {
+                $errors.Add("unescaped newline in string (line $line)")
+                $quote = [char]0
+                continue
+            }
+            if ($c -eq $quote) { $quote = [char]0 }
+            continue
+        }
+        if ($c -eq '/' -and $next -eq '*') { $inComment = $true; $i++; continue }
+        if ($c -eq "'" -or $c -eq '"') { $quote = $c; continue }
+        if ($c -eq '\') {
+            if ($next -eq [char]0 -or $next -eq "`n" -or $next -eq "`r") {
+                $errors.Add("invalid escape (line $line)")
+            }
+            if ($next -ne [char]0) { $i++ }
+            continue
+        }
+        if ($c -eq '{' -or $c -eq '(' -or $c -eq '[') {
+            $stack.Push(@{ Char = $c; Line = $line })
+            continue
+        }
+        if ($c -eq '}' -or $c -eq ')' -or $c -eq ']') {
+            $expected = switch ($c) { '}' { '{' } ')' { '(' } ']' { '[' } }
+            if ($stack.Count -eq 0) {
+                $errors.Add("unmatched closing '$c' (line $line)")
+                continue
+            }
+            $open = $stack.Peek()
+            if ($open.Char -ne $expected) {
+                $errors.Add("closing '$c' does not match '$($open.Char)' opened at line $($open.Line) (line $line)")
+                continue
+            }
+            [void]$stack.Pop()
+        }
+    }
+    if ($inComment) { $errors.Add('unterminated comment') }
+    if ($quote -ne [char]0) { $errors.Add("unterminated string (line $line)") }
+    foreach ($open in $stack) { $errors.Add("unclosed '$($open.Char)' opened at line $($open.Line)") }
+    return ,$errors
+}
+
+# files served by the website — changing any of them requires a CACHE_VERSION bump
+$served = @('index.html','style.css','script.js','chapters.js','sw.js',
             'Zastavka.jpg','icons/','fonts/','images/')
 
 Push-Location $root
@@ -44,6 +105,12 @@ try {
         $baseV = [int]([regex]::Match($swBase, "echo-v(\d+)").Groups[1].Value)
     }
     $swNow = [System.IO.File]::ReadAllText((Join-Path $root 'sw.js'))
+    $versionNow = [System.IO.File]::ReadAllText((Join-Path $root 'version.js'))
+    $echoVersion = [regex]::Match($versionNow, "\bvar\s+ECHO_VERSION\s*=\s*'(v\d+)'").Groups[1].Value
+    $nowV = [int]([regex]::Match($echoVersion, '^v(\d+)$').Groups[1].Value)
+    $derivedCache = [regex]::IsMatch($swNow, "importScripts\('version\.js'\)\s*;") -and
+                    [regex]::IsMatch($swNow, "const\s+CACHE_VERSION\s*=\s*'echo-'\s*\+\s*ECHO_VERSION\s*;")
+    Check 'CACHE_VERSION is echo-<ECHO_VERSION> from version.js' ($derivedCache -and $nowV -gt 0)
     if (@($servedChanged).Count -gt 0) {
         Check "ECHO_VERSION bumped vs $BaseRef (v$baseV -> v$nowV; served files changed)" ($nowV -gt $baseV)
     } else {
@@ -52,7 +119,7 @@ try {
 } finally { Pop-Location }
 
 # --- required served files exist ---
-foreach ($f in 'index.html','style.css','script.js','chapters.js','chapters-meta.js','sw.js','version.js','glyph-utils.js') {
+foreach ($f in 'index.html','style.css','script.js','chapters.js','sw.js') {
     Check "exists: $f" (Test-Path (Join-Path $root $f))
 }
 
@@ -61,21 +128,14 @@ $cdn = Select-String -Path (Join-Path $root 'index.html'),(Join-Path $root 'styl
         -Pattern 'https?://(cdn|unpkg|cdnjs|fonts\.googleapis|fonts\.gstatic|jsdelivr)' -AllMatches
 Check 'no CDN links in index.html/style.css' ($cdn.Count -eq 0)
 
+# --- full-file CSS Syntax component-value/block parse ---
+$cssErrors = Test-CssSyntax ([System.IO.File]::ReadAllText((Join-Path $root 'style.css')))
+foreach ($cssError in $cssErrors) { Write-Host "CSS parse error: $cssError" }
+Check 'CSS full-file parse (0 errors)' (@($cssErrors).Count -eq 0)
+
 # --- viewport meta unchanged (zoom change is prohibited) ---
 $vp = Select-String -Path (Join-Path $root 'index.html') -Pattern 'name="viewport" content="([^"]+)"'
 Check 'viewport meta present and unchanged' ($vp -and $vp.Matches[0].Groups[1].Value -eq 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover')
-
-# --- chapters-meta.js consistent with index.html + chapters.js ---
-$meta = [System.IO.File]::ReadAllText((Join-Path $root 'chapters-meta.js'))
-$html = [System.IO.File]::ReadAllText((Join-Path $root 'index.html'))
-$htmlCount = [regex]::Matches($html, 'class="contents-item"').Count
-$metaCount = [int]([regex]::Match($meta, 'chapterCount:\s*(\d+)').Groups[1].Value)
-Check "chapterCount ($metaCount) == contents-item count ($htmlCount)" ($metaCount -eq $htmlCount)
-
-# regenerate meta and compare with committed file (line-ending insensitive)
-& pwsh -NoProfile -File (Join-Path $root 'tests/build-meta.ps1') | Out-Null
-$regen = [System.IO.File]::ReadAllText((Join-Path $root 'chapters-meta.js'))
-Check 'chapters-meta.js is up to date with chapters.js' (($regen -replace "`r`n", "`n") -eq ($meta -replace "`r`n", "`n"))
 
 # --- sw.js precache entries (CORE_FILES + EXTRA_FILES) reference existing files ---
 $swListsOk = $true

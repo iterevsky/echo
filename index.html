@@ -163,6 +163,7 @@ body.install-open { overflow: hidden; }
     <!-- Экран с обложкой -->
     <div id="cover-screen">
         <div class="cover-stage">
+            <canvas id="water-cover" role="button" tabindex="0" aria-label="Ночная вода ЭХО. Коснитесь, чтобы войти и создать всплеск. Движение создаёт только волны. Enter и Space тоже открывают книгу.">Коснитесь, чтобы войти</canvas>
             <div class="cover-tremor"><img src="Zastavka.jpg" alt="ЭХО" draggable="false"></div>
             <div class="cover-ripples" aria-hidden="true"><i></i><i></i></div>
         </div>
@@ -185,6 +186,7 @@ body.install-open { overflow: hidden; }
         <div class="film-rail film-rail-right"></div>
       </div>
       <div class="film-grain"></div>
+      <div class="film-hint" id="film-hint" role="note">Дважды коснитесь, чтобы пропустить</div>
     </div>
 
     <!-- Экран с названием книги -->
@@ -401,7 +403,7 @@ body.install-open { overflow: hidden; }
       </div>
     </div>
 
-<div id="progress-overlay" role="dialog" aria-modal="true"></div>
+<div id="progress-overlay" role="dialog" aria-modal="true" inert></div>
 <div id="tear-overlay" style="position:fixed;inset:0;pointer-events:none;z-index:90;display:none;">
   <div class="tear-top" style="position:absolute;top:0;left:0;width:100%;height:55%;background:transparent;pointer-events:none;"></div>
   <div class="tear-bottom" style="position:absolute;bottom:0;left:0;width:100%;height:55%;background:transparent;pointer-events:none;"></div>
@@ -421,16 +423,16 @@ body.install-open { overflow: hidden; }
 
     <!-- Шторка настроек чтения -->
     <div id="reader-sheet-backdrop"></div>
-    <div id="reader-sheet" inert>
+    <div id="reader-sheet" role="dialog" aria-modal="true" aria-label="Настройки чтения" inert>
         <div class="rs-row">
             <span class="rs-label">Размер</span>
             <div class="rs-size">
-                <button class="rs-size-btn" data-dir="-1" aria-label="Меньше">−</button>
+                <button class="rs-size-btn" data-dir="-1" aria-label="Уменьшить размер текста">−</button>
                 <div class="rs-size-dots">
                     <span class="rs-dot"></span><span class="rs-dot"></span>
                     <span class="rs-dot"></span><span class="rs-dot"></span>
                 </div>
-                <button class="rs-size-btn" data-dir="1" aria-label="Больше">+</button>
+                <button class="rs-size-btn" data-dir="1" aria-label="Увеличить размер текста">+</button>
             </div>
         </div>
         <div class="rs-row">
@@ -448,9 +450,24 @@ body.install-open { overflow: hidden; }
     </div>
     <div id="reader-dim"></div>
 
+    <noscript id="noscript-fallback">
+      <style>
+        html.routing-pending body > :not(#noscript-fallback) { visibility: hidden !important; }
+        #noscript-fallback { position: fixed; inset: 0; z-index: 4000; display: flex; align-items: center; justify-content: center; padding: 32px; background: #0c0c0c; color: #e8e6e3; font-family: 'PT Serif', serif; text-align: center; visibility: visible; }
+        #noscript-fallback main { max-width: 34rem; }
+        #noscript-fallback h1 { margin: 0 0 16px; color: #00A8E8; font-family: 'Golos Text', sans-serif; font-size: clamp(3rem, 15vw, 6rem); letter-spacing: 0.16em; }
+        #noscript-fallback p { color: #b8b5b0; line-height: 1.65; }
+        #noscript-fallback a { color: #00A8E8; }
+      </style>
+      <main>
+        <h1>ЭХО</h1>
+        <p>Итеревский-Кочетов Иван</p>
+        <p>Для чтения книги необходим JavaScript. Включите его в настройках браузера и обновите страницу.</p>
+        <p>Связаться с автором: <a href="https://t.me/iterevsky">t.me/iterevsky</a></p>
+      </main>
+    </noscript>
+
     <script src="version.js"></script>
-    <script src="chapters.js"></script>
-    <script src="glyph-utils.js"></script>
 <script src="script.js"></script>
 
 </body>

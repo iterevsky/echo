@@ -1,21 +1,16 @@
 /* ============================================================
-   SERVICE WORKER «ЭХО» — офлайн-кэш, v18
+   SERVICE WORKER «ЭХО» — офлайн-кэш
 
-   Принципы:
-   1) Установка НЕ атомарная: каждый файл кэшируется отдельно
-      (allSettled) — SW встаёт при любой сети, недостающее
-      докэшируется при первых запросах.
-   2) Код книги (HTML/JS/CSS) — network-first: свежая версия при
-      живой сети, кэш — запасной вариант при обрыве. Любой сетевой
-      запрос ограничен таймаутом: зависшее соединение не должно
-      оставлять читателя на вечном «pending» и чёрном экране.
-   3) Картинки и шрифты — cache-first: они не меняются.
-   4) Навигация без сети и без кэша — встроенная заглушка
-      с кнопкой «Повторить», а не мёртвый экран.
+   Единый источник версии: version.js (importScripts); кэш называется
+   echo-<ECHO_VERSION>. При её смене создаётся новый кэш, а активация
+   удаляет старые кэши echo-* и не трогает чужие.
 
-   ПЕРЕД ЛЮБЫМ КОММИТОМ, который меняет хоть один файл сайта,
-   подними ECHO_VERSION в version.js на +1 — старые кэши удалятся
-   при активации, а страница и SW всегда видят одну версию.
+   1) CORE устанавливается атомарно через cache.addAll: неполный CORE
+      не даёт новому SW заменить рабочий.
+   2) EXTRA докэшируется независимо через allSettled (best effort).
+   3) HTML/JS/CSS, включая version.js, — network-first с таймаутом;
+      при сетевой ошибке используется кэш или встроенная offline-заглушка.
+   4) Картинки и шрифты — cache-first с догрузкой при промахе.
    ============================================================ */
 importScripts('version.js');
 const CACHE_VERSION = 'echo-' + ECHO_VERSION;
@@ -23,9 +18,7 @@ const CACHE_VERSION = 'echo-' + ECHO_VERSION;
 /* все кэши «ЭХО» начинаются с этого префикса; чужие кэши не трогаем */
 const CACHE_PREFIX = 'echo-';
 
-/* NOTE: install is atomic for the core again (see below) — the
-   allSettled-for-everything scheme described above was retired because
-   it let an incomplete worker replace a working one. */
+/* CORE is required for a working offline shell; EXTRA is optional. */
 const CORE_FILES = [
     './',
     './index.html',
@@ -50,13 +43,16 @@ const EXTRA_FILES = [
     './fonts/pt-serif-400-italic-cyrillic.woff2',
     './fonts/pt-serif-400-italic-latin.woff2',
     './fonts/golos-text-cyrillic.woff2',
-    './fonts/golos-text-latin.woff2'
+    './fonts/golos-text-latin.woff2',
+    './fonts/golos-text-500.woff2',
+    './fonts/golos-text-700.woff2',
+    './ascii-water.js'
 ];
 
 const PRECACHE = CORE_FILES.concat(EXTRA_FILES);
 
 /* файлы, которые всегда сначала спрашивают у сети */
-const CODE_FILES = ['index.html', 'style.css', 'script.js', 'chapters.js', 'glyph-utils.js', 'version.js'];
+const CODE_FILES = ['index.html', 'style.css', 'script.js', 'chapters.js', 'version.js', 'ascii-water.js'];
 
 /* потолок ожидания сети — потом кэш или заглушка */
 const NETWORK_TIMEOUT = 8000;
