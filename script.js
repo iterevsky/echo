@@ -449,8 +449,8 @@ function updateContentsMemory() {
 }
 updateContentsMemory();
 
-/* single initial-route decision: SW-reload flag first, then deep/hash links,
-   then saved-progress overlay, else the cover. Nothing paints before this. */
+/* single initial-route decision: SW-reload flag first, then deep/hash links.
+   Every ordinary launch keeps the cover; saved progress is offered after the title. */
 async function applyInitialRoute() {
     let swRoute = null;
     try {
@@ -471,7 +471,6 @@ async function applyInitialRoute() {
     }
     if (await handleDeepLink()) return;
     if (await handleHashLink()) return;
-    await initProgress();
 }
 /* символьный статик на разрыве глав: два кадра шума в полосе
    45–55% высоты экрана, отрисовываются заранее в простое.
@@ -798,6 +797,14 @@ async function startSequence() {
     }, 700); // задержка после свайпа
 }
 
+function showContentsList() {
+    contentsScreen.classList.add('visible');
+    contentsScreen.inert = false;
+    if (menuTrigger) menuTrigger.classList.add('visible');
+    scrollContentsToCurrent();
+    revealContentsItems();
+}
+
 function showContents() {
     updateContentsMemory();
     titleScreen.classList.remove('film-enter');
@@ -809,13 +816,10 @@ function showContents() {
         titleScreen.classList.remove('visible');
         titleScreen.classList.remove('melting');
 
-        // Показываем оглавление
         setTimeout(() => {
-            contentsScreen.classList.add('visible');
-            contentsScreen.inert = false;
-            if (menuTrigger) menuTrigger.classList.add('visible');
-            scrollContentsToCurrent();
-            revealContentsItems();
+            const saved = loadState();
+            if (saved.lastChapter !== undefined && saved.lastChapter >= 0) initProgress();
+            else showContentsList();
         }, 300);
 
     }, 1200);
@@ -1847,8 +1851,8 @@ async function handleDeepLink() {
 }
 
 /* ссылка вида #ch-12: внешний переход (history.state пуст) — открыть главу сразу.
-   Перезагрузка внутри сессии (history.state уже наш) — НЕ перехватываем:
-   отдаём ход initProgress(), чтобы показать «Продолжить / Начать сначала» */
+   Внутреннее состояние истории не перехватываем: после обычного входа
+   сохранённый прогресс предлагается после титула. */
 async function handleHashLink() {
     const m = (location.hash || '').match(/^#ch-(\d+)$/);
     if (!m) return false;
@@ -1892,29 +1896,31 @@ function revealContentsItems() {
     });
 }
 
+let progressPromptShown = false;
 async function initProgress() {
     const saved = loadState();
-    if (saved.lastChapter === undefined || saved.lastChapter < 0) return;
+    if (saved.lastChapter === undefined || saved.lastChapter < 0 || progressPromptShown) return;
+    progressPromptShown = true;
     isStarted = true;
 
     try {
         await ensureChapters();
     } catch (error) {
+        progressPromptShown = false;
         showChapterLoadError(saved.lastChapter, initProgress);
         return;
     }
     const chapter = chapters[saved.lastChapter];
-    if (!chapter || chapter.empty) { openContentsFresh(); return; }
+    if (!chapter || chapter.empty) {
+        progressPromptShown = false;
+        openContentsFresh();
+        return;
+    }
 
     hideIntroScreens();
 
     updateContentsMemory();
-    contentsScreen.classList.add('visible');
-    contentsScreen.inert = false;
-    if (menuTrigger) menuTrigger.classList.add('visible');
-    scrollContentsToCurrent();
-
-    revealContentsItems();
+    showContentsList();
 
     contentsScreen.classList.add('progress-dimmed');
 
@@ -2132,8 +2138,8 @@ function buildFilmGrain() {
 
 buildFilmGrain();
 
-/* preload only when the intro will actually run: bypassed intro
-   (deep link, hash link, saved progress) never plays the film */
+/* preload only when the intro will actually run: direct chapter routes
+   (deep link, hash link, SW restoration) never play the film */
 function prefetchIntroAssets() {
     prefetchChapters();
     startFilmPreload();
@@ -3180,8 +3186,7 @@ function coverSurgeHook() {
 (function initWaterCover() {
     const canvas = document.getElementById('water-cover');
     if (!coverScreen || !canvas || isStarted) return;
-    const saved = loadState();
-    if (saved.lastChapter !== undefined || /[?&]ch=/.test(location.search) || /^#ch-\d+$/.test(location.hash)) return;
+    if (/[?&]ch=/.test(location.search) || /^#ch-\d+$/.test(location.hash)) return;
     try {
         if (sessionStorage.getItem('echo_sw_route')) return;
     } catch (error) {}
