@@ -678,7 +678,44 @@ function playTitleDecode() {
     }, 250);
 }
 
-function startSequence() {
+let titleShown = false;
+let titleActivationBound = false;
+
+function showTitle({ decode = false } = {}) {
+    if (titleShown) return;
+    titleShown = true;
+    filmRunning = false;
+    finalScreen.classList.remove('visible', 'final-flash');
+    const loading = document.getElementById('film-loading');
+    if (loading) loading.remove();
+    if (filmScreen) {
+        filmScreen.classList.remove('visible', 'film-live', 'reduced', 'film-flick', 'film-breathe', 'film-hit-light', 'film-lamp-stutter', 'film-lamp-die', 'film-startup', 'film-catch-light', 'film-lamp-ignite');
+        filmScreen.style.pointerEvents = '';
+        filmScreen.style.transition = '';
+        filmScreen.style.filter = '';
+        if (filmHint) filmHint.classList.remove('visible');
+    }
+    if (filmGate) {
+        filmGate.classList.remove('filming', 'film-flick', 'film-tear', 'film-zoom', 'film-slip', 'film-gap', 'film-gap-dip', 'film-drift', 'film-breathe', 'film-jam', 'film-push', 'film-catch', 'film-lamp-stutter', 'film-lamp-die');
+        filmGate.style.visibility = '';
+        filmGate.style.clipPath = '';
+        filmGate.style.webkitClipPath = '';
+        filmGate.style.transition = '';
+        const scratch = filmGate.querySelector('.film-scratch');
+        if (scratch) scratch.remove();
+    }
+    if (filmImage) filmImage.style.opacity = '';
+    const crackle = filmScreen && filmScreen.querySelector('#film-crackle');
+    if (crackle) crackle.style.opacity = '0';
+    titleScreen.classList.add('visible');
+    if (decode) playTitleDecode();
+    if (!titleActivationBound) {
+        titleActivationBound = true;
+        titleScreen.addEventListener('click', showContents, { once: true });
+    }
+}
+
+async function startSequence() {
     if (isStarted) return;
     isStarted = true;
     prefetchChapters();
@@ -719,23 +756,37 @@ function startSequence() {
                     setTimeout(() => finalScreen.classList.remove('final-flash'), 150);
 
                     // 5. Через 1.5 секунды — плёнка или название
-                    setTimeout(() => {
-                        // Затухаем чёрный экран
-                        finalScreen.classList.remove('visible');
-
-                        // Эпизод проекторной плёнки (только если все кадры загрузились)
-                        if (filmReady) {
-                            runFilmSequence();
+                    setTimeout(async () => {
+                        finalScreen.classList.add('visible');
+                        const loading = document.createElement('p');
+                        loading.id = 'film-loading';
+                        loading.setAttribute('role', 'status');
+                        loading.textContent = 'Загрузка плёнки…';
+                        finalScreen.appendChild(loading);
+                        let timedOut = false;
+                        await Promise.race([
+                            startFilmPreload(),
+                            new Promise(resolve => setTimeout(() => { timedOut = true; resolve(); }, 3000))
+                        ]);
+                        loading.remove();
+                        if (titleShown) return;
+                        if (timedOut) {
+                            console.warn('[ЭХО] Film preload timed out after 3000 ms; failed frame indexes: ' + (filmFailedFrames.length ? filmFailedFrames.join(', ') : 'pending'));
+                            showTitle({ decode: true });
                             return;
                         }
-
-                        // Показываем название
-                        titleScreen.classList.add('visible');
-                        playTitleDecode();
-
-                        // Ждём клик для перехода к оглавлению
-                        titleScreen.addEventListener('click', showContents, { once: true });
-
+                        if (filmReady) {
+                            if (filmFailedFrames.length) console.warn('[ЭХО] Film uses partial frames; failed indexes: ' + filmFailedFrames.join(', '));
+                            try {
+                                runFilmSequence();
+                            } catch (error) {
+                                console.error('[ЭХО] Film sequence failed:', error);
+                                showTitle({ decode: true });
+                            }
+                        } else {
+                            console.warn('[ЭХО] Film preload failed; failed frame indexes: ' + (filmFailedFrames.length ? filmFailedFrames.join(', ') : 'unknown'));
+                            showTitle({ decode: true });
+                        }
                     }, 1500);
 
                 }, 3800); // глитч длится 3.8 секунды
@@ -1982,18 +2033,25 @@ let filmReady = false;
 let filmRunning = false;
 let filmLoaded = [];
 let filmPreloadStarted = false;
+let filmPreloadPromise = null;
+let filmStatus = 'idle';
+let filmFailedFrames = [];
 
 function preloadFilmFrames() {
-    return Promise.all(FILM_FRAMES.map((src) => new Promise((resolve) => {
+    return Promise.all(FILM_FRAMES.map((src, index) => new Promise((resolve) => {
         const img = new Image();
+        const failed = () => {
+            if (!filmFailedFrames.includes(index)) filmFailedFrames.push(index);
+            resolve(false);
+        };
         img.onload = () => {
             if (img.decode) {
-                img.decode().then(() => resolve(true)).catch(() => resolve(false));
+                img.decode().then(() => resolve(true)).catch(failed);
             } else {
                 resolve(true);
             }
         };
-        img.onerror = () => resolve(false);
+        img.onerror = failed;
         img.src = src;
     }))).then((results) => {
         filmLoaded = results;
@@ -2017,9 +2075,22 @@ function filmFrameSrc(i) {
 
 /* прелоад кадров не при загрузке страницы, а когда канал свободен */
 function startFilmPreload() {
-    if (filmPreloadStarted) return;
+    if (filmPreloadPromise) return filmPreloadPromise;
     filmPreloadStarted = true;
-    preloadFilmFrames().then((ok) => { filmReady = ok; });
+    filmStatus = 'loading';
+    filmPreloadPromise = Promise.resolve()
+        .then(() => preloadFilmFrames())
+        .then((ok) => {
+            filmReady = ok;
+            filmStatus = ok ? (filmLoaded.every(Boolean) ? 'ready' : 'partial') : 'failed';
+            return ok;
+        }, (error) => {
+            filmReady = false;
+            filmStatus = 'failed';
+            console.error('[ЭХО] Film preload failed:', error);
+            return false;
+        });
+    return filmPreloadPromise;
 }
 
 /* зерно: текстура генерируется на canvas, по образцу CRT-шума */
@@ -2148,25 +2219,7 @@ function runFilmSequence() {
         filmScreen.removeEventListener('pointercancel', onFilmPointerCancel);
         window.removeEventListener('blur', onFilmPointerCancel);
 
-        filmScreen.classList.remove('film-live');
-        filmScreen.classList.remove('visible');
-        filmScreen.style.pointerEvents = '';
-        if (filmHint) filmHint.classList.remove('visible');
-        filmGate.classList.remove('filming', 'film-flick', 'film-tear', 'film-zoom', 'film-slip', 'film-gap', 'film-gap-dip', 'film-drift', 'film-breathe', 'film-jam', 'film-push', 'film-catch', 'film-lamp-stutter', 'film-lamp-die');
-        filmGate.style.visibility = '';
-        filmGate.style.clipPath = '';
-        filmGate.style.webkitClipPath = '';
-        filmGate.style.transition = '';
-        filmImage.style.opacity = '';
-        filmScreen.style.filter = '';
-        const crackleEl = filmScreen.querySelector('#film-crackle');
-        if (crackleEl) crackleEl.style.opacity = '0';
-
-        const scratch = filmGate.querySelector('.film-scratch');
-        if (scratch) scratch.remove();
-
-        titleScreen.classList.add('visible');
-        titleScreen.addEventListener('click', showContents, { once: true });
+        showTitle();
 
         later(() => {
             filmScreen.classList.remove('reduced', 'film-flick', 'film-breathe', 'film-hit-light', 'film-lamp-stutter', 'film-lamp-die', 'film-startup', 'film-catch-light', 'film-lamp-ignite');
@@ -2176,7 +2229,8 @@ function runFilmSequence() {
         }, 450);
     };
 
-    filmScreen.addEventListener('pointerdown', onFilmPointerDown);
+    try {
+        filmScreen.addEventListener('pointerdown', onFilmPointerDown);
     filmScreen.addEventListener('pointerup', onFilmPointerUp);
     filmScreen.addEventListener('pointercancel', onFilmPointerCancel);
     window.addEventListener('blur', onFilmPointerCancel);
@@ -2424,6 +2478,11 @@ function runFilmSequence() {
 
     t += VISIBLE[6];
     later(runFilmEnding, t);
+    } catch (error) {
+        filmRunning = false;
+        console.error('[ЭХО] Film sequence failed:', error);
+        endToTitle();
+    }
 }
 
 /* ============================================================
