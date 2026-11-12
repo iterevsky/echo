@@ -75,7 +75,7 @@ function Test-CssSyntax([string]$text) {
 
 # files served by the website — changing any of them requires a CACHE_VERSION bump
 $served = @('index.html','style.css','script.js','chapters.js','sw.js',
-            'Zastavka.jpg','icons/','fonts/','images/')
+            'ascii-water.js','glyph-utils.js','Zastavka.jpg','icons/','fonts/','images/')
 
 Push-Location $root
 try {
@@ -127,6 +127,11 @@ foreach ($f in 'index.html','style.css','script.js','chapters.js','sw.js') {
 $cdn = Select-String -Path (Join-Path $root 'index.html'),(Join-Path $root 'style.css') `
         -Pattern 'https?://(cdn|unpkg|cdnjs|fonts\.googleapis|fonts\.gstatic|jsdelivr)' -AllMatches
 Check 'no CDN links in index.html/style.css' ($cdn.Count -eq 0)
+
+# --- the glyph dependency must be loaded immediately before the main script ---
+$htmlNow = [System.IO.File]::ReadAllText((Join-Path $root 'index.html'))
+$glyphOrder = [regex]::IsMatch($htmlNow, '(?s)<script src="version\.js"></script>\s*<script src="glyph-utils\.js"></script>\s*<script src="script\.js"></script>')
+Check 'glyph-utils.js loaded immediately before script.js' $glyphOrder
 
 # --- full-file CSS Syntax component-value/block parse ---
 $cssErrors = Test-CssSyntax ([System.IO.File]::ReadAllText((Join-Path $root 'style.css')))

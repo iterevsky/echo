@@ -59,7 +59,7 @@ const EXTRA_FILES = [
 const PRECACHE = CORE_FILES.concat(EXTRA_FILES);
 
 /* файлы, которые всегда сначала спрашивают у сети */
-const CODE_FILES = ['index.html', 'style.css', 'script.js', 'chapters.js', 'version.js', 'ascii-water.js'];
+const CODE_FILES = ['index.html', 'style.css', 'script.js', 'chapters.js', 'version.js', 'ascii-water.js', 'glyph-utils.js'];
 
 /* потолок ожидания сети — потом кэш или заглушка */
 const NETWORK_TIMEOUT = 8000;
