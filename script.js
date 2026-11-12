@@ -718,6 +718,12 @@ async function startSequence() {
     if (isStarted) return;
     isStarted = true;
     prefetchChapters();
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        coverScreen.classList.add('hide-up');
+        coverScreen.dispatchEvent(new CustomEvent('echo:entry-start'));
+        showTitle({ decode: false });
+        return;
+    }
     startFilmPreload();
 
     // 1. Убираем картинку
@@ -806,6 +812,7 @@ function showContentsList() {
 }
 
 function showContents() {
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     updateContentsMemory();
     titleScreen.classList.remove('film-enter');
     titleScreen.classList.remove('decoding');  /* клик в середине decode — melt не блокируем */
@@ -820,9 +827,9 @@ function showContents() {
             const saved = loadState();
             if (saved.lastChapter !== undefined && saved.lastChapter >= 0) initProgress();
             else showContentsList();
-        }, 300);
+        }, reduced ? 0 : 300);
 
-    }, 1200);
+    }, reduced ? 0 : 1200);
 }
 
 /* signal-acquisition boot: only the first full contents entry, started when
@@ -2051,11 +2058,8 @@ function preloadFilmFrames() {
             resolve(false);
         };
         img.onload = () => {
-            if (img.decode) {
-                img.decode().then(() => resolve(true)).catch(failed);
-            } else {
-                resolve(true);
-            }
+            if (img.naturalWidth > 0 && img.naturalHeight > 0) resolve(true);
+            else failed();
         };
         img.onerror = failed;
         img.src = src;
@@ -3450,7 +3454,11 @@ function coverSurgeHook() {
     coverScreen.addEventListener('echo:entry-start', () => {
         state = 'entering';
         record('entry-start');
-        setTimeout(() => finishCover({ target: coverScreen, propertyName: 'transform' }), 1050);
+        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+            finishCover({ target: coverScreen, propertyName: 'transform' });
+        } else {
+            setTimeout(() => finishCover({ target: coverScreen, propertyName: 'transform' }), 1050);
+        }
     });
     coverScreen.addEventListener('transitionend', finishCover);
     coverScreen.__waterRetry = () => {
