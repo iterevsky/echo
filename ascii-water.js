@@ -9,7 +9,7 @@ const PROFILES = {
 14: { scanlines: 0.06, vignette: 0.11, grain: 0 },
 16: { scanlines: 0.04, vignette: 0.08, grain: 0 }
 };
-const TARGET_FRAME_MS = 1000 / 30;
+const TARGET_FRAME_MS = 1000 / ((window.matchMedia('(min-width: 900px)').matches && window.matchMedia('(pointer: fine)').matches) ? 60 : 30);
 const clamp = (v, low = 0, high = 1) => Math.min(high, Math.max(low, v));
 const hash = (x, y) => {
 const n = Math.sin(x * 127.1 + y * 311.7 + 17) * 43758.5453;
@@ -31,12 +31,10 @@ const n = cols * rows;
 this.sb = new Uint8ClampedArray(n * 4);
 this.rb = new Uint8ClampedArray(n * 4);
 this.lum = new Float32Array(n);
-this.column = new Float32Array(n);
 this.highlight = new Float32Array(n);
 this.dense = new Float32Array(n);
 this.glyph = new Float32Array(n);
 this.ramp = new Uint8Array(n);
-this.shore = new Uint8Array(n);
 const image = this.sourceImage;
 if (!image || !image.naturalWidth || !image.naturalHeight) throw new Error('cover source image is unavailable');
 this.sourceWidth = image.naturalWidth;
@@ -83,9 +81,9 @@ return { lum: this.sampleSource(point.x, point.y), column: 0, shore: false };
 }
 gray(buffer, index, lum, water) {
 const offset = index * 4;
-buffer[offset] = Math.round((water ? 0 : 0) + clamp(lum) * (water ? 248 : 255));
-buffer[offset + 1] = Math.round((water ? 0 : 0) + clamp(lum) * (water ? 236 : 255));
-buffer[offset + 2] = Math.round((water ? 0 : 0) + clamp(lum) * (water ? 234 : 255));
+buffer[offset] = Math.round(clamp(lum) * (water ? 248 : 255));
+buffer[offset + 1] = Math.round(clamp(lum) * (water ? 236 : 255));
+buffer[offset + 2] = Math.round(clamp(lum) * (water ? 234 : 255));
 buffer[offset + 3] = 255;
 }
 generate(field) {
@@ -96,8 +94,6 @@ const x = col / Math.max(1, this.cols - 1);
 const i = row * this.cols + col;
 const s = this.sample(x, y);
 this.lum[i] = s.lum;
-this.column[i] = 0;
-this.shore[i] = 0;
 this.gray(this.sb, i, s.lum, false);
 }
 }
@@ -126,7 +122,7 @@ for (let col = 0; col < this.cols; col++) {
 const i = row * this.cols + col;
 const x = col / Math.max(1, this.cols - 1);
 const y = row / Math.max(1, this.rows - 1);
-const dense = Math.max(this.column[i], this.highlight[i]);
+const dense = this.highlight[i];
 const density = clamp(0.08 + 0.82 * dense + 0.04 * hash(x, y));
 this.dense[i] = dense;
 this.ramp[i] = dense >= 0.35 ? 1 : 0;

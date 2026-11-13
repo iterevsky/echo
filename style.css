@@ -1534,24 +1534,6 @@ html, body {
     position: relative;
 }
 
-.voice-base {
-    position: relative;
-    z-index: 1;
-}
-
-.voice-red,
-.voice-cyan,
-.voice-slice {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    opacity: 0;
-    pointer-events: none;
-    white-space: pre-wrap;
-}
-
 .voice-red {
     color: #c41e3a;
 }

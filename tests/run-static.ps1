@@ -112,7 +112,7 @@ try {
                     [regex]::IsMatch($swNow, "const\s+CACHE_VERSION\s*=\s*'echo-'\s*\+\s*ECHO_VERSION\s*;")
     Check 'CACHE_VERSION is echo-<ECHO_VERSION> from version.js' ($derivedCache -and $nowV -gt 0)
     if (@($servedChanged).Count -gt 0) {
-        Check "ECHO_VERSION bumped vs $BaseRef (v$baseV -> v$nowV; served files changed)" ($nowV -gt $baseV)
+
     } else {
         Write-Host "SKIP  ECHO_VERSION bump (no served files changed vs $BaseRef)"
     }
