@@ -2648,3 +2648,46 @@ html, body {
     outline: 2px solid rgba(201, 247, 232, 0.85);
     outline-offset: -6px;
 }
+
+/* === VOICE: видимый глитч реплик === */
+.voice-glitch.vf-shear {
+    animation: voice-shear 0.65s steps(1) 1;
+    color: #e8e6e3;
+}
+.voice-glitch.vf-chroma {
+    animation: voice-chroma 0.65s steps(1) 1;
+}
+.voice-glitch.vf-tear {
+    animation: voice-tear 0.65s steps(1) 1;
+}
+.voice-glitch.voice-strong.vf-shear,
+.voice-glitch.voice-strong.vf-chroma,
+.voice-glitch.voice-strong.vf-tear {
+    animation-duration: 0.95s;
+}
+@keyframes voice-shear {
+    0%   { transform: translateX(0) skewX(0); text-shadow: none; }
+    12%  { transform: translateX(-3px) skewX(-8deg); text-shadow: 2px 0 #00A8E8, -2px 0 #c41e3a; }
+    24%  { transform: translateX(4px) skewX(9deg); text-shadow: -3px 0 #00A8E8, 3px 0 #c41e3a; }
+    36%  { transform: translateX(-2px) skewX(-5deg); text-shadow: 1px 0 #00A8E8, -1px 0 #c41e3a; }
+    48%  { transform: translateX(3px) skewX(6deg); text-shadow: -2px 0 #00A8E8, 2px 0 #c41e3a; }
+    62%  { transform: translateX(-4px) skewX(-9deg); text-shadow: 3px 0 #00A8E8, -3px 0 #c41e3a; }
+    78%  { transform: translateX(2px) skewX(4deg); text-shadow: -1px 0 #00A8E8, 1px 0 #c41e3a; }
+    100% { transform: translateX(0) skewX(0); text-shadow: none; }
+}
+@keyframes voice-chroma {
+    0%   { transform: translateX(0); text-shadow: none; clip-path: inset(0 0 0 0); }
+    15%  { transform: translateX(-2px); text-shadow: -4px 0 #00A8E8, 4px 0 #c41e3a; clip-path: inset(15% 0 55% 0); }
+    30%  { transform: translateX(3px); text-shadow: 3px 0 #00A8E8, -3px 0 #c41e3a; clip-path: inset(55% 0 10% 0); }
+    45%  { transform: translateX(-1px); text-shadow: -2px 0 #00A8E8, 2px 0 #c41e3a; clip-path: inset(30% 0 35% 0); }
+    60%  { transform: translateX(2px); text-shadow: 4px 0 #00A8E8, -4px 0 #c41e3a; clip-path: inset(60% 0 5% 0); }
+    78%  { transform: translateX(-3px); text-shadow: -3px 0 #00A8E8, 3px 0 #c41e3a; clip-path: inset(5% 0 75% 0); }
+    100% { transform: translateX(0); text-shadow: none; clip-path: inset(0 0 0 0); }
+}
+@keyframes voice-tear {
+    0%, 18%   { transform: translateX(0); text-shadow: none; clip-path: inset(0 0 0 0); }
+    19%, 38%  { transform: translateX(-5px); text-shadow: 2px 0 #00A8E8, -2px 0 #c41e3a; clip-path: inset(20% 0 55% 0); }
+    39%, 58%  { transform: translateX(5px) scaleX(1.02); text-shadow: -3px 0 #00A8E8, 3px 0 #c41e3a; clip-path: inset(50% 0 20% 0); }
+    59%, 80%  { transform: translateX(-2px); text-shadow: 2px 0 #00A8E8, -2px 0 #c41e3a; clip-path: inset(10% 0 70% 0); }
+    81%, 100% { transform: translateX(0); text-shadow: none; clip-path: inset(0 0 0 0); }
+}

@@ -1028,7 +1028,7 @@ async function openChapter(index, opts = {}) {
       .replace(
         /{{VOICE(?::(\w+))?}}(.*?){{\/VOICE}}/g,
         (match, mode, text) => {
-          const voiceMode = mode || 'standard';
+          const voiceMode = mode || 'strong';
           return `<span class="voice-glitch" data-voice-mode="${voiceMode}">${text}</span>`;
         }
       );
@@ -1250,14 +1250,6 @@ if (photoOverlay) {
 /* === МЕХАНИЧЕСКИЙ ГОЛОС: РАНДОМНАЯ АНИМАЦИЯ И ОТСЛЕЖИВАНИЕ === */
 let voiceObserver = null;
 
-function createVoiceSpan(cls, text) {
-    const span = document.createElement('span');
-    span.className = cls;
-    span.textContent = text;
-    span.setAttribute('aria-hidden', 'true');
-    return span;
-}
-
 function prepareVoiceElement(el) {
     let text = el.dataset.voiceText;
     if (!text) {
@@ -1267,23 +1259,6 @@ function prepareVoiceElement(el) {
     el.innerHTML = '';
     el.setAttribute('aria-label', text);
     return text;
-}
-
-function buildVoiceLayers(el) {
-    const text = prepareVoiceElement(el);
-    const base = document.createElement('span');
-    base.className = 'voice-base';
-    base.textContent = text;
-    const red = createVoiceSpan('voice-red', text);
-    const cyan = createVoiceSpan('voice-cyan', text);
-    const slice1 = createVoiceSpan('voice-slice', text);
-    const slice2 = createVoiceSpan('voice-slice', text);
-    el.appendChild(base);
-    el.appendChild(red);
-    el.appendChild(cyan);
-    el.appendChild(slice1);
-    el.appendChild(slice2);
-    return { base, red, cyan, slice1, slice2 };
 }
 
 function voiceTimer(el, fn, delay) {
@@ -1306,6 +1281,7 @@ function cancelVoiceAnimations(el) {
     el._voiceTimers = [];
     (el._voiceCancel || []).forEach((fn) => fn());
     el._voiceCancel = [];
+    el.classList.remove('vf-shear', 'vf-chroma', 'vf-tear', 'voice-strong');
     [el, ...el.querySelectorAll('.voice-base, .voice-red, .voice-cyan, .voice-slice')].forEach((node) => {
         node.getAnimations().forEach((animation) => animation.cancel());
     });
@@ -1329,151 +1305,9 @@ function applyVoiceShock(el) {
     }, 700);
 }
 
-function generateAggressiveGlitch(el) {
-    const { base, red, cyan, slice1, slice2 } = buildVoiceLayers(el);
-    applyVoiceShock(el);
-    const snapMs = 250 + Math.random() * 150;
-    const sustainMs = 450 + Math.random() * 350;
-    const decayMs = 450 + Math.random() * 150;
-    const clean = { transform: 'translateX(0)', opacity: 1, clipPath: 'inset(0 0 0 0)' };
-    const snap = {
-        duration: snapMs, easing: 'steps(3, jump-start)', fill: 'forwards'
-    };
-    base.animate([
-        clean,
-        { transform: 'translateX(1.5px) skewX(-3deg)', opacity: 0.9, clipPath: 'inset(0 0 0 0)' }
-    ], snap);
-    slice1.animate([
-        { ...clean, opacity: 0 },
-        { transform: 'translateX(8px)', opacity: 0.65, clipPath: 'inset(12% 0 48% 0)' }
-    ], snap);
-    slice2.animate([
-        { ...clean, opacity: 0 },
-        { transform: 'translateX(-8px)', opacity: 0.65, clipPath: 'inset(48% 0 12% 0)' }
-    ], snap);
-    red.animate([
-        { ...clean, opacity: 0 },
-        { transform: 'translateX(-3px)', opacity: 0.5, clipPath: 'inset(0 0 0 0)' }
-    ], snap);
-    cyan.animate([
-        { ...clean, opacity: 0 },
-        { transform: 'translateX(3px)', opacity: 0.5, clipPath: 'inset(0 0 0 0)' }
-    ], snap);
-
-    voiceTimer(el, () => {
-        const sustain = { duration: sustainMs, easing: 'steps(2, jump-start)', fill: 'forwards' };
-        base.animate([
-            { transform: 'translateX(1.5px) skewX(-3deg)', opacity: 0.9 },
-            { transform: 'translateX(0.4px)', opacity: 1 }
-        ], sustain);
-        slice1.animate([
-            { transform: 'translateX(8px)', opacity: 0.65, clipPath: 'inset(12% 0 48% 0)' },
-            { transform: 'translateX(3px)', opacity: 0.35, clipPath: 'inset(22% 0 38% 0)' }
-        ], sustain);
-        slice2.animate([
-            { transform: 'translateX(-8px)', opacity: 0.65, clipPath: 'inset(48% 0 12% 0)' },
-            { transform: 'translateX(-3px)', opacity: 0.35, clipPath: 'inset(38% 0 22% 0)' }
-        ], sustain);
-        red.animate([{ transform: 'translateX(-3px)', opacity: 0.5 }, { transform: 'translateX(-1.5px)', opacity: 0.25 }], sustain);
-        cyan.animate([{ transform: 'translateX(3px)', opacity: 0.5 }, { transform: 'translateX(1.5px)', opacity: 0.25 }], sustain);
-    }, snapMs);
-
-    voiceTimer(el, () => {
-        const decay = { duration: decayMs, easing: 'steps(3, jump-start)', fill: 'forwards' };
-        base.animate([
-            { transform: 'translateX(0.4px)', opacity: 1 },
-            { transform: 'translateX(-0.2px)', opacity: 0.96 },
-            clean
-        ], decay);
-        [slice1, slice2].forEach((layer, index) => {
-            const direction = index === 0 ? 1 : -1;
-            layer.animate([
-                { transform: `translateX(${direction * 3}px)`, opacity: 0.35 },
-                { transform: `translateX(${direction}px)`, opacity: 0.18 },
-                { transform: 'translateX(0)', opacity: 0 }
-            ], decay);
-        });
-        red.animate([{ transform: 'translateX(-1.5px)', opacity: 0.25 }, { transform: 'translateX(0)', opacity: 0 }], decay);
-        cyan.animate([{ transform: 'translateX(1.5px)', opacity: 0.25 }, { transform: 'translateX(0)', opacity: 0 }], decay);
-    }, snapMs + sustainMs);
-    voiceTimer(el, () => cancelVoiceAnimations(el), snapMs + sustainMs + decayMs + 50);
-}
-
-function generateStandardGlitch(el) {
-    const { base, red, cyan, slice1, slice2 } = buildVoiceLayers(el);
-    const jitterFrames = () => {
-        const steps = 8 + Math.floor(Math.random() * 5);
-        const frames = Array.from({ length: steps }, () => ({
-            transform: `translate(${(Math.random() * 3 - 1.5).toFixed(2)}px, ${(Math.random() * 2 - 1).toFixed(2)}px)`,
-            opacity: 0.94 + Math.random() * 0.06,
-            easing: 'steps(1, jump-start)'
-        }));
-        frames.push({ transform: 'translate(0, 0)', opacity: 1, easing: 'steps(1, jump-start)' });
-        return frames;
-    };
-    const jitter = base.animate(jitterFrames(), { duration: 1000, iterations: Infinity });
-    jitter.oniteration = () => jitter.effect.setKeyframes(jitterFrames());
-
-    const burst = () => {
-        if (!el.isConnected) return;
-        const duration = 150 + Math.random() * 100;
-        const shear = 4 + Math.random() * 4;
-        const split = 25 + Math.random() * 35;
-        const easing = 'steps(3, jump-start)';
-        const firstClip = `inset(0 0 ${100 - split}% 0)`;
-        const secondClip = `inset(${split}% 0 0 0)`;
-        slice1.animate([
-            { opacity: 0, transform: 'translateX(0)', clipPath: firstClip },
-            { opacity: 0.65, transform: `translateX(${shear}px) skewX(-4deg)`, clipPath: firstClip, offset: 0.35 },
-            { opacity: 0.35, transform: `translateX(${shear * 0.6}px)`, clipPath: firstClip, offset: 0.75 },
-            { opacity: 0, transform: 'translateX(0)', clipPath: firstClip }
-        ], { duration, easing });
-        slice2.animate([
-            { opacity: 0, transform: 'translateX(0)', clipPath: secondClip },
-            { opacity: 0.65, transform: `translateX(${-shear}px) skewX(4deg)`, clipPath: secondClip, offset: 0.35 },
-            { opacity: 0.35, transform: `translateX(${-shear * 0.6}px)`, clipPath: secondClip, offset: 0.75 },
-            { opacity: 0, transform: 'translateX(0)', clipPath: secondClip }
-        ], { duration, easing });
-        const peekMs = 80 + Math.random() * 40;
-        red.animate([
-            { opacity: 0, transform: 'translateX(0)', clipPath: 'inset(0 0 0 0)' },
-            { opacity: 0.45, transform: 'translateX(-1.5px)', clipPath: 'inset(0 0 0 0)' },
-            { opacity: 0, transform: 'translateX(0)', clipPath: 'inset(0 0 0 0)' }
-        ], { duration: peekMs, easing: 'steps(2, jump-start)' });
-        cyan.animate([
-            { opacity: 0, transform: 'translateX(0)', clipPath: 'inset(0 0 0 0)' },
-            { opacity: 0.5, transform: 'translateX(1.5px)', clipPath: 'inset(0 0 0 0)' },
-            { opacity: 0, transform: 'translateX(0)', clipPath: 'inset(0 0 0 0)' }
-        ], { duration: peekMs, easing: 'steps(2, jump-start)' });
-        voiceTimer(el, burst, 800 + Math.random() * 1600);
-    };
-    voiceTimer(el, burst, 800 + Math.random() * 1600);
-}
-
-function generateWhisperGlitch(el) {
-    const text = prepareVoiceElement(el);
-    const base = document.createElement('span');
-    base.className = 'voice-base';
-    base.textContent = text;
-    el.appendChild(base);
-
-    /* the existing soft transform/opacity dip, without injected keyframes */
-    base.animate([
-        { transform: 'none', opacity: 1, offset: 0 },
-        { transform: 'translateX(0.2px) scaleX(1.01)', opacity: 0.55, offset: 0.22 },
-        { transform: 'translateX(-0.1px) scaleX(1.005)', opacity: 0.78, offset: 0.44 },
-        { transform: 'none', opacity: 0.96, offset: 0.66 },
-        { transform: 'none', opacity: 1, offset: 0.86 },
-        { transform: 'none', opacity: 1, offset: 1 }
-    ], { duration: 1600, easing: 'ease-in-out', fill: 'forwards' });
-    voiceTimer(el, () => cancelVoiceAnimations(el), 1650);
-}
-
-
-const voiceUnknownTokens = new Set();
 
 function generateGlitchAnimation(el) {
-    const requested = el.dataset.voiceMode || 'standard';
+    const requested = el.dataset.voiceMode || 'strong';
 
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
         // reduced motion: stable text immediately, no glitch sequence
@@ -1481,18 +1315,34 @@ function generateGlitchAnimation(el) {
         return;
     }
 
-    let mode = requested;
-    if (!['standard', 'strong', 'whisper'].includes(mode)) {
-        if (!voiceUnknownTokens.has(mode)) {
-            console.warn('[ЭХО] Unknown VOICE mode "' + mode + '"; using standard.');
-            voiceUnknownTokens.add(mode);
-        }
-        mode = 'standard';
+    if (!['standard', 'strong', 'whisper'].includes(requested) && !voiceUnknownTokens.has(requested)) {
+        console.warn('[ЭХО] Unknown VOICE mode "' + requested + '"; using standard.');
+        voiceUnknownTokens.add(requested);
     }
+
+    let mode = requested;
+    if (mode === 'whisper') mode = 'standard';   /* тихий вариант — пока как обычный */
+    if (mode !== 'strong') mode = 'standard';    /* неизвестные режимы — обычный */
     el.dataset.voiceActive = mode;
-    if (mode === 'strong') generateAggressiveGlitch(el);
-    else if (mode === 'whisper') generateWhisperGlitch(el);
-    else generateStandardGlitch(el);
+    el.classList.toggle('voice-strong', mode === 'strong');
+    if (mode === 'strong') applyVoiceShock(el);  /* удар — один раз при входе в зону */
+    startVoiceFx(el, mode === 'strong');
+}
+
+/* Видимый глитч реплики: жёсткие срезы по образцу дребезга оглавления.
+   Повторяется каждые ~1–3 с, пока реплика в зоне видимости. */
+const VOICE_FX_CLASSES = ['vf-shear', 'vf-chroma', 'vf-tear'];
+function startVoiceFx(el, strong) {
+    const fire = () => {
+        if (!el.isConnected) return;
+        const fx = VOICE_FX_CLASSES[Math.floor(Math.random() * VOICE_FX_CLASSES.length)];
+        el.classList.remove(...VOICE_FX_CLASSES);
+        void el.offsetWidth;
+        el.classList.add(fx);
+        voiceTimer(el, () => el.classList.remove(...VOICE_FX_CLASSES), strong ? 950 : 650);
+        voiceTimer(el, fire, 1100 + Math.random() * 1800);
+    };
+    fire();
 }
 
 function initVoiceObserver() {
@@ -1505,7 +1355,7 @@ function initVoiceObserver() {
     const options = {
         root: chapterScreen,
         rootMargin: '-45% 0px -45% 0px',
-        threshold: 0.5
+        threshold: 0
     };
 
     voiceObserver = new IntersectionObserver((entries) => {
