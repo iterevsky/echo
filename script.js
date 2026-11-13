@@ -450,7 +450,8 @@ function updateContentsMemory() {
 updateContentsMemory();
 
 /* single initial-route decision: SW-reload flag first, then deep/hash links.
-   Every ordinary launch keeps the cover; saved progress is offered after the title. */
+   Every ordinary launch keeps the cover; saved progress is offered over it immediately. */
+let forcedChapter = null; /* глава, предложенная к открытию поверх обложки */
 async function applyInitialRoute() {
     let swRoute = null;
     let rawRoute = null;
@@ -478,12 +479,11 @@ async function applyInitialRoute() {
     document.documentElement.classList.remove('routing-pending');
 
     if (swRoute && typeof swRoute.chapter === 'number' && chapters[swRoute.chapter]) {
-        hideIntroScreens();
-        await openChapter(swRoute.chapter, { restore: !!swRoute.restore });
-        return;
+        forcedChapter = swRoute.chapter;
     }
     if (await handleDeepLink()) return;
     if (await handleHashLink()) return;
+    await initProgress();
 }
 /* символьный статик на разрыве глав: два кадра шума в полосе
    45–55% высоты экрана, отрисовываются заранее в простое.
@@ -547,12 +547,13 @@ function closeProgress(restoreFocus = true) {
     if (!overlay || !overlay.classList.contains('visible')) return;
     overlay.classList.remove('visible');
     overlay.inert = true;
+    coverScreen.inert = false;
     contentsScreen.classList.remove('progress-dimmed');
-    contentsScreen.inert = false;
+    contentsScreen.inert = true;
     markOverlayClosed(overlay);
     if (restoreFocus) {
-        const item = contentsScreen.querySelector('.contents-item.current') || contentsScreen.querySelector('.contents-item');
-        if (item) item.focus();
+        const canvas = document.getElementById('water-cover');
+        if (canvas) canvas.focus({ preventScroll: true });
     }
 }
 
@@ -660,13 +661,18 @@ document.addEventListener('keydown', (e) => {
 
 
 document.addEventListener('click', (e) => {
-    if (isStarted) return;
+    if (isStarted || e.target.closest('#progress-overlay')) return;
     if (e.detail !== 0 && e.target.closest('#cover-screen')) return;
     startSequence();
 });
 
 // === ФУНКЦИИ ===
 
+let introTimers = [];
+function cancelIntroTimers() {
+    introTimers.forEach((id) => clearTimeout(id));
+    introTimers = [];
+}
 /* название собирается из символов: автор — слева направо (700 мс),
    ЭХО — к центру (900 мс, «Х» последней), после лока «Х» её свечение
    проявляется fade'ом. Только полное интро; при reduced-motion —
@@ -738,7 +744,7 @@ function showTitle({ decode = false } = {}) {
 }
 
 async function startSequence() {
-    if (isStarted) return;
+    if (isStarted || document.getElementById('progress-overlay')?.classList.contains('visible')) return;
     isStarted = true;
     prefetchChapters();
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
@@ -749,81 +755,69 @@ async function startSequence() {
     }
     startFilmPreload();
 
+    introTimers.length = 0;
+    const later = (fn, ms) => introTimers.push(setTimeout(fn, ms));
+
     // 1. Убираем картинку
     coverScreen.classList.add('hide-up');
     coverScreen.dispatchEvent(new CustomEvent('echo:entry-start'));
 
-    // 2. Показываем текст
-    setTimeout(() => {
+    // 2. Текст через 700 мс
+    later(() => {
         textScreen.classList.add('visible');
         glitchText.classList.add('visible');
+    }, 700);
 
-        // 3. Мигание
-        setTimeout(() => {
-            glitchText.classList.add('blinking');
+    // 3. Мигание
+    later(() => glitchText.classList.add('blinking'), 1100);
+    later(() => glitchText.classList.remove('blinking'), 2900);
 
-            setTimeout(() => {
-                glitchText.classList.remove('blinking');
+    // 4. Глитч 3.8 с: параллельно гасим экран вопроса
+    later(() => glitchText.classList.add('glitching'), 2900);
+    later(() => { textScreen.style.opacity = '0'; }, 5900);
+    later(() => {
+        textScreen.classList.remove('visible');
+        textScreen.style.opacity = '';
+        finalScreen.classList.add('visible');
+        finalScreen.classList.add('final-flash');
+    }, 6700);
+    later(() => finalScreen.classList.remove('final-flash'), 6850);
 
-                // 4. Глитч с затуханием в тьму — 3.8 секунды
-                glitchText.classList.add('glitching');
-
-                // Затухаем text-screen параллельно с глитчем
-                setTimeout(() => {
-                    textScreen.style.opacity = '0';
-                }, 3000);
-
-                // После окончания глитча — чёрный экран
-                setTimeout(() => {
-                    textScreen.classList.remove('visible');
-                    textScreen.style.opacity = '';
-
-                    // Показываем финальный чёрный экран
-                    finalScreen.classList.add('visible');
-                    finalScreen.classList.add('final-flash');
-                    setTimeout(() => finalScreen.classList.remove('final-flash'), 150);
-
-                    // 5. Через 1.5 секунды — плёнка или название
-                    setTimeout(async () => {
-                        finalScreen.classList.add('visible');
-                        const loading = document.createElement('p');
-                        loading.id = 'film-loading';
-                        loading.setAttribute('role', 'status');
-                        loading.textContent = 'Загрузка плёнки…';
-                        finalScreen.appendChild(loading);
-                        let timedOut = false;
-                        await Promise.race([
-                            startFilmPreload(),
-                            new Promise(resolve => setTimeout(() => { timedOut = true; resolve(); }, 3000))
-                        ]);
-                        loading.remove();
-                        if (titleShown) return;
-                        if (timedOut) {
-                            console.warn('[ЭХО] Film preload timed out after 3000 ms; failed frame indexes: ' + (filmFailedFrames.length ? filmFailedFrames.join(', ') : 'pending'));
-                            showTitle({ decode: true });
-                            return;
-                        }
-                        if (filmReady) {
-                            if (filmFailedFrames.length) console.warn('[ЭХО] Film uses partial frames; failed indexes: ' + filmFailedFrames.join(', '));
-                            try {
-                                runFilmSequence();
-                            } catch (error) {
-                                console.error('[ЭХО] Film sequence failed:', error);
-                                showTitle({ decode: true });
-                            }
-                        } else {
-                            console.warn('[ЭХО] Film preload failed; failed frame indexes: ' + (filmFailedFrames.length ? filmFailedFrames.join(', ') : 'unknown'));
-                            showTitle({ decode: true });
-                        }
-                    }, 1500);
-
-                }, 3800); // глитч длится 3.8 секунды
-
-            }, 1800); // мигание
-
-        }, 400); // пауза перед миганием
-
-    }, 700); // задержка после свайпа
+    // 5. Чёрный экран 1.5 с — плёнка или название
+    later(async () => {
+        const loading = document.createElement('p');
+        loading.id = 'film-loading';
+        loading.setAttribute('role', 'status');
+        loading.textContent = 'Загрузка плёнки…';
+        finalScreen.appendChild(loading);
+        let timedOut = false;
+        try {
+            await Promise.race([
+                startFilmPreload(),
+                new Promise(resolve => setTimeout(() => { timedOut = true; resolve(); }, 8000))
+            ]);
+        } finally {
+            if (loading.parentNode) loading.remove();
+        }
+        if (titleShown) return;
+        if (timedOut) {
+            console.warn('[ЭХО] Film preload timed out after 8000 ms; failed frame indexes: ' + (filmFailedFrames.length ? filmFailedFrames.join(', ') : 'pending'));
+            showTitle({ decode: true });
+            return;
+        }
+        if (filmReady) {
+            if (filmFailedFrames.length) console.warn('[ЭХО] Film uses partial frames; failed indexes: ' + filmFailedFrames.join(', '));
+            try {
+                runFilmSequence();
+            } catch (error) {
+                console.error('[ЭХО] Film sequence failed:', error);
+                showTitle({ decode: true });
+            }
+        } else {
+            console.warn('[ЭХО] Film preload failed; failed frame indexes: ' + (filmFailedFrames.length ? filmFailedFrames.join(', ') : 'unknown'));
+            showTitle({ decode: true });
+        }
+    }, 8200);
 }
 
 function showContentsList() {
@@ -852,11 +846,7 @@ function showContents() {
         titleScreen.classList.remove('visible');
         titleScreen.classList.remove('melting');
 
-        setTimeout(() => {
-            const saved = loadState();
-            if (saved.lastChapter !== undefined && saved.lastChapter >= 0) initProgress();
-            else showContentsList();
-        }, reduced ? 0 : 300);
+        setTimeout(showContentsList, reduced ? 0 : 300);
 
     }, reduced ? 0 : 1200);
 }
@@ -1858,6 +1848,7 @@ document.addEventListener('touchend', function(e) {
 
 /* скрыть обложку/вопрос/финал/титул — вход в книгу без вступления */
 function hideIntroScreens() {
+    cancelIntroTimers();
     isStarted = true;
     coverScreen.style.opacity = '0';
     coverScreen.style.pointerEvents = 'none';
@@ -1875,29 +1866,21 @@ async function handleDeepLink() {
     if (!m) return false;
     const idx = parseInt(m[1], 10);
     try { history.replaceState(null, '', location.pathname); } catch (e) {}
-    hideIntroScreens();
-    updateContentsMemory();
-
-    if (isNaN(idx) || idx < 0 || idx >= chapters.length) {
-        openContentsFresh();
-        return true;
+    if (!isNaN(idx) && idx >= 0 && idx < chapters.length) forcedChapter = idx;
+    return false;
     }
-    await openChapter(idx);
-    return true;
-}
-
+    
 /* ссылка вида #ch-12: внешний переход (history.state пуст) — открыть главу сразу.
-   Внутреннее состояние истории не перехватываем: после обычного входа
-   сохранённый прогресс предлагается после титула. */
+   Внутреннее состояние истории не перехватываем: при обычном входе
+   сохранённый прогресс предлагается поверх обложки. */
 async function handleHashLink() {
     const m = (location.hash || '').match(/^#ch-(\d+)$/);
     if (!m) return false;
     if (history.state && history.state.echoChapter !== undefined) return false;
     const idx = chapters.findIndex((c) => String(c.number) === m[1]);
     if (idx < 0) return false;
-    hideIntroScreens(); /* новый читатель по ссылке — без заставки */
-    await openChapter(idx);
-    return true;
+    forcedChapter = idx;
+    return false;
 }
 
 function openContentsFresh() {
@@ -1935,33 +1918,21 @@ function revealContentsItems() {
 let progressPromptShown = false;
 async function initProgress() {
     const saved = loadState();
-    if (saved.lastChapter === undefined || saved.lastChapter < 0 || progressPromptShown) return;
+    const target = (typeof forcedChapter === 'number' && chapters[forcedChapter]) ? forcedChapter : saved.lastChapter;
+    forcedChapter = null;
+    if (target === undefined || target < 0 || progressPromptShown) return;
     progressPromptShown = true;
-    isStarted = true;
-
-    try {
-        await ensureChapters();
-    } catch (error) {
-        progressPromptShown = false;
-        showChapterLoadError(saved.lastChapter, initProgress);
-        return;
-    }
-    const chapter = chapters[saved.lastChapter];
-    if (!chapter || chapter.empty) {
-        progressPromptShown = false;
-        openContentsFresh();
-        return;
-    }
-
-    hideIntroScreens();
-
-    updateContentsMemory();
-    showContentsList();
-
-    contentsScreen.classList.add('progress-dimmed');
-
+    const chapter = chapters[target];
     const overlay = document.getElementById('progress-overlay');
-    if (!overlay) return;
+    if (!chapter || chapter.empty || !overlay) {
+        progressPromptShown = false;
+        return;
+    }
+
+    coverScreen.inert = true;
+    contentsScreen.classList.remove('visible', 'progress-dimmed');
+    contentsScreen.inert = true;
+
     overlay.innerHTML = `
         <div class="progress-content">
             <div class="progress-title" id="progress-title">Вы остановились на главе ${chapter.number}</div>
@@ -1975,16 +1946,20 @@ async function initProgress() {
     overlay.setAttribute('aria-labelledby', 'progress-title');
     overlay.inert = false;
     overlay.classList.add('visible');
-    contentsScreen.inert = true;   // dimmed contents stays out of the Tab order
     markOverlayOpen(overlay);
-    overlay.querySelector('.progress-continue').focus();
+    overlay.querySelector('.progress-continue').focus({ preventScroll: true });
 
+    let actionTaken = false;
     overlay.querySelector('.progress-continue').addEventListener('click', () => {
+        if (actionTaken) return;
+        actionTaken = true;
         closeProgress(false);
-        setTimeout(() => openChapter(saved.lastChapter, { restore: true }), 400);
+        openChapter(target, { restore: true });
     });
 
     overlay.querySelector('.progress-restart').addEventListener('click', () => {
+        if (actionTaken) return;
+        actionTaken = true;
         // стираем только прогресс чтения; настройки читателя сохраняем
         // everything else survives too: installed flag, visit rotation,
         // badge state, unknown fields — no wholesale replacement
@@ -1995,8 +1970,7 @@ async function initProgress() {
         try {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
         } catch (err) {}
-        closeProgress(false);
-        location.reload();
+        closeProgress();
     });
 }
 
@@ -2267,6 +2241,7 @@ function runFilmSequence() {
         filmScreen.removeEventListener('pointercancel', onFilmPointerCancel);
         filmScreen.removeEventListener('keydown', onFilmKeyDown);
         window.removeEventListener('blur', onFilmPointerCancel);
+        window.removeEventListener('resize', onCrackleResize);
 
         showTitle();
 
@@ -2337,6 +2312,11 @@ function runFilmSequence() {
     }
     crackle.width = window.innerWidth;
     crackle.height = window.innerHeight;
+    const onCrackleResize = () => {
+    crackle.width = window.innerWidth;
+    crackle.height = window.innerHeight;
+    };
+    window.addEventListener('resize', onCrackleResize);
     const crackleCtx = crackle.getContext('2d');
     const crackleFrames = makeStaticFrames(window.innerWidth, window.innerHeight, {
         frames: 2,
@@ -3230,11 +3210,7 @@ function coverSurgeHook() {
 (function initWaterCover() {
     const canvas = document.getElementById('water-cover');
     if (!coverScreen || !canvas || isStarted) return;
-    if (/[?&]ch=/.test(location.search) || /^#ch-\d+$/.test(location.hash)) return;
-    try {
-        if (sessionStorage.getItem('echo_sw_route')) return;
-    } catch (error) {}
-
+   
     let state = 'idle';
     let view = null;
     let waterPromise = null;
@@ -3366,7 +3342,7 @@ function coverSurgeHook() {
     }
 
     function enterWithWater(clientX, clientY, strength, pointerType, pointerId) {
-        if (isStarted) return;
+        if (isStarted || document.getElementById('progress-overlay')?.classList.contains('visible')) return;
         const point = toGrid(clientX, clientY);
         record('coordinates', { x: point.x, y: point.y, normalizedX: point.normalizedX, normalizedY: point.normalizedY, pointerType, pointerId });
         const impulse = { x: point.x, y: point.y, strength, pointerType, pointerId, entryAttempt: ++entryAttempt };

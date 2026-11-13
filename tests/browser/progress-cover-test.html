@@ -1,0 +1,272 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Progress prompt over cover regression</title>
+<style>html,body{margin:0;background:#06080a;color:#c9f7e8;font:12px monospace}iframe{display:block;width:900px;height:500px;border:0}pre{white-space:pre-wrap}</style>
+<iframe id="root"></iframe>
+<pre id="output">Running cover and progress regression…</pre>
+<script>
+(function () {
+    const frame = document.getElementById('root');
+    const output = document.getElementById('output');
+    const results = [];
+    const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
+    const check = (name, pass, details) => results.push({ name, pass: Boolean(pass), details });
+    let source = null;
+    const saved = {
+        v: 1, lastChapter: 0, readPos: { 0: 0.42 }, chapterTitle: 'saved chapter',
+        readerSettings: { size: 2, tone: 'soft', dim: 10 }, installed: true, unrelated: 'preserved'
+    };
+
+    async function waitFor(fn, timeout = 15000, label = 'condition') {
+        const start = performance.now();
+        while (performance.now() - start < timeout) {
+            const value = await fn();
+            if (value) return value;
+            await pause(40);
+        }
+        throw new Error('Timed out: ' + label);
+    }
+
+    function notRun(name, reason) {
+        results.push({ name, notRun: true, details: reason });
+    }
+
+    async function rafAvailable(w) {
+        try {
+            return await Promise.race([
+                new Promise(resolve => w.requestAnimationFrame(() => resolve(true))),
+                pause(300).then(() => false)
+            ]);
+        } catch (error) {
+            return false;
+        }
+    }
+
+    function loaded() {
+        return new Promise((resolve, reject) => {
+            const timer = setTimeout(() => reject(new Error('Page load timeout')), 20000);
+            frame.addEventListener('load', () => { clearTimeout(timer); resolve(); }, { once: true });
+        });
+    }
+
+    async function load({ state = null, route = null, url = '/', direct = false, reduce = false, width = 900, height = 500 } = {}) {
+        localStorage.clear();
+        sessionStorage.clear();
+        if (state) localStorage.setItem('echo_state', JSON.stringify(state));
+        if (route) sessionStorage.setItem('echo_sw_route', route);
+        frame.style.width = width + 'px';
+        frame.style.height = height + 'px';
+        const loading = loaded();
+        if (url) {
+            frame.removeAttribute('srcdoc');
+            frame.src = url;
+            await loading;
+            const w = frame.contentWindow;
+            await waitFor(() => direct ? w.document.getElementById('chapter-screen').classList.contains('visible') : w.document.getElementById('cover-screen') && w.document.getElementById('cover-screen').__waterState, 15000, direct ? 'direct chapter' : 'cover initialization');
+            w.__errors = [];
+            w.addEventListener('error', event => w.__errors.push(event.message || 'resource error'));
+            w.addEventListener('unhandledrejection', event => w.__errors.push(String(event.reason)));
+            return w;
+        }
+        let html = source.replace('<head>', '<head><base href="/">');
+        let inject = '<script>window.__errors=[];window.addEventListener("error",function(e){window.__errors.push(e.message||"resource error")});window.addEventListener("unhandledrejection",function(e){window.__errors.push(String(e.reason))});';
+        inject += 'var nosw={register:function(){return new Promise(function(){});},addEventListener:function(){},controller:null};try{Object.defineProperty(navigator,"serviceWorker",{value:nosw,configurable:true});}catch(e){}';
+        if (reduce) {
+            inject += 'var nativeMatch=window.matchMedia.bind(window);window.matchMedia=function(q){var result=nativeMatch(q);if(q!=="(prefers-reduced-motion: reduce)")return result;return new Proxy(result,{get:function(target,key){if(key==="matches")return true;var value=Reflect.get(target,key,target);return typeof value==="function"?value.bind(target):value;}});};';
+        }
+        inject += '<\/script>';
+        html = html.replace('<script src="version.js"><\/script>', inject + '<script src="version.js"><\/script>');
+        frame.srcdoc = html;
+        await loading;
+        const w = frame.contentWindow;
+        await waitFor(() => w.document.getElementById('cover-screen') && w.document.getElementById('cover-screen').__waterState, 15000, 'cover initialization');
+        return w;
+    }
+
+    function key(w, element, value, shiftKey = false) {
+        const event = new w.KeyboardEvent('keydown', { key: value, bubbles: true, cancelable: true, shiftKey });
+        element.dispatchEvent(event);
+        return event;
+    }
+
+    function tab(w, element, shiftKey = false) {
+        const event = key(w, element, 'Tab', shiftKey);
+        if (!event.defaultPrevented) {
+            const buttons = Array.from(element.closest('#progress-overlay').querySelectorAll('button'));
+            const next = buttons[buttons.indexOf(element) + (shiftKey ? -1 : 1)];
+            if (next) next.focus();
+        }
+        return event;
+    }
+
+    function activateButton(w, element, keyName) {
+        const event = key(w, element, keyName);
+        if (!event.defaultPrevented) element.click();
+        return event;
+    }
+
+    function tap(w, canvas) {
+        const rect = canvas.getBoundingClientRect();
+        for (const [type, buttons] of [['pointerdown', 1], ['pointerup', 0]]) {
+            canvas.dispatchEvent(new w.PointerEvent(type, { pointerId: 4, pointerType: 'touch', isPrimary: true, clientX: rect.left + 80, clientY: rect.top + 80, buttons, bubbles: true, cancelable: true }));
+        }
+    }
+
+    function observeOpens(w) {
+        const calls = [];
+        const original = w.openChapter;
+        w.openChapter = function (index, options) {
+            calls.push({ index, options });
+            return original.apply(this, arguments);
+        };
+        return calls;
+    }
+
+    function noErrors(w, name) {
+        check(name + ': no uncaught page errors', (w.__errors || []).length === 0, w.__errors);
+    }
+
+    async function continueScenario(keyName) {
+        const w = await load({ state: saved });
+        const doc = w.document, cover = doc.getElementById('cover-screen'), contents = doc.getElementById('contents-screen'), chapter = doc.getElementById('chapter-screen'), overlay = doc.getElementById('progress-overlay');
+        const calls = observeOpens(w);
+        check(keyName + ': cover and prompt are immediate', overlay.classList.contains('visible') && Number(w.getComputedStyle(cover).opacity) > 0 && !cover.classList.contains('hide-up'));
+        check(keyName + ': contents and chapter stay hidden before choice', !contents.classList.contains('visible') && !chapter.classList.contains('visible') && !contents.classList.contains('progress-dimmed'));
+        check(keyName + ': no automatic chapter open or intro', calls.length === 0 && !w.eval('isStarted'));
+        check(keyName + ': dialog has accessible semantics and initial focus', overlay.getAttribute('role') === 'dialog' && overlay.getAttribute('aria-modal') === 'true' && overlay.getAttribute('aria-labelledby') === 'progress-title' && doc.activeElement === overlay.querySelector('.progress-continue'));
+        check(keyName + ': cover is inert but artwork and water remain', cover.inert && cover.clientWidth === w.innerWidth && cover.clientHeight === w.innerHeight && doc.querySelector('.cover-tremor img').getBoundingClientRect().width === w.innerWidth);
+        await waitFor(() => cover.__waterState().state === 'ready', 10000, 'water ready');
+        const continueButton = overlay.querySelector('.progress-continue'), restartButton = overlay.querySelector('.progress-restart');
+        tab(w, continueButton);
+        check(keyName + ': Tab moves to Start over', doc.activeElement === restartButton);
+        tab(w, restartButton);
+        check(keyName + ': Tab wraps to Continue', doc.activeElement === continueButton);
+        tab(w, continueButton, true);
+        check(keyName + ': Shift Tab remains contained', doc.activeElement === restartButton);
+        tab(w, restartButton);
+        const canvas = doc.getElementById('water-cover');
+        key(w, canvas, 'Enter');
+        tap(w, canvas);
+        await w.startSequence();
+        check(keyName + ': modal blocks cover pointer and keyboard entry', !w.eval('isStarted') && calls.length === 0);
+        const nativeRaf = await rafAvailable(w);
+        if (!nativeRaf) {
+            notRun(keyName + ': native requestAnimationFrame restore path', 'The built-in browser did not deliver a frame callback; the real setTimeout fallback is tested instead.');
+            Object.defineProperty(w.document, 'fonts', { value: undefined, configurable: true });
+        }
+        activateButton(w, continueButton, keyName);
+        await waitFor(() => chapter.classList.contains('visible') && w.eval('currentChapter') === 0 && !chapter.querySelector('.placeholder') && chapter.querySelector('.chapter-text').textContent.length > 100, 15000, 'Continue renders chapter');
+        const expected = 0.42 * (chapter.scrollHeight - chapter.clientHeight);
+        await waitFor(() => expected > 0 && Math.abs(chapter.scrollTop - expected) < 2, 8000, 'reading position restoration');
+        check(keyName + ': Continue closes prompt and opens saved chapter once with restore', !overlay.classList.contains('visible') && calls.length === 1 && calls[0].index === 0 && calls[0].options.restore === true && Math.abs(chapter.scrollTop - expected) < 2, { calls, actual: chapter.scrollTop, expected, restoreMode: nativeRaf ? 'fonts.ready and requestAnimationFrame' : 'setTimeout fallback' });
+        continueButton.click();
+        check(keyName + ': repeated Continue cannot duplicate chapter opening', calls.length === 1);
+        noErrors(w, keyName);
+    }
+
+    async function escapeScenario() {
+        const w = await load({ state: saved });
+        const doc = w.document, overlay = doc.getElementById('progress-overlay'), cover = doc.getElementById('cover-screen');
+        const markup = overlay.innerHTML;
+        key(w, doc, 'Escape');
+        check('Escape closes prompt and restores cover focus', !overlay.classList.contains('visible') && doc.activeElement === doc.getElementById('water-cover') && !cover.inert);
+        check('Escape preserves saved progress and does not open contents', w.loadState().lastChapter === 0 && !doc.getElementById('contents-screen').classList.contains('visible'));
+        await w.initProgress();
+        check('Repeated initialization cannot duplicate prompt', overlay.innerHTML === markup && overlay.querySelectorAll('.progress-content').length === 1 && !overlay.classList.contains('visible'));
+        w.showContents();
+        await waitFor(() => doc.getElementById('contents-screen').classList.contains('visible'), 5000, 'contents after prompt dismissal');
+        check('Later contents entry does not show saved prompt again', !overlay.classList.contains('visible') && overlay.querySelectorAll('.progress-content').length === 1);
+        noErrors(w, 'Escape');
+    }
+
+    async function restartScenario(keyName, activate) {
+        const w = await load({ state: saved });
+        const doc = w.document, cover = doc.getElementById('cover-screen'), overlay = doc.getElementById('progress-overlay');
+        const calls = observeOpens(w);
+        w.__noReloadMarker = 'same-document';
+        const restart = overlay.querySelector('.progress-restart');
+        restart.focus();
+        activateButton(w, restart, keyName);
+        await pause(250);
+        const state = w.loadState();
+        check(keyName + ' restart: selective cleanup preserves settings and unrelated state', state.lastChapter === undefined && state.readPos === undefined && state.chapterTitle === undefined && state.readerSettings.size === 2 && state.readerSettings.tone === 'soft' && state.readerSettings.dim === 10 && state.installed === true && state.unrelated === 'preserved', state);
+        check(keyName + ' restart: closes prompt without reload and keeps cover only', !overlay.classList.contains('visible') && Number(w.getComputedStyle(cover).opacity) > 0 && !cover.classList.contains('hide-up') && !doc.getElementById('contents-screen').classList.contains('visible') && !doc.getElementById('chapter-screen').classList.contains('visible') && calls.length === 0 && w.__noReloadMarker === 'same-document');
+        check(keyName + ' restart: cover and keyboard focus are usable', !cover.inert && !w.eval('isStarted') && doc.activeElement === doc.getElementById('water-cover'));
+        if (activate) {
+            const canvas = doc.getElementById('water-cover');
+            key(w, canvas, 'Enter');
+            await waitFor(() => doc.getElementById('text-screen').classList.contains('visible'), 2500, 'fresh intro after restart');
+            check(keyName + ' restart: subsequent cover activation starts from beginning', w.eval('isStarted') && cover.classList.contains('hide-up') && !doc.getElementById('chapter-screen').classList.contains('visible') && !doc.getElementById('contents-screen').classList.contains('visible') && calls.length === 0);
+        }
+        noErrors(w, keyName + ' restart');
+    }
+
+    async function directScenario(name, url, route) {
+        const w = await load({ url, route, direct: true });
+        const doc = w.document;
+        check(name + ': intentional direct route opens chapter', w.eval('currentChapter') === 0 && doc.getElementById('chapter-screen').classList.contains('visible'));
+        await waitFor(() => Number(w.getComputedStyle(doc.getElementById('cover-screen')).opacity) === 0, 3000, 'cover hidden by direct route');
+        check(name + ': direct route does not show progress prompt or cover', !doc.getElementById('progress-overlay').classList.contains('visible') && Number(w.getComputedStyle(doc.getElementById('cover-screen')).opacity) === 0);
+        if (route) check(name + ': one-shot route state is consumed', sessionStorage.getItem('echo_sw_route') === null);
+        noErrors(w, name);
+    }
+
+    async function idleScenario(width, height, reduce) {
+        const w = await load({ width, height, reduce, url: reduce ? '' : '/' });
+        const doc = w.document;
+        if (reduce) {
+            check('Reduced motion has no animated ring', !doc.querySelector('.cover-beckon-ring') && doc.querySelector('.cover-idle-static') && w.matchMedia('(prefers-reduced-motion: reduce)').matches);
+            check('Reduced motion hint is static', w.getComputedStyle(doc.querySelector('.cover-idle-static')).animationName === 'none');
+            noErrors(w, 'Reduced-motion idle');
+            return;
+        }
+        await waitFor(() => doc.getElementById('cover-screen').dataset.idlePhase === 'SURGE', 13000, 'idle SURGE at ' + width);
+        const ring = doc.querySelector('.cover-beckon-ring'), style = w.getComputedStyle(ring), ripple = ring.querySelector('i'), rippleStyle = w.getComputedStyle(ripple);
+        const keyframes = ripple.getAnimations().flatMap(animation => animation.effect.getKeyframes());
+        const definedPeak = Math.max(...keyframes.map(frame => Number(frame.opacity) || 0));
+        check(width + 'x' + height + ': idle ring is transparent, thin, and has no glow', style.backgroundColor === 'rgba(0, 0, 0, 0)' && style.borderTopWidth === '1px' && style.outlineStyle === 'none' && style.boxShadow === 'none' && rippleStyle.backgroundColor === 'rgba(0, 0, 0, 0)' && rippleStyle.boxShadow === 'none', { background: style.backgroundColor, border: style.borderTopWidth, shadow: style.boxShadow });
+        check(width + 'x' + height + ': idle hint is noninteractive and aria-hidden', style.pointerEvents === 'none' && rippleStyle.pointerEvents === 'none' && ring.getAttribute('aria-hidden') === 'true');
+        check(width + 'x' + height + ': ripple keyframes are gentle and faint', definedPeak > 0 && definedPeak <= 0.200001 && keyframes.some(frame => frame.transform === 'scale(1.18)') && rippleStyle.animationName === 'cover-beckon-ripple' && rippleStyle.animationDuration === '1.4s', { definedPeak, keyframes });
+        if (await rafAvailable(w)) {
+            await waitFor(() => ripple.getAnimations().some(animation => animation.playState === 'running'), 3000, 'ripple animation start');
+            let peak = 0;
+            for (let i = 0; i < 8; i++) { peak = Math.max(peak, Number(w.getComputedStyle(ripple).opacity)); await pause(150); }
+            check(width + 'x' + height + ': ripple playback stays gentle and faint', peak > 0 && peak <= 0.200001, { peak });
+        } else {
+            notRun(width + 'x' + height + ': ripple playback timing', 'The built-in browser did not advance requestAnimationFrame/CSS animation time. Actual keyframes, styling, and SURGE scheduling were verified instead.');
+        }
+        const rect = ring.getBoundingClientRect();
+        check(width + 'x' + height + ': existing size and positioning are preserved', rect.width >= 76 && rect.width <= 132 && rect.left >= 0 && rect.top >= 0 && rect.right <= width && rect.bottom <= height, { width: rect.width, left: rect.left, top: rect.top });
+        noErrors(w, 'Idle ' + width);
+    }
+
+    async function scenario(name, fn) {
+        try { await fn(); }
+        catch (error) { results.push({ name: name + ': scenario completed', pass: false, details: error.stack }); }
+    }
+
+    (async function () {
+        source = await fetch('/index.html', { cache: 'no-store' }).then(response => response.text());
+        await scenario('Fresh root', async () => {
+            const w = await load();
+            const doc = w.document;
+            check('Fresh root shows cover without prompt', Number(w.getComputedStyle(doc.getElementById('cover-screen')).opacity) > 0 && !doc.getElementById('progress-overlay').classList.contains('visible'));
+            check('Fresh root does not auto-open chapter or intro', !doc.getElementById('chapter-screen').classList.contains('visible') && !doc.getElementById('contents-screen').classList.contains('visible') && !w.eval('isStarted'));
+            noErrors(w, 'Fresh root');
+        });
+        await scenario('Continue Enter', () => continueScenario('Enter'));
+        await scenario('Continue Space', () => continueScenario(' '));
+        await scenario('Escape', escapeScenario);
+        await scenario('Restart Enter', () => restartScenario('Enter', false));
+        await scenario('Restart Space', () => restartScenario(' ', true));
+        await scenario('Query route', () => directScenario('?ch=0', '/?ch=0', null));
+        await scenario('Hash route', () => directScenario('#ch-01', '/?external=1#ch-01', null));
+        await scenario('SW route', () => directScenario('SW restore', '/?restore=1', JSON.stringify({ chapter: 0, restore: true })));
+        await scenario('Desktop idle', () => idleScenario(1440, 900, false));
+        await scenario('Mobile idle', () => idleScenario(390, 844, false));
+        await scenario('Reduced idle', () => idleScenario(390, 844, true));
+        output.textContent = JSON.stringify({ passed: results.filter(result => result.pass).length, failed: results.filter(result => !result.pass).length, results }, null, 2);
+    })().catch(error => { output.textContent = JSON.stringify({ fatal: error.stack, results }, null, 2); });
+})();
+</script>

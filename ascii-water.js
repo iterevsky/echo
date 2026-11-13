@@ -48,7 +48,7 @@ this.cropWidth = cssWidth / this.cropScale;
 this.cropHeight = cssHeight / this.cropScale;
 this.cropX = (this.sourceWidth - this.cropWidth) / 2;
 this.cropY = (this.sourceHeight - this.cropHeight) / 2;
-this.waterline = clamp((0.67 * this.sourceHeight - this.cropY) * this.cropScale / cssHeight);
+this.waterline = clamp((0.63 * this.sourceHeight - this.cropY) * this.cropScale / cssHeight);
 const canvas = document.createElement('canvas');
 canvas.width = cols;
 canvas.height = rows;
@@ -83,9 +83,9 @@ return { lum: this.sampleSource(point.x, point.y), column: 0, shore: false };
 }
 gray(buffer, index, lum, water) {
 const offset = index * 4;
-buffer[offset] = Math.round((water ? 7 : 0) + clamp(lum) * (water ? 248 : 255));
-buffer[offset + 1] = Math.round((water ? 19 : 0) + clamp(lum) * (water ? 236 : 255));
-buffer[offset + 2] = Math.round((water ? 21 : 0) + clamp(lum) * (water ? 234 : 255));
+buffer[offset] = Math.round((water ? 0 : 0) + clamp(lum) * (water ? 248 : 255));
+buffer[offset + 1] = Math.round((water ? 0 : 0) + clamp(lum) * (water ? 236 : 255));
+buffer[offset + 2] = Math.round((water ? 0 : 0) + clamp(lum) * (water ? 234 : 255));
 buffer[offset + 3] = 255;
 }
 generate(field) {
@@ -114,8 +114,8 @@ continue;
 const t = (y - this.waterline) / Math.max(0.0001, 1 - this.waterline);
 const p = field.displace(x, y);
 const point = this.sourcePoint(p.x, p.y);
-const reflected = this.sampleSource(point.x, 1.34 - point.y) * 0.68 * Math.exp(-1.6 * t);
-const highlight = reflected * (0.45 + 0.55 * hash(x, y));
+const reflected = this.sampleSource(point.x, 1.26 - point.y) * 0.68 * Math.exp(-1.6 * t);
+const highlight = reflected * (0.45 + 0.55 * hash(x * 3.7 + field.time * 2.3, y * 2.9 + field.time * 1.7));
 this.highlight[i] = highlight;
 this.lum[i] = clamp(reflected + 0.08 * highlight);
 this.gray(this.rb, i, this.lum[i], true);
@@ -167,7 +167,7 @@ this.accumulator = 0;
 }
 ambientDelay() {
 this.ambientSeed = (1664525 * this.ambientSeed + 1013904223) >>> 0;
-return 20 + 40 * this.ambientSeed / 4294967296;
+return 4 + 8 * this.ambientSeed / 4294967296;
 }
 reset() {
 this.current.fill(0);
@@ -247,7 +247,7 @@ this.ambientCount++;
 if (!this.sources.some(source => source.ambient)) {
 const x = (0.18 + 0.64 * hash(this.ambientCount, 1.7)) * (this.cols - 1);
 const y = (0.65 + 0.25 * hash(this.ambientCount, 4.2)) * (this.rows - 1);
-const id = this.drop(x, y, 0.08, 2);
+const id = this.drop(x, y, 0.25, 3);
 const source = this.sources.find(item => item.id === id);
 if (source) source.ambient = true;
 }
@@ -312,8 +312,10 @@ return;
 }
 } else this.below24Since = null;
 if (timestamp - this.lastChange < 5000) return;
+if (!document.getElementById('cover-screen').classList.contains('visible')) {
 if (this.intervals.length >= 90 && this.p95(90) > 40 && this.view.cellPx < 16) this.setCell(this.view.cellPx + 2, timestamp, 'downgrade');
 else if (this.intervals.length >= 300 && this.p95(300) < 34 && this.mean(300) >= 27 && this.view.cellPx > 8) this.setCell(this.view.cellPx - 2, timestamp, 'upgrade');
+}
 }
 }
 class View {

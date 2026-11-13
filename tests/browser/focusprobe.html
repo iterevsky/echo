@@ -28,7 +28,7 @@
 
     fetch('/index.html').then(function (r) { return r.text(); }).then(function (html) {
         html = html.replace('<head>', '<head><base href="/">');
-        html = html.replace('<script src="chapters.js"><\/script>', inject + '<script src="chapters.js"><\/script>');
+        html = html.replace('<script src="version.js"><\/script>', inject + '<script src="version.js"><\/script>');
         f.srcdoc = html;
     });
 
