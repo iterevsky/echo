@@ -130,7 +130,9 @@ const dense = Math.max(this.column[i], this.highlight[i]);
 const density = clamp(0.08 + 0.82 * dense + 0.04 * hash(x, y));
 this.dense[i] = dense;
 this.ramp[i] = dense >= 0.35 ? 1 : 0;
-this.glyph[i] = clamp(this.lum[i] * (0.80 + 0.20 * density));
+const shaped = y < this.waterline ? Math.max(0, (this.lum[i] - 0.09) * 2.6) : Math.max(0, (this.lum[i] - 0.03) * 1.15) + this.highlight[i] * 0.35;
+const pulse = Math.sin(row * 1.1 + col * 0.18 - field.time * 6);
+this.glyph[i] = clamp(shaped * (1 + 0.28 * pulse * clamp(shaped * 2.2)) * (0.80 + 0.20 * density));
 }
 }
 }
@@ -322,7 +324,7 @@ class View {
 constructor(canvas, sourceImage) {
 this.canvas = canvas;
 this.context = canvas.getContext('2d', { alpha: false });
-this.cellPx = 12;
+this.cellPx = 14;
 this.rafId = null;
 this.lastTimestamp = null;
 this.destroyed = false;
@@ -382,7 +384,7 @@ canvas.width = width * RAMPS[ramp].length;
 canvas.height = height;
 const context = canvas.getContext('2d');
 context.setTransform(dpr, 0, 0, dpr, padding * dpr, padding * dpr);
-context.font = '700 ' + this.cellPx * 0.9 + 'px monospace';
+context.font = '700 ' + this.cellPx * 1.05 + 'px monospace';
 context.textAlign = 'center';
 context.textBaseline = 'middle';
 context.fillStyle = GRADES[grade];

@@ -2241,7 +2241,6 @@ function runFilmSequence() {
         filmScreen.removeEventListener('pointercancel', onFilmPointerCancel);
         filmScreen.removeEventListener('keydown', onFilmKeyDown);
         window.removeEventListener('blur', onFilmPointerCancel);
-        window.removeEventListener('resize', onCrackleResize);
 
         showTitle();
 
@@ -2312,11 +2311,6 @@ function runFilmSequence() {
     }
     crackle.width = window.innerWidth;
     crackle.height = window.innerHeight;
-    const onCrackleResize = () => {
-    crackle.width = window.innerWidth;
-    crackle.height = window.innerHeight;
-    };
-    window.addEventListener('resize', onCrackleResize);
     const crackleCtx = crackle.getContext('2d');
     const crackleFrames = makeStaticFrames(window.innerWidth, window.innerHeight, {
         frames: 2,
