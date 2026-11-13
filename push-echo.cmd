@@ -168,14 +168,14 @@ if not "%DRY_RUN%"=="1" (
     echo.
     echo Будет выполнено:
     echo   git add -A
-    echo   git commit -m "%MSG%"
+    echo   git commit -m "!MSG!"
     echo   git pull --rebase + git push  ^(ветка %BRANCH%^)
     set /p "CONFIRM=Опубликовать? (y/N): "
     if /i not "!CONFIRM!"=="y" goto :abort
 
     git add -A
     if errorlevel 1 goto :fail
-    git commit -m "%MSG%"
+    git commit -m "!MSG!"
     if errorlevel 1 goto :fail
     goto :push
 ) else (
