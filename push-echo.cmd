@@ -164,14 +164,14 @@ echo Version: %OLD_VERSION% -^> %VERSION%
 if not "%DRY_RUN%"=="1" (
     echo.
     set /p "MSG=Сообщение коммита [Обновление сайта]: "
-    if "%MSG%"=="" set "MSG=Обновление сайта"
+    if "!MSG!"=="" set "MSG=Обновление сайта"
     echo.
     echo Будет выполнено:
     echo   git add -A
     echo   git commit -m "%MSG%"
     echo   git pull --rebase + git push  ^(ветка %BRANCH%^)
     set /p "CONFIRM=Опубликовать? (y/N): "
-    if /i not "%CONFIRM%"=="y" goto :abort
+    if /i not "!CONFIRM!"=="y" goto :abort
 
     git add -A
     if errorlevel 1 goto :fail
