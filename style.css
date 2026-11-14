@@ -2582,6 +2582,7 @@ html, body {
     color: #c9f7e8;
     cursor: pointer;
     mix-blend-mode: screen;
+    opacity: 0;
 }
 #water-cover:focus-visible {
     outline: 2px solid #c9f7e8;
