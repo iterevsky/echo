@@ -551,6 +551,7 @@ function closeProgress(restoreFocus = true) {
     contentsScreen.classList.remove('progress-dimmed');
     contentsScreen.inert = true;
     markOverlayClosed(overlay);
+    coverScreen.dispatchEvent(new CustomEvent('echo:cover-free'));
     if (restoreFocus) {
         const canvas = document.getElementById('water-cover');
         if (canvas) canvas.focus({ preventScroll: true });
@@ -2920,131 +2921,71 @@ if ('serviceWorker' in navigator) {
     }, true);
 })();
 
-
-function coverSurgeHook() {
-    /* W-8 integration point: emit the water impulse burst on SURGE. */
-    if (coverScreen.__waterSurge) coverScreen.__waterSurge();
-}
-
-(function coverIdleRhythm() {
+/* === ОБЛОЖКА: 3 С ТИШИНЫ → МЕРЦАНИЕ-ВКЛЮЧЕНИЕ ВОДЫ → КАМНИ === */
+(function coverWaterReveal() {
     if (!coverScreen || isStarted) return;
-    const img = coverScreen.querySelector('img');
-    const tremor = coverScreen.querySelector('.cover-tremor');
-    if (!img || !tremor) return;
-    const entryEvents = ['touchstart', 'mousedown', 'keydown', 'click'];
+    const canvas = document.getElementById('water-cover');
+    if (!canvas) return;
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let revealTimer = null;
+    let stoneTimer = null;
+    let revealed = false;
 
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-        const hint = document.createElement('div');
-        hint.className = 'cover-idle-static';
-        hint.setAttribute('role', 'note');
-        hint.textContent = 'Коснитесь, чтобы войти';
-        coverScreen.appendChild(hint);
-        entryEvents.forEach((eventName) => {
-            document.addEventListener(eventName, () => hint.remove(), { once: true, passive: true });
-        });
-        return;
+    function stopStoneWaves() {
+        if (stoneTimer) { clearTimeout(stoneTimer); stoneTimer = null; }
     }
 
-    const ring = document.createElement('div');
-    ring.className = 'cover-beckon-ring';
-    ring.setAttribute('aria-hidden', 'true');
-    ring.innerHTML = '<i></i><i></i>';
-    coverScreen.appendChild(ring);
-
-    let phase = 'IDLE';
-    let timer = null;
-    let tremorAnimation = null;
-    let stopped = false;
-    const ringObserver = new ResizeObserver(positionRing);
-
-    function positionRing() {
-        const rect = img.getBoundingClientRect();
-        const size = Math.max(76, Math.min(132, Math.min(rect.width, rect.height) * 0.18));
-        ring.style.width = size + 'px';
-        ring.style.height = size + 'px';
-        ring.style.left = (rect.left + rect.width / 2 - size / 2) + 'px';
-        ring.style.top = (rect.top + rect.height * 0.43 - size / 2) + 'px';
-    }
-
-    function cancelSurge() {
-        if (tremorAnimation) {
-            tremorAnimation.cancel();
-            tremorAnimation = null;
+    /* кольца-камни: каждые ~2.4–4.2 с камень падает в случайную точку воды */
+    function dropStone() {
+        const st = coverScreen.__waterState && coverScreen.__waterState();
+        if (!st || st.covered || st.state === 'destroyed' || isStarted) { stopStoneWaves(); return; }
+        const m = coverScreen.__waterMetrics && coverScreen.__waterMetrics();
+        if (m) {
+            const cols = m.grid[0], rows = m.grid[1];
+            window.__echoWater.drop(
+                cols * (0.15 + Math.random() * 0.7),
+                rows * (0.62 + Math.random() * 0.3),
+                0.3
+            );
         }
-        coverScreen.classList.remove('surge');
-        ring.classList.remove('visible');
+        stoneTimer = setTimeout(dropStone, 2400 + Math.random() * 1800);
     }
 
-    function schedulePhase() {
-        if (stopped || document.hidden) return;
-        const delay = phase === 'IDLE' ? 8000 : phase === 'SURGE' ? 3000 : 12000;
-        timer = setTimeout(() => {
-            if (phase === 'IDLE') enterPhase('SURGE');
-            else if (phase === 'SURGE') enterPhase('LULL');
-            else enterPhase('IDLE');
-        }, delay);
-    }
-
-    function enterPhase(next) {
-        if (stopped) return;
-        clearTimeout(timer);
-        timer = null;
-        phase = next;
-        coverScreen.dataset.idlePhase = phase;
-        coverScreen.classList.toggle('lull', phase === 'LULL');
-        cancelSurge();
-        if (phase === 'SURGE') {
-            positionRing();
-            coverScreen.classList.add('surge');
-            ring.classList.add('visible');
-            const frames = Array.from({ length: 24 }, () => ({
-                transform: `translate(${(Math.random() * 1.5 - 0.75).toFixed(2)}px, ${(Math.random() * 1.5 - 0.75).toFixed(2)}px)`,
-                easing: 'steps(1, jump-start)'
-            }));
-            frames.push({ transform: 'translate(0, 0)', easing: 'steps(1, jump-start)' });
-            tremorAnimation = tremor.animate(frames, { duration: 3000 });
-            coverSurgeHook();
+    function wake() {
+        if (revealed || isStarted) return;
+        revealed = true;
+        clearTimeout(revealTimer);
+        revealTimer = null;
+        if (reduced) {
+            canvas.classList.add('water-awake');
+            return;
         }
-        schedulePhase();
+        coverScreen.classList.add('water-flickering');
+        canvas.classList.add('water-flicker');
+        canvas.addEventListener('animationend', () => {
+            coverScreen.classList.remove('water-flickering');
+            canvas.classList.add('water-awake');
+            const m = coverScreen.__waterMetrics && coverScreen.__waterMetrics();
+            if (m) window.__echoWater.drop(m.grid[0] * 0.5, m.grid[1] * 0.7, 0.55);
+            dropStone();
+        }, { once: true });
     }
 
-    function stopRhythm() {
-        stopped = true;
-        clearTimeout(timer);
-        timer = null;
-        cancelSurge();
-        coverScreen.classList.remove('lull');
-        delete coverScreen.dataset.idlePhase;
-        ringObserver.disconnect();
-        ring.remove();
+    /* счётчик 3 с: только когда обложка на экране и поверх неё нет оверлея */
+    function arm() {
+        if (revealed || isStarted) return;
+        clearTimeout(revealTimer);
+        const overlayOpen = document.getElementById('progress-overlay')?.classList.contains('visible');
+        if (overlayOpen || document.hidden) return;
+        revealTimer = setTimeout(wake, 3000);
     }
 
-    function rearmOnVisibility() {
-        if (stopped) return;
-        clearTimeout(timer);
-        timer = null;
-        cancelSurge();
-        coverScreen.classList.remove('lull');
-        phase = 'IDLE';
-        coverScreen.dataset.idlePhase = phase;
-        if (!document.hidden) {
-            positionRing();
-            enterPhase('IDLE');
-        }
-    }
-
-    positionRing();
-    enterPhase('IDLE');
-    img.addEventListener('load', positionRing);
-    ringObserver.observe(img);
-    window.addEventListener('resize', positionRing);
-    window.addEventListener('orientationchange', positionRing);
-    document.addEventListener('visibilitychange', rearmOnVisibility);
-    entryEvents.forEach((eventName) => {
-        document.addEventListener(eventName, stopRhythm, { once: true, passive: true });
-    });
+    coverScreen.addEventListener('echo:cover-free', arm);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) arm(); });
+    arm();
 })();
 
+    
 /* focus containment hooks — registered last, after every overlay exists */
 [menuOverlay, installOverlay, photoOverlay, document.getElementById('reader-sheet'), document.getElementById('progress-overlay')].forEach((ov) => {
     if (ov) ov.addEventListener('keydown', (e) => trapTab(ov, e));
@@ -3326,11 +3267,7 @@ function coverSurgeHook() {
         state = 'idle';
         return ensureWater('deliberate-retry');
     };
-    coverScreen.__waterSurge = () => {
-        if (state !== 'ready' || !view) return;
-        window.__echoWater.drop(view.cols * 0.5, view.rows * 0.68, 0.65);
-        record('surge', { x: view.cols * 0.5, y: view.rows * 0.68, strength: 0.65 });
-    };
+    
     const schedule = window.requestIdleCallback || (callback => setTimeout(callback, 250));
     schedule(() => ensureWater('idle'), { timeout: 250 });
 })();

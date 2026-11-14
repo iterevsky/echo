@@ -2673,3 +2673,29 @@ html, body {
     59%, 80%  { transform: translateX(-2px); text-shadow: 2px 0 #00A8E8, -2px 0 #c41e3a; clip-path: inset(10% 0 70% 0); }
     81%, 100% { transform: translateX(0); text-shadow: none; clip-path: inset(0 0 0 0); }
 }
+
+/* === ОБЛОЖКА: мерцание-включение воды (3 с тишины → проектор ловит сигнал) === */
+#water-cover.water-awake { opacity: 1; }
+@media (prefers-reduced-motion: no-preference) {
+    #water-cover.water-flicker {
+        animation: water-flicker-in 1.1s steps(1) forwards;
+    }
+    #cover-screen.water-flickering .cover-tremor img {
+        animation: water-photo-dip 1.1s steps(1) 1;
+    }
+}
+@keyframes water-flicker-in {
+    0%   { opacity: 0; }
+    12%  { opacity: 0.35; }
+    24%  { opacity: 0.08; }
+    38%  { opacity: 0.6; }
+    50%  { opacity: 0.18; }
+    64%  { opacity: 0.85; }
+    78%  { opacity: 0.4; }
+    100% { opacity: 1; }
+}
+@keyframes water-photo-dip {
+    0%, 100% { filter: contrast(1.05) brightness(0.95) saturate(0.85); }
+    40%      { filter: contrast(1.05) brightness(0.8) saturate(0.85); }
+    60%      { filter: contrast(1.05) brightness(1.02) saturate(0.85); }
+}
