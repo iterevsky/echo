@@ -109,6 +109,7 @@ Check 'CSS full-file parse (0 errors)' (@($cssErrors).Count -eq 0)
 $vp = Select-String -Path (Join-Path $root 'index.html') -Pattern 'name="viewport" content="([^"]+)"'
 Check 'viewport meta present and unchanged' ($vp -and $vp.Matches[0].Groups[1].Value -eq 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover')
 
+$swNow = [System.IO.File]::ReadAllText((Join-Path $root 'sw.js'))
 # --- sw.js precache entries (CORE_FILES + EXTRA_FILES) reference existing files ---
 $swListsOk = $true
 foreach ($listName in 'CORE_FILES', 'EXTRA_FILES') {
