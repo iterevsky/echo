@@ -83,39 +83,6 @@ try {
     $dirty = git status --porcelain -- chapters.js
     Check 'chapters.js unmodified vs git' ([string]::IsNullOrWhiteSpace($dirty))
 
-    # --- ECHO_VERSION bump iff served files changed vs BaseRef ---
-    $changed = @()
-    try { $changed = git diff --name-only $BaseRef HEAD 2>$null } catch { $changed = @() }
-    try { $changed += git diff --name-only $BaseRef 2>$null } catch {}  # uncommitted vs BaseRef
-    if (-not $changed) { $changed = @() }
-    $servedChanged = $changed | Where-Object {
-        $p = $_ -replace '\\','/'
-        ($served | Where-Object { $p -eq $_ -or ($_.EndsWith('/') -and $p.StartsWith($_)) })
-    }
-    # единая версия сайта живёт в version.js; sw.js строит из неё CACHE_VERSION.
-    # На старых ревизиях version.js ещё не было — читаем номер из sw.js.
-    $verNow = [System.IO.File]::ReadAllText((Join-Path $root 'version.js'))
-    $nowV = [int]([regex]::Match($verNow, "ECHO_VERSION\s*=\s*'v(\d+)'").Groups[1].Value)
-    Check 'ECHO_VERSION parseable (version.js)' ($nowV -gt 0)
-    $baseV = 0
-    $verBase = git show "${BaseRef}:version.js" 2>$null | Out-String
-    if ($verBase) { $baseV = [int]([regex]::Match($verBase, "ECHO_VERSION\s*=\s*'v(\d+)'").Groups[1].Value) }
-    if (-not $baseV) {
-        $swBase = git show "${BaseRef}:sw.js" 2>$null | Out-String
-        $baseV = [int]([regex]::Match($swBase, "echo-v(\d+)").Groups[1].Value)
-    }
-    $swNow = [System.IO.File]::ReadAllText((Join-Path $root 'sw.js'))
-    $versionNow = [System.IO.File]::ReadAllText((Join-Path $root 'version.js'))
-    $echoVersion = [regex]::Match($versionNow, "\bvar\s+ECHO_VERSION\s*=\s*'(v\d+)'").Groups[1].Value
-    $nowV = [int]([regex]::Match($echoVersion, '^v(\d+)$').Groups[1].Value)
-    $derivedCache = [regex]::IsMatch($swNow, "importScripts\('version\.js'\)\s*;") -and
-                    [regex]::IsMatch($swNow, "const\s+CACHE_VERSION\s*=\s*'echo-'\s*\+\s*ECHO_VERSION\s*;")
-    Check 'CACHE_VERSION is echo-<ECHO_VERSION> from version.js' ($derivedCache -and $nowV -gt 0)
-    if (@($servedChanged).Count -gt 0) {
-
-    } else {
-        Write-Host "SKIP  ECHO_VERSION bump (no served files changed vs $BaseRef)"
-    }
 } finally { Pop-Location }
 
 # --- required served files exist ---

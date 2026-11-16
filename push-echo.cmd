@@ -121,7 +121,7 @@ if errorlevel 1 (
     echo без node --check публикация невозможна. Такова политика проекта.
     goto :fail
 )
-for %%j in (script.js sw.js version.js chapters.js) do (
+for %%j in (script.js sw.js version.js ascii-water.js glyph-utils.js chapters.js) do (
     node --check "%%j" >nul 2>&1
     if errorlevel 1 (
         echo.

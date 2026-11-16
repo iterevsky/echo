@@ -2675,28 +2675,63 @@ html, body {
     81%, 100% { transform: translateX(0); text-shadow: none; clip-path: inset(0 0 0 0); }
 }
 
-/* === ОБЛОЖКА: мерцание-включение воды (3 с тишины → проектор ловит сигнал) === */
+/* === ОБЛОЖКА: хореография включения воды ===
+   6 с тишины → короткое замыкание фото → нарастающие вспышки →
+   полный свет → затемнение → круги-зов в темноте. */
 #water-cover.water-awake { opacity: 1; }
 @media (prefers-reduced-motion: no-preference) {
-    #water-cover.water-flicker {
-        animation: water-flicker-in 1.1s steps(1) forwards;
+    /* фаза 1: заставка «коротит» — рывки яркости и сдвига */
+    #cover-screen.cover-short .cover-tremor img {
+        animation: cover-short-circuit 0.8s steps(1) 1;
     }
-    #cover-screen.water-flickering .cover-tremor img {
-        animation: water-photo-dip 1.1s steps(1) 1;
+    /* фаза 2: вода вспыхивает нарастающими импульсами, последний не гаснет */
+    #water-cover.water-power-on {
+        animation: water-power-on 4.6s steps(1) forwards;
+    }
+    /* фаза 3: плавное затемнение заставки */
+    #cover-screen.cover-dusk .cover-tremor img {
+        filter: brightness(0.22) contrast(1.05) saturate(0.6);
+        transition: filter 2s ease;
+    }
+    #cover-screen.cover-dusk::after {
+        opacity: 0.15;
+        transition: opacity 2s ease;
+    }
+    #water-cover.cover-dusk-on {
+        animation: water-dusk 2s ease forwards;
     }
 }
-@keyframes water-flicker-in {
+@keyframes cover-short-circuit {
+    0%   { filter: contrast(1.05) brightness(0.95) saturate(0.85); transform: translateX(0); }
+    12%  { filter: contrast(1.3) brightness(1.5) saturate(0.7); transform: translateX(-2px); }
+    24%  { filter: contrast(1.05) brightness(0.6) saturate(0.85); transform: translateX(0); }
+    40%  { filter: contrast(1.4) brightness(1.8) saturate(0.6); transform: translateX(2px); }
+    55%  { filter: contrast(1.05) brightness(0.5) saturate(0.85); transform: translateX(0); }
+    72%  { filter: contrast(1.35) brightness(1.6) saturate(0.65); transform: translateX(-1px); }
+    100% { filter: contrast(1.05) brightness(0.95) saturate(0.85); transform: translateX(0); }
+}
+@keyframes water-power-on {
     0%   { opacity: 0; }
-    12%  { opacity: 0.35; }
-    24%  { opacity: 0.08; }
-    38%  { opacity: 0.6; }
-    50%  { opacity: 0.18; }
-    64%  { opacity: 0.85; }
-    78%  { opacity: 0.4; }
+    8%   { opacity: 0.45; }
+    16%  { opacity: 0; }
+    28%  { opacity: 0.65; }
+    38%  { opacity: 0.08; }
+    52%  { opacity: 0.8; }
+    62%  { opacity: 0.2; }
+    78%  { opacity: 0.92; }
+    86%  { opacity: 0.45; }
     100% { opacity: 1; }
 }
-@keyframes water-photo-dip {
-    0%, 100% { filter: contrast(1.05) brightness(0.95) saturate(0.85); }
-    40%      { filter: contrast(1.05) brightness(0.8) saturate(0.85); }
-    60%      { filter: contrast(1.05) brightness(1.02) saturate(0.85); }
+@keyframes water-dusk {
+    from { opacity: 1; }
+    to   { opacity: 0.3; }
+}
+/* пульс индикатора «Загрузка главы…» (CSS вместо WAAPI) */
+.chapter-text .placeholder.loading { animation: chapter-loading 650ms ease-in-out infinite alternate; }
+@keyframes chapter-loading {
+    from { opacity: 0.3; }
+    to   { opacity: 0.85; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .chapter-text .placeholder.loading { animation: none; opacity: 0.85; }
 }

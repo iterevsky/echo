@@ -893,16 +893,11 @@ function showChapterPending(index) {
     chapterScreen.querySelector('.chapter-number').textContent = 'Глава ' + chapter.number;
     chapterScreen.querySelector('.chapter-title').textContent = chapter.title;
     const textEl = chapterScreen.querySelector('.chapter-text');
-    textEl.innerHTML = '<p class="placeholder" role="status" style="margin:2em 0">Загрузка главы…</p>';
+    textEl.innerHTML = '<p class="placeholder loading" role="status" style="margin:2em 0">Загрузка главы…</p>';
     chapterScreen.classList.add('visible');
     chapterScreen.inert = false;
     chapterScreen.scrollTop = 0;
-    const pending = textEl.firstElementChild;
-    if (pending.animate && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-        pending.animate([{ opacity: 0.3 }, { opacity: 0.85 }], {
-            duration: 650, direction: 'alternate', iterations: Infinity
-        });
-    }
+    textEl.firstElementChild.classList.add('loading');
 }
 
 function showChapterLoadError(index, retry) {
@@ -1283,9 +1278,6 @@ function cancelVoiceAnimations(el) {
     (el._voiceCancel || []).forEach((fn) => fn());
     el._voiceCancel = [];
     el.classList.remove('vf-shear', 'vf-chroma', 'vf-tear', 'voice-strong');
-    [el, ...el.querySelectorAll('.voice-base, .voice-red, .voice-cyan, .voice-slice')].forEach((node) => {
-        node.getAnimations().forEach((animation) => animation.cancel());
-    });
     delete el.dataset.voiceActive;
 }
 
@@ -2921,70 +2913,113 @@ if ('serviceWorker' in navigator) {
     }, true);
 })();
 
-/* === ОБЛОЖКА: 3 С ТИШИНЫ → МЕРЦАНИЕ-ВКЛЮЧЕНИЕ ВОДЫ → КАМНИ === */
+/* === ОБЛОЖКА: 6 С ТИШИНЫ → КОРОТКОЕ ЗАМЫКАНИЕ → ВСПЫШКИ → ЗАТЕМНЕНИЕ И КРУГИ-ЗОВ === */
 (function coverWaterReveal() {
     if (!coverScreen || isStarted) return;
     const canvas = document.getElementById('water-cover');
     if (!canvas) return;
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    let revealTimer = null;
-    let stoneTimer = null;
-    let revealed = false;
+    let phaseTimer = null;
+    let beckonTimer = null;
+    let started = false;  /* хореография запущена */
 
-    function stopStoneWaves() {
-        if (stoneTimer) { clearTimeout(stoneTimer); stoneTimer = null; }
+    function waterOk() {
+        const st = coverScreen.__waterState && coverScreen.__waterState();
+        return Boolean(st) && !st.covered && st.state !== 'destroyed' && st.state !== 'failed';
     }
 
-    /* кольца-камни: каждые ~2.4–4.2 с камень падает в случайную точку воды */
-    function dropStone() {
-        const st = coverScreen.__waterState && coverScreen.__waterState();
-        if (!st || st.covered || st.state === 'destroyed' || isStarted) { stopStoneWaves(); return; }
+    function stopBeckon() {
+        if (beckonTimer) { clearTimeout(beckonTimer); beckonTimer = null; }
+    }
+
+    function stopAll() {
+        if (phaseTimer) { clearTimeout(phaseTimer); phaseTimer = null; }
+        stopBeckon();
+    }
+
+    /* круги-зов в темноте: раз в ~5–8 с, иногда второй камень эхом */
+    function beckon() {
+        if (isStarted || !waterOk()) { stopBeckon(); return; }
         const m = coverScreen.__waterMetrics && coverScreen.__waterMetrics();
         if (m) {
             const cols = m.grid[0], rows = m.grid[1];
-            window.__echoWater.drop(
-                cols * (0.15 + Math.random() * 0.7),
-                rows * (0.62 + Math.random() * 0.3),
-                0.3
-            );
+            const x = cols * (0.25 + Math.random() * 0.5);
+            const y = rows * (0.6 + Math.random() * 0.25);
+            window.__echoWater.drop(x, y, 0.45);
+            if (Math.random() < 0.35) {
+                setTimeout(() => {
+                    if (!isStarted && waterOk()) window.__echoWater.drop(x + cols * 0.06, y + rows * 0.03, 0.35);
+                }, 350);
+            }
         }
-        stoneTimer = setTimeout(dropStone, 2400 + Math.random() * 1800);
+        beckonTimer = setTimeout(beckon, 5200 + Math.random() * 2600);
+    }
+
+    /* фаза 4: плавное затемнение, дальше — круги в темноте */
+    function dusk() {
+        if (isStarted || !waterOk()) { stopAll(); return; }
+        coverScreen.classList.add('cover-dusk');
+        canvas.classList.add('cover-dusk-on');
+        phaseTimer = setTimeout(() => {
+            if (isStarted || !waterOk()) { stopAll(); return; }
+            beckon();
+        }, 2200);
+    }
+
+    /* фаза 3: вода горит в полную силу, потом гаснет */
+    function holdLight() {
+        if (isStarted || !waterOk()) { stopAll(); return; }
+        phaseTimer = setTimeout(dusk, 4500);
+    }
+
+    /* фаза 2: четыре нарастающие вспышки; последняя остаётся включённой */
+    function powerOn() {
+        if (isStarted || !waterOk()) { stopAll(); return; }
+        canvas.classList.add('water-power-on');
+        canvas.addEventListener('animationend', () => {
+            canvas.classList.remove('water-power-on');
+            canvas.classList.add('water-awake');
+            const m = coverScreen.__waterMetrics && coverScreen.__waterMetrics();
+            if (m) window.__echoWater.drop(m.grid[0] * 0.5, m.grid[1] * 0.7, 0.55);
+            holdLight();
+        }, { once: true });
+    }
+
+    /* фаза 1: заставка «коротит», пара секунд тишины, потом вспышки */
+    function shortCircuit() {
+        if (isStarted) { stopAll(); return; }
+        coverScreen.classList.add('cover-short');
+        coverScreen.addEventListener('animationend', () => {
+            coverScreen.classList.remove('cover-short');
+            if (isStarted) { stopAll(); return; }
+            phaseTimer = setTimeout(powerOn, 2300);
+        }, { once: true });
     }
 
     function wake() {
-        if (revealed || isStarted) return;
-        revealed = true;
-        clearTimeout(revealTimer);
-        revealTimer = null;
+        if (started || isStarted) return;
+        started = true;
         if (reduced) {
             canvas.classList.add('water-awake');
             return;
         }
-        coverScreen.classList.add('water-flickering');
-        canvas.classList.add('water-flicker');
-        canvas.addEventListener('animationend', () => {
-            coverScreen.classList.remove('water-flickering');
-            canvas.classList.add('water-awake');
-            const m = coverScreen.__waterMetrics && coverScreen.__waterMetrics();
-            if (m) window.__echoWater.drop(m.grid[0] * 0.5, m.grid[1] * 0.7, 0.55);
-            dropStone();
-        }, { once: true });
+        shortCircuit();
     }
 
-    /* счётчик 3 с: только когда обложка на экране и поверх неё нет оверлея */
+    /* счётчик тишины: только когда обложка на экране и поверх неё нет оверлея */
     function arm() {
-        if (revealed || isStarted) return;
-        clearTimeout(revealTimer);
+        if (started || isStarted) return;
+        clearTimeout(phaseTimer);
         const overlayOpen = document.getElementById('progress-overlay')?.classList.contains('visible');
         if (overlayOpen || document.hidden) return;
-        revealTimer = setTimeout(wake, 3000);
+        phaseTimer = setTimeout(wake, 6000);
     }
 
     coverScreen.addEventListener('echo:cover-free', arm);
+    coverScreen.addEventListener('echo:entry-start', stopAll);
     document.addEventListener('visibilitychange', () => { if (!document.hidden) arm(); });
     arm();
 })();
-
     
 /* focus containment hooks — registered last, after every overlay exists */
 [menuOverlay, installOverlay, photoOverlay, document.getElementById('reader-sheet'), document.getElementById('progress-overlay')].forEach((ov) => {

@@ -310,7 +310,7 @@ return;
 }
 } else this.below24Since = null;
 if (timestamp - this.lastChange < 5000) return;
-if (!document.getElementById('cover-screen').classList.contains('visible')) {
+if (!document.getElementById('cover-screen').classList.contains('hide-up')) {
 if (this.intervals.length >= 90 && this.p95(90) > 40 && this.view.cellPx < 16) this.setCell(this.view.cellPx + 2, timestamp, 'downgrade');
 else if (this.intervals.length >= 300 && this.p95(300) < 34 && this.mean(300) >= 27 && this.view.cellPx > 8) this.setCell(this.view.cellPx - 2, timestamp, 'upgrade');
 }
